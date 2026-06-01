@@ -1,0 +1,194 @@
+# ============================================================
+# 安全
+# ============================================================
+
+# 跳过后台 dexopt
+pm.dexopt.bg-dexopt=skip
+
+# OTA 后编译策略
+pm.dexopt.boot-after-ota=speed-profile
+
+# Mainline 更新后编译策略
+pm.dexopt.boot-after-mainline-update=verify
+
+# 安装时编译策略
+pm.dexopt.install=speed-profile
+
+# 批量安装编译策略
+pm.dexopt.install-bulk=speed-profile
+
+# 批量安装降级包编译策略
+pm.dexopt.install-bulk-downgraded=verify
+
+# 批量安装 secondary dex
+pm.dexopt.install-bulk-secondary=verify
+
+# 批量安装 secondary dex 降级
+pm.dexopt.install-bulk-secondary-downgraded=verify
+
+# 快速安装路径编译策略
+pm.dexopt.install-fast=verify
+
+# 开机后编译策略
+pm.dexopt.post-boot=verify
+
+# 首次开机编译策略
+pm.dexopt.first-boot=verify
+
+# 共享库编译策略
+pm.dexopt.shared=speed
+
+# 闲置 App 编译策略
+pm.dexopt.inactive=verify
+
+# A/B OTA 编译策略
+pm.dexopt.ab-ota=speed-profile
+
+# 手动触发编译策略
+pm.dexopt.cmdline=speed-profile
+
+# 禁用闲置降级
+pm.dexopt.downgrade_after_inactive_days=9999
+
+# 关闭调试符号生成
+dalvik.vm.dex2oat-minidebuginfo=false
+dalvik.vm.minidebuginfo=false
+
+# ColorOS 后台编译开关
+persist.sys.oplus.bgdex2oat_enabled=false
+
+# ColorOS 编译缓存 miss 触发
+persist.sys.feature.compile.re.cache.miss=0
+
+# ColorOS 编译缓存 fmap
+persist.sys.feature.compile.re.fmap.size=0
+
+# 禁用启动缓存
+persist.device_config.runtime_native.use_app_image_startup_cache=false
+
+# 禁用 iorap 预读
+persist.device_config.runtime_native_boot.iorap_readahead_enable=false
+
+# 禁用 iorap 追踪
+persist.device_config.runtime_native_boot.iorap_perfetto_enable=false
+
+# ColorOS opex 模块合并触发
+oplus.opex.merge=false
+oplus.opex.modulemerge=false
+
+
+# ============================================================
+# 谨慎
+# ============================================================
+
+# 默认 dex2oat 编译过滤器
+# dalvik.vm.dex2oat-filter=speed-profile
+
+# 超大 APK 防降级
+# dalvik.vm.dex2oat-very-large=everything
+
+# 禁用启动字符串预解析
+# dalvik.vm.dex2oat-resolve-startup-strings=false
+
+# ColorOS 温控编译触发
+# oplus.dex.tempcontrol=false
+
+# ColorOS dalvik 周期同步任务
+# sys.oplus.dalvik_sync_config=0,0,0,0,0
+
+# heap 优化触发的 dexopt
+# sys.heap.optimize.enable=0
+# sys.furtherHeapEnlarge.optimize.enable=0
+# sys.gcsupression.optimize.enable=0
+
+
+# ============================================================
+# 激进
+# ============================================================
+
+# OTA 后编译策略
+# pm.dexopt.boot-after-ota=everything
+
+# Mainline 更新后编译策略
+# pm.dexopt.boot-after-mainline-update=everything
+
+# 安装时编译策略
+# pm.dexopt.install=everything
+
+# 批量安装编译策略
+# pm.dexopt.install-bulk=everything
+
+# 批量安装降级包编译策略
+# pm.dexopt.install-bulk-downgraded=everything
+
+# 批量安装 secondary dex
+# pm.dexopt.install-bulk-secondary=everything
+
+# 批量安装 secondary dex 降级
+# pm.dexopt.install-bulk-secondary-downgraded=everything
+
+# 快速安装路径编译策略
+# pm.dexopt.install-fast=everything
+
+# 开机后编译策略
+# pm.dexopt.post-boot=everything
+
+# 首次开机编译策略
+# pm.dexopt.first-boot=everything
+
+# 共享库编译策略
+# pm.dexopt.shared=everything
+
+# 闲置 App 编译策略
+# pm.dexopt.inactive=everything
+
+# A/B OTA 编译策略
+# pm.dexopt.ab-ota=everything
+
+# 手动触发编译策略
+# pm.dexopt.cmdline=everything
+
+# 特权 App 编译策略
+# pm.dexopt.priv-apps-oob=everything
+
+# 特权 App 列表
+# pm.dexopt.priv-apps-oob-list=ALL
+
+# secondary dex 编译策略
+# pm.dexopt.secondary=everything
+
+# 默认 dex2oat 编译过滤器
+# dalvik.vm.dex2oat-filter=everything
+
+# 禁用 ART Service 调度器
+# dalvik.vm.useartservice=false
+
+# 禁用 JIT 即时编译
+# dalvik.vm.usejit=false
+
+# 禁用 Package Reference dexopt
+# dalvik.vm.enable_pr_dexopt=false
+
+# 禁用 OTA 异步 pr_dexopt
+# dalvik.vm.pr_dexopt_async_for_ota=false
+
+# 禁用 secondary dex 自动编译
+# dalvik.vm.dexopt.secondary=false
+
+# 关闭 dexopt 温控截断
+# dalvik.vm.dexopt.thermal-cutoff=0
+
+# 禁用 ART 文件预读缓存
+# dalvik.vm.madvise.artfile.size=0
+
+# bg-dexopt 新类触发阈值设 0
+# dalvik.vm.bgdexopt.new-classes-percent=0
+
+# bg-dexopt 新方法触发阈值设 0
+# dalvik.vm.bgdexopt.new-methods-percent=0
+
+# JIT 代码缓存上限设 0
+# dalvik.vm.jitmaxsize=0
+
+# profile 保存间隔设最大值
+# dalvik.vm.ps-min-save-period-ms=2147483647
