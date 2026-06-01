@@ -1,0 +1,478 @@
+{
+  "categories": [
+    {
+      "id": "safe",
+      "title": "安全",
+      "tone": "safe",
+      "description": "日常推荐配置，优先保证稳定性和兼容性。",
+      "items": [
+        {
+          "id": "pm_bg_dexopt",
+          "label": "跳过后台 dexopt",
+          "description": "控制后台自动 dexopt 场景，减少后台重编译触发。",
+          "prop": "pm.dexopt.bg-dexopt",
+          "defaultEnabled": true,
+          "defaultValue": "skip",
+          "values": ["skip", "speed-profile", "verify"]
+        },
+        {
+          "id": "pm_boot_after_ota",
+          "label": "OTA 后编译策略",
+          "description": "系统 OTA 后的包编译策略。",
+          "prop": "pm.dexopt.boot-after-ota",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_mainline",
+          "label": "Mainline 更新后编译策略",
+          "description": "ART/Mainline 更新后的编译策略。",
+          "prop": "pm.dexopt.boot-after-mainline-update",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_install",
+          "label": "安装时编译策略",
+          "description": "App 正常安装路径的 dexopt 策略。",
+          "prop": "pm.dexopt.install",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_install_bulk",
+          "label": "批量安装编译策略",
+          "description": "批量安装 App 时使用的 dexopt 策略。",
+          "prop": "pm.dexopt.install-bulk",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_install_bulk_downgraded",
+          "label": "批量安装降级包编译策略",
+          "description": "批量安装降级包时使用的 dexopt 策略。",
+          "prop": "pm.dexopt.install-bulk-downgraded",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_install_bulk_secondary",
+          "label": "批量安装 secondary dex",
+          "description": "批量安装时 secondary dex 的处理策略。",
+          "prop": "pm.dexopt.install-bulk-secondary",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_install_bulk_secondary_downgraded",
+          "label": "批量安装 secondary dex 降级",
+          "description": "批量安装降级包时 secondary dex 的处理策略。",
+          "prop": "pm.dexopt.install-bulk-secondary-downgraded",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_install_fast",
+          "label": "快速安装路径编译策略",
+          "description": "快速安装路径下的 dexopt 策略。",
+          "prop": "pm.dexopt.install-fast",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_post_boot",
+          "label": "开机后编译策略",
+          "description": "系统启动完成后的 dexopt 策略。",
+          "prop": "pm.dexopt.post-boot",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_first_boot",
+          "label": "首次开机编译策略",
+          "description": "首次启动或系统初始化后的 dexopt 策略。",
+          "prop": "pm.dexopt.first-boot",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_shared",
+          "label": "共享库编译策略",
+          "description": "共享库相关包的 dexopt 策略。",
+          "prop": "pm.dexopt.shared",
+          "defaultEnabled": true,
+          "defaultValue": "speed",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_inactive",
+          "label": "闲置 App 编译策略",
+          "description": "闲置 App 被触发 dexopt 时的策略。",
+          "prop": "pm.dexopt.inactive",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_ab_ota",
+          "label": "A/B OTA 编译策略",
+          "description": "A/B OTA 场景下的 dexopt 策略。",
+          "prop": "pm.dexopt.ab-ota",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_cmdline",
+          "label": "手动触发编译策略",
+          "description": "命令行手动触发 dexopt 时的策略。",
+          "prop": "pm.dexopt.cmdline",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "pm_downgrade_days",
+          "label": "禁用闲置降级",
+          "description": "增大闲置降级天数，减少系统降级优化产物的机会。",
+          "prop": "pm.dexopt.downgrade_after_inactive_days",
+          "defaultEnabled": true,
+          "defaultValue": "9999",
+          "values": ["15", "90", "365", "9999"]
+        },
+        {
+          "id": "mini_debug",
+          "label": "关闭调试符号生成",
+          "description": "减少 ART 编译产物的调试信息体积。",
+          "prop": "dalvik.vm.dex2oat-minidebuginfo",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "mini_debug_vm",
+          "label": "关闭 VM 调试符号",
+          "description": "关闭 dalvik VM 级别的 mini debug info。",
+          "prop": "dalvik.vm.minidebuginfo",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "oplus_bgdex2oat",
+          "label": "ColorOS 后台编译开关",
+          "description": "关闭 OPlus 后台 dex2oat 开关。",
+          "prop": "persist.sys.oplus.bgdex2oat_enabled",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "compile_cache_miss",
+          "label": "ColorOS 编译缓存 miss 触发",
+          "description": "降低 ColorOS 编译缓存 miss 触发。",
+          "prop": "persist.sys.feature.compile.re.cache.miss",
+          "defaultEnabled": true,
+          "defaultValue": "0",
+          "values": ["0", "1"]
+        },
+        {
+          "id": "compile_cache_fmap",
+          "label": "ColorOS 编译缓存 fmap",
+          "description": "关闭 ColorOS 编译缓存 fmap。",
+          "prop": "persist.sys.feature.compile.re.fmap.size",
+          "defaultEnabled": true,
+          "defaultValue": "0",
+          "values": ["0", "1"]
+        },
+        {
+          "id": "startup_cache",
+          "label": "禁用启动缓存",
+          "description": "关闭 app image startup cache。",
+          "prop": "persist.device_config.runtime_native.use_app_image_startup_cache",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "iorap_readahead",
+          "label": "禁用 iorap 预读",
+          "description": "关闭 iorap readahead。",
+          "prop": "persist.device_config.runtime_native_boot.iorap_readahead_enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "iorap_perfetto",
+          "label": "禁用 iorap 追踪",
+          "description": "关闭 iorap perfetto 追踪。",
+          "prop": "persist.device_config.runtime_native_boot.iorap_perfetto_enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "opex_merge",
+          "label": "ColorOS opex 模块合并触发",
+          "description": "关闭 OPlus opex merge 触发。",
+          "prop": "oplus.opex.merge",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "opex_modulemerge",
+          "label": "ColorOS opex 模块合并",
+          "description": "关闭 OPlus opex modulemerge 触发。",
+          "prop": "oplus.opex.modulemerge",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        }
+      ]
+    },
+    {
+      "id": "caution",
+      "title": "谨慎",
+      "tone": "caution",
+      "description": "设备相关配置，建议确认效果后再启用。",
+      "items": [
+        {
+          "id": "dex2oat_filter",
+          "label": "默认 dex2oat 编译过滤器",
+          "description": "设置全局 dex2oat filter，过高会增加编译时间和空间占用。",
+          "prop": "dalvik.vm.dex2oat-filter",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "very_large",
+          "label": "超大 APK 防降级",
+          "description": "控制超大 APK 编译策略，everything 会明显增加安装负担。",
+          "prop": "dalvik.vm.dex2oat-very-large",
+          "defaultEnabled": false,
+          "defaultValue": "everything",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "resolve_startup",
+          "label": "禁用启动字符串预解析",
+          "description": "关闭启动字符串预解析，收益依设备和 App 而定。",
+          "prop": "dalvik.vm.dex2oat-resolve-startup-strings",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "oplus_tempcontrol",
+          "label": "ColorOS 温控编译触发",
+          "description": "OPlus 私有温控/编译触发项，不同版本行为可能不同。",
+          "prop": "oplus.dex.tempcontrol",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "dalvik_sync",
+          "label": "ColorOS dalvik 周期同步任务",
+          "description": "OPlus dalvik 同步任务配置，机型差异较大。",
+          "prop": "sys.oplus.dalvik_sync_config",
+          "defaultEnabled": false,
+          "defaultValue": "0,0,0,0,0",
+          "values": ["0,0,0,0,0", "1,1,1,1,1"]
+        },
+        {
+          "id": "heap_optimize",
+          "label": "heap 优化触发的 dexopt",
+          "description": "关闭 heap optimize 触发项。",
+          "prop": "sys.heap.optimize.enable",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": ["0", "1"]
+        },
+        {
+          "id": "heap_enlarge",
+          "label": "进一步 heap enlarge 优化",
+          "description": "关闭 furtherHeapEnlarge optimize 触发项。",
+          "prop": "sys.furtherHeapEnlarge.optimize.enable",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": ["0", "1"]
+        },
+        {
+          "id": "gc_suppression",
+          "label": "GC suppression 优化",
+          "description": "关闭 gcsupression optimize 触发项。",
+          "prop": "sys.gcsupression.optimize.enable",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": ["0", "1"]
+        }
+      ]
+    },
+    {
+      "id": "aggressive",
+      "title": "激进",
+      "tone": "aggressive",
+      "description": "实验配置，可能影响发热、安装耗时、OTA 或 App 性能。",
+      "items": [
+        {
+          "id": "force_install_everything",
+          "label": "安装时强制 everything",
+          "description": "安装阶段全量 AOT，安装更慢、占用更高。",
+          "prop": "pm.dexopt.install",
+          "defaultEnabled": false,
+          "defaultValue": "everything",
+          "values": ["speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "force_ota_everything",
+          "label": "OTA 后强制 everything",
+          "description": "OTA 后尽量全量编译，可能增加开机后负载。",
+          "prop": "pm.dexopt.boot-after-ota",
+          "defaultEnabled": false,
+          "defaultValue": "everything",
+          "values": ["speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "force_cmdline_everything",
+          "label": "手动编译强制 everything",
+          "description": "命令行触发 dexopt 时使用 everything。",
+          "prop": "pm.dexopt.cmdline",
+          "defaultEnabled": false,
+          "defaultValue": "everything",
+          "values": ["speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "priv_apps_oob",
+          "label": "特权 App 编译策略",
+          "description": "启用 priv-apps-oob everything。",
+          "prop": "pm.dexopt.priv-apps-oob",
+          "defaultEnabled": false,
+          "defaultValue": "everything",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "priv_apps_oob_list",
+          "label": "特权 App 列表",
+          "description": "将特权 App OOB 列表设为 ALL。",
+          "prop": "pm.dexopt.priv-apps-oob-list",
+          "defaultEnabled": false,
+          "defaultValue": "ALL",
+          "values": ["ALL"]
+        },
+        {
+          "id": "secondary_everything",
+          "label": "secondary dex 编译策略",
+          "description": "对 secondary dex 使用 everything。",
+          "prop": "pm.dexopt.secondary",
+          "defaultEnabled": false,
+          "defaultValue": "everything",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "global_everything",
+          "label": "默认 dex2oat filter everything",
+          "description": "将全局 dex2oat filter 设为 everything。",
+          "prop": "dalvik.vm.dex2oat-filter",
+          "defaultEnabled": false,
+          "defaultValue": "everything",
+          "values": ["verify", "speed-profile", "speed", "everything"]
+        },
+        {
+          "id": "disable_art_service",
+          "label": "禁用 ART Service 调度器",
+          "description": "可能影响系统正常 dexopt 调度和维护任务。",
+          "prop": "dalvik.vm.useartservice",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "disable_jit",
+          "label": "禁用 JIT 即时编译",
+          "description": "可能降低 App 长时间运行性能。",
+          "prop": "dalvik.vm.usejit",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "disable_pr_dexopt",
+          "label": "禁用 Package Reference dexopt",
+          "description": "关闭 PR dexopt，可能影响 profile 相关优化。",
+          "prop": "dalvik.vm.enable_pr_dexopt",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "disable_ota_pr",
+          "label": "禁用 OTA 异步 pr_dexopt",
+          "description": "关闭 OTA 后的异步 PR dexopt。",
+          "prop": "dalvik.vm.pr_dexopt_async_for_ota",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "disable_secondary_auto",
+          "label": "禁用 secondary dex 自动编译",
+          "description": "可能影响插件化、大型 App 或动态加载场景。",
+          "prop": "dalvik.vm.dexopt.secondary",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": ["false", "true"]
+        },
+        {
+          "id": "disable_thermal_cutoff",
+          "label": "关闭 dexopt 温控截断",
+          "description": "发热风险较高，不建议日常使用。",
+          "prop": "dalvik.vm.dexopt.thermal-cutoff",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": ["0", "1", "2"]
+        },
+        {
+          "id": "disable_artfile_madvise",
+          "label": "禁用 ART 文件预读缓存",
+          "description": "关闭 ART 文件 madvise 预读缓存。",
+          "prop": "dalvik.vm.madvise.artfile.size",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": ["0", "2147483647"]
+        },
+        {
+          "id": "jit_max_zero",
+          "label": "JIT 代码缓存上限设 0",
+          "description": "极限压制 JIT 代码缓存。",
+          "prop": "dalvik.vm.jitmaxsize",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": ["0", "64m"]
+        },
+        {
+          "id": "profile_save_max",
+          "label": "profile 保存间隔设最大值",
+          "description": "延长 profile 保存间隔，减少 profile 写入。",
+          "prop": "dalvik.vm.ps-min-save-period-ms",
+          "defaultEnabled": false,
+          "defaultValue": "2147483647",
+          "values": ["30000", "2147483647"]
+        }
+      ]
+    }
+  ]
+}
