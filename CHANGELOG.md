@@ -1,11 +1,24 @@
 # Changelog
 
+## v1.4 (2026-06-05)
+
+### 改进
+- 优化 system.prop 注释，添加默认值对比
+- 添加版本标记和卸载说明
+- 标注 iorap 属性仅适用于 Android 12
+- 移除激进档重复的 `dalvik.vm.dex2oat-filter` 属性
+- 改进三档标题格式（emoji + 中英文）
+
 ## v1.3 (2026-06-05)
 
 ### 修复
 - 修复 CSS 目录名拼写错误 (ccs → css)
 - 修复 CSS 文件名拼写错误 (app.ccs → app.css)
 - 修复 WebUI 样式加载失败的问题
+
+### 新增
+- 支持 Magisk 云端更新检查
+- 添加更新日志 (CHANGELOG.md)
 
 ## v1.2 (2026-06-02)
 

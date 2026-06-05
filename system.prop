@@ -1,56 +1,65 @@
 # ============================================================
-# 安全
+# Dex2oat Lock - system.prop
+# Version: v1.4
+# 说明：ColorOS dexopt 优化配置
+# 卸载模块后自动恢复系统默认值
 # ============================================================
 
-# 跳过后台 dexopt
+
+# ============================================================
+# 🟢 安全 / Safe
+# 保守策略，适合日常使用
+# ============================================================
+
+# 跳过后台 dexopt（默认: speed-profile）
 pm.dexopt.bg-dexopt=skip
 
-# OTA 后编译策略
+# OTA 后编译策略（默认: speed-profile）
 pm.dexopt.boot-after-ota=speed-profile
 
-# Mainline 更新后编译策略
+# Mainline 更新后编译策略（默认: verify）
 pm.dexopt.boot-after-mainline-update=verify
 
-# 安装时编译策略
+# 安装时编译策略（默认: speed-profile）
 pm.dexopt.install=speed-profile
 
-# 批量安装编译策略
+# 批量安装编译策略（默认: speed-profile）
 pm.dexopt.install-bulk=speed-profile
 
-# 批量安装降级包编译策略
+# 批量安装降级包编译策略（默认: verify）
 pm.dexopt.install-bulk-downgraded=verify
 
-# 批量安装 secondary dex
+# 批量安装 secondary dex（默认: verify）
 pm.dexopt.install-bulk-secondary=verify
 
-# 批量安装 secondary dex 降级
+# 批量安装 secondary dex 降级（默认: verify）
 pm.dexopt.install-bulk-secondary-downgraded=verify
 
-# 快速安装路径编译策略
+# 快速安装路径编译策略（默认: verify）
 pm.dexopt.install-fast=verify
 
-# 开机后编译策略
+# 开机后编译策略（默认: speed-profile）
 pm.dexopt.post-boot=verify
 
-# 首次开机编译策略
+# 首次开机编译策略（默认: verify）
 pm.dexopt.first-boot=verify
 
-# 共享库编译策略
+# 共享库编译策略（默认: speed）
 pm.dexopt.shared=speed
 
-# 闲置 App 编译策略
+# 闲置 App 编译策略（默认: speed-profile）
 pm.dexopt.inactive=verify
 
-# A/B OTA 编译策略
+# A/B OTA 编译策略（默认: speed-profile）
 pm.dexopt.ab-ota=speed-profile
 
-# 手动触发编译策略
+# 手动触发编译策略（默认: speed-profile）
 pm.dexopt.cmdline=speed-profile
 
-# 禁用闲置降级
+# 禁用闲置降级（默认: 14）
 pm.dexopt.downgrade_after_inactive_days=9999
 
-# 关闭调试符号生成
+# 关闭调试符号生成（减少 dex2oat 开销）
 dalvik.vm.dex2oat-minidebuginfo=false
 dalvik.vm.minidebuginfo=false
 
@@ -66,10 +75,10 @@ persist.sys.feature.compile.re.fmap.size=0
 # 禁用启动缓存
 persist.device_config.runtime_native.use_app_image_startup_cache=false
 
-# 禁用 iorap 预读
+# 禁用 iorap 预读（仅 Android 12，Android 13+ 已移除 iorap）
 persist.device_config.runtime_native_boot.iorap_readahead_enable=false
 
-# 禁用 iorap 追踪
+# 禁用 iorap 追踪（仅 Android 12，Android 13+ 已移除 iorap）
 persist.device_config.runtime_native_boot.iorap_perfetto_enable=false
 
 # ColorOS opex 模块合并触发
@@ -78,7 +87,8 @@ oplus.opex.modulemerge=false
 
 
 # ============================================================
-# 谨慎
+# 🟡 谨慎 / Caution
+# 在安全基础上叠加更多选项（默认注释，按需启用）
 # ============================================================
 
 # 默认 dex2oat 编译过滤器
@@ -103,7 +113,8 @@ oplus.opex.modulemerge=false
 
 
 # ============================================================
-# 激进
+# 🔴 激进 / Aggressive
+# 最大化抑制编译，适合有经验的用户（⚠️ 冷启动可能变慢）
 # ============================================================
 
 # OTA 后编译策略
@@ -157,7 +168,7 @@ oplus.opex.modulemerge=false
 # secondary dex 编译策略
 # pm.dexopt.secondary=everything
 
-# 默认 dex2oat 编译过滤器
+# 默认 dex2oat 编译过滤器（激进模式）
 # dalvik.vm.dex2oat-filter=everything
 
 # 禁用 ART Service 调度器
