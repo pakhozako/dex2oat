@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.9 (2026-06-05)
+
+### 修复
+- 修复 customize.sh 手动设置 webroot 权限的问题（KernelSU 自动处理）
+- 确保所有 shell 脚本使用 LF 换行符
+- 移除不必要的 `set_perm_recursive "$MODPATH"` 调用
+
+### 改进
+- 研究并遵循 KernelSU 模块开发规范
+- 优化 customize.sh 权限设置逻辑
+
 ## v1.8 (2026-06-05)
 
 ### 修复

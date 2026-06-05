@@ -1,5 +1,8 @@
 #!/system/bin/sh
 
+# Dex2oat Lock - Module Installer
+# 仅在 ColorOS/OPlus 设备上生效
+
 STATE_DIR=/data/adb/dex2oat-lock
 BACKUP_DIR="$STATE_DIR/backup"
 LOG_DIR="$STATE_DIR/logs"
@@ -27,14 +30,13 @@ case "$DEVICE_INFO" in
   *)
     ui_print "! Unsupported device detected"
     ui_print "! This module only works on ColorOS/OPlus devices"
-    ui_print "! Aborting installation"
     abort "Unsupported device"
     ;;
 esac
 
 ui_print "- Initializing ColorOS configuration"
 
-# 创建目录
+# 创建数据目录
 mkdir -p "$BACKUP_DIR" || { ui_print "! Failed to create backup dir"; abort; }
 mkdir -p "$LOG_DIR" || { ui_print "! Failed to create log dir"; abort; }
 
@@ -75,18 +77,19 @@ fi
 
 touch "$LOG_DIR/apply.log"
 
-# 设置权限
-set_perm_recursive "$MODPATH" 0 0 0755 0644
+# 设置脚本权限（不包含 webroot，KernelSU 会自动处理）
 set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/customize.sh" 0 0 0755
 set_perm "$MODPATH/uninstall.sh" 0 0 0755
+set_perm "$MODPATH/system.prop" 0 0 0644
+set_perm "$MODPATH/module.prop" 0 0 0644
 
-# 设置数据目录权限（仅在文件存在时）
-[ -d "$STATE_DIR" ] && chmod 0700 "$STATE_DIR"
-[ -d "$BACKUP_DIR" ] && chmod 0700 "$BACKUP_DIR"
-[ -d "$LOG_DIR" ] && chmod 0700 "$LOG_DIR"
-[ -f "$CONFIG_FILE" ] && chmod 0600 "$CONFIG_FILE"
-[ -f "$ORIGINAL_PROPS" ] && chmod 0600 "$ORIGINAL_PROPS"
+# 设置数据目录权限
+chmod 0700 "$STATE_DIR"
+chmod 0700 "$BACKUP_DIR"
+chmod 0700 "$LOG_DIR"
+chmod 0600 "$CONFIG_FILE"
+chmod 0600 "$ORIGINAL_PROPS"
 
 ui_print "- Safe profile enabled by default"
 ui_print "- WebUI data directory: $STATE_DIR"
