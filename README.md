@@ -27,11 +27,15 @@ A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm
 |:---------|:------|:------------|
 | `pm.dexopt.bg-dexopt` | `skip` | 跳过后台 dexopt |
 | `pm.dexopt.install` | `speed-profile` | 安装时按 profile 编译 |
+| `pm.dexopt.boot-after-ota` | `speed-profile` | OTA 后按 profile 编译 |
+| `pm.dexopt.first-boot` | `verify` | 首次开机仅验证 |
 | `pm.dexopt.post-boot` | `verify` | 开机后仅验证 |
 | `pm.dexopt.inactive` | `verify` | 闲置 App 仅验证 |
+| `pm.dexopt.shared` | `speed` | 共享库 speed 编译 |
 | `pm.dexopt.downgrade_after_inactive_days` | `9999` | 禁用闲置降级 |
 | `dalvik.vm.dex2oat-minidebuginfo` | `false` | 关闭调试符号生成 |
 | `persist.sys.oplus.bgdex2oat_enabled` | `false` | 禁用 ColorOS 后台编译 |
+| `persist.device_config.runtime_native_boot.iorap_readahead_enable` | `false` | 禁用 iorap 预读 |
 
 ### 🟡 Caution / 谨慎
 
@@ -76,7 +80,7 @@ A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm
 
 ```
 dex2oat/
-├── webui/                  # WebUI 界面
+├── webroot/                # WebUI 界面（KernelSU 要求）
 │   ├── css/
 │   │   └── app.css         # 样式文件
 │   ├── data/
