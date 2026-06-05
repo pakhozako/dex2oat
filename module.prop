@@ -4,3 +4,4 @@ version=v1.3
 versionCode=4
 author=pakhozako
 description=ColorOS dexopt tuning
+updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json
