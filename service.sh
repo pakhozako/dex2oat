@@ -22,15 +22,21 @@ apply_prop() {
     setprop "$PROP_KEY" "$PROP_VALUE"
   fi
 
-  log_msg "Applied: $PROP_KEY=$PROP_VALUE"
+  if [ $? -eq 0 ]; then
+    log_msg "Applied: $PROP_KEY=$PROP_VALUE"
+  else
+    log_msg "Failed: $PROP_KEY=$PROP_VALUE"
+  fi
 }
 
 # 等待 Android 完成启动
+log_msg "Waiting for boot completed..."
 while [ "$(getprop sys.boot_completed)" != "1" ]; do
   sleep 5
 done
 
 sleep 10
+log_msg "Boot completed, checking device..."
 
 DEVICE_INFO="$(
   printf '%s %s %s %s' \
@@ -43,15 +49,22 @@ DEVICE_INFO="$(
 
 case "$DEVICE_INFO" in
   *coloros*|*oplus*|*oppo*|*oneplus*|*realme*)
-    log_msg "Detected supported OPlus-family device."
+    log_msg "Detected supported OPlus-family device: $DEVICE_INFO"
     ;;
   *)
-    log_msg "Unsupported device. Runtime properties were not applied."
+    log_msg "Unsupported device: $DEVICE_INFO. Runtime properties were not applied."
     exit 0
     ;;
 esac
 
+# 检查配置文件是否存在
+if [ ! -f "$PROP_FILE" ]; then
+  log_msg "Error: system.prop not found at $PROP_FILE"
+  exit 1
+fi
+
 # 补设被系统覆盖的运行时属性
+PROP_COUNT=0
 while IFS='=' read -r PROP_KEY PROP_VALUE; do
   case "$PROP_KEY" in
     ""|\#*)
@@ -65,8 +78,9 @@ while IFS='=' read -r PROP_KEY PROP_VALUE; do
     sys.oplus.*|\
     sys.heap.*)
       apply_prop "$PROP_KEY" "$PROP_VALUE"
+      PROP_COUNT=$((PROP_COUNT + 1))
       ;;
   esac
 done < "$PROP_FILE"
 
-log_msg "Runtime property apply completed."
+log_msg "Runtime property apply completed. Total: $PROP_COUNT properties applied."
