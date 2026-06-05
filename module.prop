@@ -1,6 +1,6 @@
 id=dex2oat-lock
 name=Dex2oat Lock
-version=v1.1
-versionCode=3
+version=v1.3
+versionCode=4
 author=pakhozako
 description=ColorOS dexopt tuning
