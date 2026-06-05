@@ -1,1 +1,61 @@
-#!/system/bin/sh\n\nSTATE_DIR=/data/adb/dex2oat-lock\nLOG_DIR="$STATE_DIR/logs"\nLOG_FILE="$LOG_DIR/uninstall.log"\nORIGINAL_PROPS="$STATE_DIR/original-props.conf"\n\nmkdir -p "$LOG_DIR"\n\nlog_msg() {\n  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE"\n}\n\nrestore_prop() {\n  PROP_KEY="$1"\n  PROP_VALUE="$2"\n\n  if command -v resetprop >/dev/null 2>&1; then\n    resetprop "$PROP_KEY" "$PROP_VALUE"\n  else\n    setprop "$PROP_KEY" "$PROP_VALUE"\n  fi\n\n  log_msg "Restored: $PROP_KEY=$PROP_VALUE"\n}\n\ndelete_prop() {\n  PROP_KEY="$1"\n\n  if command -v resetprop >/dev/null 2>&1; then\n    resetprop --delete "$PROP_KEY" 2>/dev/null\n  else\n    setprop "$PROP_KEY" ""\n  fi\n\n  log_msg "Deleted: $PROP_KEY"\n}\n\nlog_msg "Uninstalling Dex2oat Lock..."\n\nif [ -f "$ORIGINAL_PROPS" ]; then\n  PROP_COUNT=0\n  while IFS= read -r PROP_LINE; do\n    case "$PROP_LINE" in\n      @unset:*)\n        delete_prop "${PROP_LINE#@unset:}"\n        PROP_COUNT=$((PROP_COUNT + 1))\n        ;;\n      *=*)\n        restore_prop "${PROP_LINE%%=*}" "${PROP_LINE#*=}"\n        PROP_COUNT=$((PROP_COUNT + 1))\n        ;;\n    esac\n  done < "$ORIGINAL_PROPS"\n  log_msg "Restored $PROP_COUNT properties."\nelse\n  log_msg "No original props file found, skipping restore."\nfi\n\nrm -rf "$STATE_DIR"\nlog_msg "Cleanup completed. Module uninstalled."\n
+#!/system/bin/sh
+
+STATE_DIR=/data/adb/dex2oat-lock
+LOG_DIR="$STATE_DIR/logs"
+LOG_FILE="$LOG_DIR/uninstall.log"
+ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
+
+mkdir -p "$LOG_DIR"
+
+log_msg() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE"
+}
+
+restore_prop() {
+  PROP_KEY="$1"
+  PROP_VALUE="$2"
+
+  if command -v resetprop >/dev/null 2>&1; then
+    resetprop "$PROP_KEY" "$PROP_VALUE"
+  else
+    setprop "$PROP_KEY" "$PROP_VALUE"
+  fi
+
+  log_msg "Restored: $PROP_KEY=$PROP_VALUE"
+}
+
+delete_prop() {
+  PROP_KEY="$1"
+
+  if command -v resetprop >/dev/null 2>&1; then
+    resetprop --delete "$PROP_KEY" 2>/dev/null
+  else
+    setprop "$PROP_KEY" ""
+  fi
+
+  log_msg "Deleted: $PROP_KEY"
+}
+
+log_msg "Uninstalling Dex2oat Lock..."
+
+if [ -f "$ORIGINAL_PROPS" ]; then
+  PROP_COUNT=0
+  while IFS= read -r PROP_LINE; do
+    case "$PROP_LINE" in
+      @unset:*)
+        delete_prop "${PROP_LINE#@unset:}"
+        PROP_COUNT=$((PROP_COUNT + 1))
+        ;;
+      *=*)
+        restore_prop "${PROP_LINE%%=*}" "${PROP_LINE#*=}"
+        PROP_COUNT=$((PROP_COUNT + 1))
+        ;;
+    esac
+  done < "$ORIGINAL_PROPS"
+  log_msg "Restored $PROP_COUNT properties."
+else
+  log_msg "No original props file found, skipping restore."
+fi
+
+rm -rf "$STATE_DIR"
+log_msg "Cleanup completed. Module uninstalled."
