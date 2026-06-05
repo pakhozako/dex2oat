@@ -8,10 +8,35 @@ ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 PROP_FILE="$MODPATH/system.prop"
 
 ui_print "- Installing Dex2oat Lock"
+ui_print "- Checking device compatibility..."
+
+# 检查设备是否为 ColorOS/OPlus
+DEVICE_INFO="$(
+  printf '%s %s %s %s' \
+    "$(getprop ro.build.version.oplusrom)" \
+    "$(getprop ro.oplus.version)" \
+    "$(getprop ro.product.brand)" \
+    "$(getprop ro.product.manufacturer)" |
+    tr '[:upper:]' '[:lower:]'
+)"
+
+case "$DEVICE_INFO" in
+  *coloros*|*oplus*|*oppo*|*oneplus*|*realme*)
+    ui_print "- Detected supported OPlus-family device"
+    ;;
+  *)
+    ui_print "! Unsupported device detected"
+    ui_print "! This module only works on ColorOS/OPlus devices"
+    ui_print "! Aborting installation"
+    abort "Unsupported device"
+    ;;
+esac
+
 ui_print "- Initializing ColorOS configuration"
 
-mkdir -p "$BACKUP_DIR"
-mkdir -p "$LOG_DIR"
+# 创建目录
+mkdir -p "$BACKUP_DIR" || { ui_print "! Failed to create backup dir"; abort; }
+mkdir -p "$LOG_DIR" || { ui_print "! Failed to create log dir"; abort; }
 
 # 备份设备原始属性
 if [ ! -f "$ORIGINAL_PROPS" ]; then
@@ -50,16 +75,18 @@ fi
 
 touch "$LOG_DIR/apply.log"
 
+# 设置权限
 set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/customize.sh" 0 0 0755
 set_perm "$MODPATH/uninstall.sh" 0 0 0755
 
-chmod 0700 "$STATE_DIR"
-chmod 0700 "$BACKUP_DIR"
-chmod 0700 "$LOG_DIR"
-chmod 0600 "$CONFIG_FILE"
-chmod 0600 "$ORIGINAL_PROPS"
+# 设置数据目录权限（仅在文件存在时）
+[ -d "$STATE_DIR" ] && chmod 0700 "$STATE_DIR"
+[ -d "$BACKUP_DIR" ] && chmod 0700 "$BACKUP_DIR"
+[ -d "$LOG_DIR" ] && chmod 0700 "$LOG_DIR"
+[ -f "$CONFIG_FILE" ] && chmod 0600 "$CONFIG_FILE"
+[ -f "$ORIGINAL_PROPS" ] && chmod 0600 "$ORIGINAL_PROPS"
 
 ui_print "- Safe profile enabled by default"
 ui_print "- WebUI data directory: $STATE_DIR"
