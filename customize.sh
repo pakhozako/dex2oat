@@ -7,6 +7,7 @@ STATE_DIR=/data/adb/dex2oat-lock
 BACKUP_DIR="$STATE_DIR/backup"
 LOG_DIR="$STATE_DIR/logs"
 INSTALL_LOG="$LOG_DIR/install.log"
+FINAL_INSTALL_STATE=/data/adb/dex2oat-lock-install.prop
 CONFIG_FILE="$STATE_DIR/config.json"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 PROP_FILE="$MODPATH/system.prop"
@@ -48,8 +49,26 @@ cleanup_partial_state() {
   fi
 }
 
+write_install_state() {
+  INSTALL_STATUS="$1"
+  INSTALL_REASON="$2"
+  NOW="$(date '+%s')"
+
+  {
+    printf 'status=%s\n' "$INSTALL_STATUS"
+    [ -n "$INSTALL_REASON" ] && printf 'reason=%s\n' "$INSTALL_REASON"
+    printf 'module_path=%s\n' "${MODPATH:-}"
+    printf 'state_created=%s\n' "$STATE_CREATED"
+    printf 'backup_ready=%s\n' "$BACKUP_READY"
+    printf 'install_log=%s\n' "$INSTALL_LOG"
+    printf 'updated_at=%s\n' "$NOW"
+  } > "$FINAL_INSTALL_STATE" 2>/dev/null || true
+  chmod 0600 "$FINAL_INSTALL_STATE" 2>/dev/null || true
+}
+
 fail_install() {
   log_install "! $*"
+  write_install_state failed "$*"
   cleanup_partial_state
   abort "$*"
 }
@@ -240,3 +259,4 @@ chmod 0600 "$INSTALL_LOG" || fail_install "Failed to chmod install log"
 log_install "- Safe profile enabled by default"
 log_install "- WebUI data directory: $STATE_DIR"
 log_install "- Installation completed"
+write_install_state ok installed

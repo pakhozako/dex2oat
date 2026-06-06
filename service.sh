@@ -7,11 +7,6 @@ LOG_FILE="$LOG_DIR/apply.log"
 SERVICE_STATE="$STATE_DIR/service-state.prop"
 FALLBACK_LOG=/data/adb/dex2oat-lock-apply.log
 PROP_FILE="$MODDIR/system.prop"
-TOTAL_PROP_COUNT=0
-TOTAL_APPLIED_COUNT=0
-TOTAL_MATCHED_COUNT=0
-TOTAL_MISMATCH_COUNT=0
-TOTAL_FAILED_COUNT=0
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
   LOG_FILE="$FALLBACK_LOG"

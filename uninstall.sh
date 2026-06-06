@@ -5,6 +5,7 @@ LOG_DIR="$STATE_DIR/logs"
 LOG_FILE="$LOG_DIR/uninstall.log"
 FALLBACK_LOG=/data/adb/dex2oat-lock-uninstall-working.log
 FINAL_LOG=/data/adb/dex2oat-lock-uninstall.log
+FINAL_STATE=/data/adb/dex2oat-lock-uninstall.prop
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
@@ -19,6 +20,24 @@ persist_uninstall_log() {
   if [ -f "$LOG_FILE" ]; then
     cp -af "$LOG_FILE" "$FINAL_LOG" 2>/dev/null
   fi
+}
+
+write_uninstall_state() {
+  UNINSTALL_STATUS="$1"
+  UNINSTALL_REASON="$2"
+  NOW="$(date '+%s')"
+
+  {
+    printf 'status=%s\n' "$UNINSTALL_STATUS"
+    [ -n "$UNINSTALL_REASON" ] && printf 'reason=%s\n' "$UNINSTALL_REASON"
+    printf 'prop_total=%s\n' "${PROP_COUNT:-0}"
+    printf 'restored=%s\n' "${RESTORED_COUNT:-0}"
+    printf 'deleted=%s\n' "${DELETED_COUNT:-0}"
+    printf 'mismatch=%s\n' "${MISMATCH_COUNT:-0}"
+    printf 'failed=%s\n' "${FAILED_COUNT:-0}"
+    printf 'updated_at=%s\n' "$NOW"
+  } > "$FINAL_STATE" 2>/dev/null || true
+  chmod 0600 "$FINAL_STATE" 2>/dev/null || true
 }
 
 restore_prop() {
@@ -113,8 +132,19 @@ if [ -f "$ORIGINAL_PROPS" ]; then
     esac
   done < "$ORIGINAL_PROPS"
   log_msg "Uninstall property restore completed. Total: $PROP_COUNT restored=$RESTORED_COUNT deleted=$DELETED_COUNT mismatch=$MISMATCH_COUNT failed=$FAILED_COUNT"
+  if [ "$FAILED_COUNT" -gt 0 ] || [ "$MISMATCH_COUNT" -gt 0 ]; then
+    write_uninstall_state problem restore_problem
+  else
+    write_uninstall_state ok restored
+  fi
 else
   log_msg "No original props file found, skipping restore."
+  PROP_COUNT=0
+  RESTORED_COUNT=0
+  DELETED_COUNT=0
+  MISMATCH_COUNT=0
+  FAILED_COUNT=0
+  write_uninstall_state skipped no_original_props
 fi
 
 log_msg "Cleanup completed. Module uninstalled."
