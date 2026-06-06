@@ -1,5 +1,15 @@
 # Dex2oat Lock
 
+## Auto Commit
+
+Run the helper script from PowerShell to pull the current branch, commit all changed files, and push them to the configured `origin` remote:
+
+```powershell
+.\scripts\auto-commit.ps1 -Message "chore: update dex2oat"
+```
+
+Use `-NoPush` to create the commit locally without pushing, or `-NoPull` to skip the initial `git pull --ff-only`.
+
 A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm.*` system properties to suppress unnecessary dexopt compilation during background tasks, app installation, and OTA updates — reducing heat, lowering power consumption, and extending battery life without compromising app runtime performance. A built-in WebUI allows switching between three preset profiles without reflashing.
 
 针对 ColorOS 设备的 Magisk 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制系统在后台、安装、OTA 等场景下触发不必要的 dexopt 编译行为，从而减少发热、降低功耗、延长电池寿命，同时保持应用的正常运行性能。模块内置 WebUI，支持在线切换三种预设方案，无需重新刷入。
