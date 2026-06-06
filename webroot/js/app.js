@@ -1,5 +1,5 @@
 import { MODULE_DIR, STATE_DIR, exec, readText, writeBase64 } from "./bridge.js";
-import { countEnabled, loadJson, loadUserConfig, readGeneratedSystemProp, resetSafeProfile, saveConfig } from "./config.js";
+import { countEnabled, loadJson, loadUserConfig, readGeneratedSystemProp, saveConfig } from "./config.js";
 import { readDeviceStats } from "./device-monitor.js";
 import { readSystemInfo } from "./system-info.js";
 import { $, createElement, metric, setStatus, showConfirm } from "./ui.js";
@@ -12,6 +12,59 @@ const state = {
   systemInfo: null,
   stats: null
 };
+
+const diagnosticSections = [
+  {
+    title: "--- getprop ---",
+    props: ["ro.product.model", "ro.build.version.release", "ro.build.version.oplusrom", "ro.oplus.version"]
+  },
+  {
+    title: "--- dexopt props ---",
+    props: [
+      "pm.dexopt.bg-dexopt",
+      "pm.dexopt.install",
+      "pm.dexopt.boot-after-ota",
+      "pm.dexopt.post-boot",
+      "dalvik.vm.dex2oat-filter",
+      "dalvik.vm.dex2oat-resolve-startup-strings",
+      "dalvik.vm.dexopt.secondary",
+      "dalvik.vm.dexopt.thermal-cutoff",
+      "dalvik.vm.enable_pr_dexopt",
+      "dalvik.vm.pr_dexopt_async_for_ota",
+      "dalvik.vm.bgdexopt.new-classes-percent",
+      "dalvik.vm.bgdexopt.new-methods-percent",
+      "dalvik.vm.background-dex2oat-threads",
+      "persist.dalvik.vm.dex2oat-threads",
+      "dalvik.vm.usejit",
+      "dalvik.vm.useartservice",
+      "dalvik.vm.jitmaxsize",
+      "dalvik.vm.ps-min-save-period-ms",
+      "system_perf_init.bg-dex2oat-threads",
+      "system_perf_init.boot-dex2oat-threads",
+      "system_perf_init.dex2oat-threads"
+    ]
+  },
+  {
+    title: "--- ART services ---",
+    props: ["init.svc.artd", "init.svc.art_boot", "init.svc_debug_pid.artd", "init.svc_debug_pid.art_boot"]
+  },
+  {
+    title: "--- ColorOS runtime props ---",
+    props: [
+      "persist.sys.oplus.bgdex2oat_enabled",
+      "persist.sys.feature.compile.re.cache.miss",
+      "persist.sys.feature.compile.re.fmap.size",
+      "persist.device_config.runtime_native.use_app_image_startup_cache",
+      "persist.device_config.runtime_native_boot.iorap_readahead_enable",
+      "persist.device_config.runtime_native_boot.iorap_perfetto_enable",
+      "oplus.dex.tempcontrol",
+      "sys.oplus.dalvik_sync_config",
+      "sys.heap.optimize.enable",
+      "sys.furtherHeapEnlarge.optimize.enable",
+      "sys.gcsupression.optimize.enable"
+    ]
+  }
+];
 
 function categoryById(id) {
   return state.options.categories.find((category) => category.id === id);
@@ -36,8 +89,17 @@ function resultMessage(result) {
   return result.stderr || result.stdout || `exit ${result.code}`;
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
 function commandUrl(value) {
-  return String(value || "").replace(/"/g, '\\"');
+  const url = new URL(String(value || ""));
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error("unsupported URL protocol");
+  }
+
+  return shellQuote(url.href);
 }
 
 async function loadMeta() {
@@ -108,6 +170,7 @@ function renderHome() {
   const page = $("#page");
   const info = state.systemInfo || {};
   const stats = state.stats || {};
+  const rebootState = state.config.rebootState || {};
   const githubLabel = state.meta.githubUrl ? "打开 GitHub" : "GitHub 待填写";
   const qqLabel = state.meta.qqGroup ? `QQ 群 ${state.meta.qqGroup}` : "QQ 群待填写";
 
@@ -119,7 +182,7 @@ function renderHome() {
       <div class="module-status-title">模块运行中</div>
       <div class="module-status-version">${state.meta.version}</div>
       <div class="module-status-meta">
-        <span>已验证✅</span>
+        <span>管理器同源版本</span>
         <span>${state.meta.edition}</span>
       </div>
     </div>
@@ -147,11 +210,14 @@ function renderHome() {
   realtime.append(grid);
   page.append(realtime);
 
-  const moduleState = createSection("模块状态", state.config.pendingReboot ? "待重启" : "已生效");
+  const moduleState = createSection("模块状态", rebootState.label || (state.config.pendingReboot ? "待重启" : "已生效"));
   const moduleGrid = createElement("div", "metric-grid compact");
-  moduleGrid.append(metric("当前档位", categoryById(state.config.profile)?.title || "安全"));
   moduleGrid.append(metric("启用属性", `${countEnabled(state.config)} 项`));
   moduleGrid.append(metric("待重启应用", state.config.pendingReboot ? "是" : "否"));
+  moduleGrid.append(metric("服务阶段", rebootState.servicePhase || rebootState.serviceStatus || "暂不可用"));
+  moduleGrid.append(metric("服务健康", rebootState.serviceHealth || "暂不可用"));
+  moduleGrid.append(metric("写入异常", `${rebootState.serviceFailedTotal || 0} 失败 / ${rebootState.serviceMismatchTotal || 0} 未粘住`));
+  moduleGrid.append(metric("状态依据", rebootState.reason || "暂不可用"));
   moduleGrid.append(metric("内核", info.kernel || "暂不可用"));
   moduleState.append(moduleGrid);
   page.append(moduleState);
@@ -159,7 +225,6 @@ function renderHome() {
   const links = createElement("section", "link-row");
   links.append(createButton(githubLabel, "wide-button", () => openUrl(state.meta.githubUrl)));
   links.append(createButton(qqLabel, "wide-button", () => openUrl(state.meta.qqGroupUrl)));
-  links.append(createButton("恢复安全默认", "wide-button", restoreSafe));
   links.append(createButton("查看 system.prop", "wide-button", showSystemProp));
   links.append(createButton("诊断输出", "wide-button", showDiagnostics));
   page.append(links);
@@ -287,26 +352,16 @@ async function refreshStats() {
 
 async function saveCurrentConfig() {
   setStatus("正在保存配置...");
-  state.config.profile = state.page;
+  const nextConfig = {
+    ...state.config,
+    profile: state.page
+  };
   try {
-    state.config = await saveConfig(state.options, state.config);
+    state.config = await saveConfig(state.options, nextConfig);
     renderPage();
     setStatus("已保存，重启后生效", "warn");
   } catch (error) {
     setStatus(`保存失败：${error.message}`, "warn");
-  }
-}
-
-async function restoreSafe() {
-  const ok = showConfirm("确定恢复安全默认配置吗？");
-  if (!ok) return;
-  const safeConfig = resetSafeProfile(state.options);
-  try {
-    state.config = await saveConfig(state.options, safeConfig);
-    renderPage();
-    setStatus("已恢复安全默认，重启后生效", "warn");
-  } catch (error) {
-    setStatus(`恢复失败：${error.message}`, "warn");
   }
 }
 
@@ -373,13 +428,16 @@ cat /sys/class/power_supply/battery/status 2>/dev/null
 cat /sys/class/power_supply/battery/temp 2>/dev/null
 echo '--- storage ---'
 df -k /data 2>/dev/null
+echo '--- reboot state ---'
+cat /proc/sys/kernel/random/boot_id 2>/dev/null
+cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null
 echo '--- apply log ---'
 grep -E 'Runtime property apply pass completed|Runtime property apply completed|Applied:|Matched:|Mismatch:|Failed:' /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null | tail -n 80
 echo '--- apply log tail ---'
 tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null
 `.trim());
 
-  showDiagnosticsDialog(`errno=${result.code}\n\n${result.stdout || ""}\n${result.stderr || ""}`);
+  await showDiagnosticsDialog(`errno=${result.code}\n\n${result.stdout || ""}\n${result.stderr || ""}`);
   setStatus(result.code === 0 ? "诊断输出已生成" : `诊断命令异常：${resultMessage(result)}`, result.code === 0 ? "ok" : "warn");
 }
 
@@ -434,14 +492,248 @@ function parseApplyLog(content) {
   return { groups, passSummaries, summary };
 }
 
-function showDiagnosticsDialog(content) {
+function parseActiveSystemProp(content) {
+  const props = {};
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const index = trimmed.indexOf("=");
+    if (index <= 0) continue;
+    props[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+  }
+
+  return props;
+}
+
+function parseDiagnosticGetprop(content) {
+  const props = {};
+  const sectionByTitle = new Map(diagnosticSections.map((section) => [section.title, section]));
+  let activeSection = null;
+  let activeIndex = 0;
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+
+    if (sectionByTitle.has(trimmed)) {
+      activeSection = sectionByTitle.get(trimmed);
+      activeIndex = 0;
+      continue;
+    }
+
+    if (trimmed.startsWith("--- ")) {
+      activeSection = null;
+      activeIndex = 0;
+      continue;
+    }
+
+    if (!activeSection || activeIndex >= activeSection.props.length) continue;
+    props[activeSection.props[activeIndex]] = trimmed;
+    activeIndex += 1;
+  }
+
+  return props;
+}
+
+function parseDiagnosticRebootState(content) {
+  const state = {};
+  let inSection = false;
+  let bootId = "";
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+
+    if (trimmed === "--- reboot state ---") {
+      inSection = true;
+      continue;
+    }
+
+    if (inSection && trimmed.startsWith("--- ")) {
+      break;
+    }
+
+    if (!inSection || !trimmed) continue;
+
+    if (!trimmed.includes("=") && !bootId) {
+      bootId = trimmed;
+      continue;
+    }
+
+    const index = trimmed.indexOf("=");
+    if (index <= 0) continue;
+    state[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+  }
+
+  return {
+    bootId,
+    status: state.status || "",
+    phase: state.phase || "",
+    health: state.health || "",
+    reason: state.reason || "",
+    updatedAt: Number(state.updated_at || 0),
+    settledAt: Number(state.settled_at || 0),
+    serviceBootId: state.boot_id || "",
+    phaseTotal: Number(state.phase_total || 0),
+    phaseApplied: Number(state.phase_applied || 0),
+    phaseMatched: Number(state.phase_matched || 0),
+    phaseMismatch: Number(state.phase_mismatch || 0),
+    phaseFailed: Number(state.phase_failed || 0),
+    propTotal: Number(state.prop_total || 0),
+    appliedTotal: Number(state.applied_total || 0),
+    matchedTotal: Number(state.matched_total || 0),
+    mismatchTotal: Number(state.mismatch_total || 0),
+    failedTotal: Number(state.failed_total || 0)
+  };
+}
+
+function latestApplyByProp(groups) {
+  const result = new Map();
+
+  for (const entry of [...groups.applied, ...groups.matched, ...groups.mismatch, ...groups.failed]) {
+    result.set(entry.prop, entry);
+  }
+
+  return result;
+}
+
+function buildDiagnosticState(content, applyLog, desiredProps) {
+  const actualProps = parseDiagnosticGetprop(content);
+  const latestByProp = latestApplyByProp(applyLog.groups);
+  const mismatches = [];
+  const missing = [];
+
+  for (const [prop, expected] of Object.entries(desiredProps)) {
+    if (!Object.hasOwn(actualProps, prop)) {
+      missing.push({ prop, expected });
+    } else if (actualProps[prop] !== expected) {
+      const latest = latestByProp.get(prop);
+      mismatches.push({ prop, expected, actual: actualProps[prop], latest });
+    }
+  }
+
+  const postApplyOverrides = mismatches.filter(({ expected, latest }) =>
+    latest && ["applied", "matched"].includes(latest.status) && latest.newValue === expected
+  );
+  const unresolved = mismatches.filter(({ expected, latest }) =>
+    !latest || ["mismatch", "failed"].includes(latest.status) || latest.newValue !== expected
+  );
+
+  return {
+    actualProps,
+    desiredProps,
+    mismatches,
+    missing,
+    matchedCount: Math.max(Object.keys(desiredProps).length - mismatches.length - missing.length, 0),
+    postApplyOverrides,
+    unresolved
+  };
+}
+
+async function showDiagnosticsDialog(content) {
   const applyLog = parseApplyLog(content);
-  showDialog("诊断输出", content, createApplyLogSummary(applyLog), {
+  const rebootState = parseDiagnosticRebootState(content);
+  const desiredProps = parseActiveSystemProp(await readGeneratedSystemProp());
+  const diagnosticState = buildDiagnosticState(content, applyLog, desiredProps);
+  showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState), {
     savePath: `${STATE_DIR}/logs/webui-diagnostic.txt`
   });
 }
 
-function createApplyLogSummary({ groups, passSummaries, summary }) {
+function createDiagnosticSummary(applyLog, diagnosticState, rebootState) {
+  const section = createElement("section", "diagnostic-stack");
+  section.append(createRebootStateSummary(rebootState, applyLog.passSummaries));
+  section.append(createFinalPropSummary(diagnosticState));
+  section.append(createApplyLogSummary(applyLog, diagnosticState, rebootState));
+  return section;
+}
+
+function createRebootStateSummary(rebootState, passSummaries) {
+  const section = createElement("section", "diagnostic-summary");
+  const header = createElement("div", "diagnostic-summary-head");
+  header.append(createElement("strong", "", "重启状态"));
+  header.append(createElement("span", "", buildRebootDiagnosticText(rebootState, passSummaries)));
+  section.append(header);
+
+  const chips = createElement("div", "diagnostic-chip-row");
+  chips.append(createDiagnosticChip("服务", rebootState.status || "未知", rebootState.status === "settled" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("健康", rebootState.health || "未知", rebootState.health === "problem" ? "failed" : "applied"));
+  chips.append(createDiagnosticChip("阶段", rebootState.phase || "未知", rebootState.phase === "settled" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("异常", `${rebootState.failedTotal || 0}/${rebootState.mismatchTotal || 0}`, rebootState.failedTotal || rebootState.mismatchTotal ? "failed" : "applied"));
+  chips.append(createDiagnosticChip("settled", rebootState.settledAt ? "已记录" : "缺失", rebootState.settledAt ? "applied" : "mismatch"));
+  section.append(chips);
+
+  return section;
+}
+
+function buildRebootDiagnosticText(rebootState, passSummaries) {
+  const hasSettledPass = passSummaries.some((pass) => pass.phase === "settled");
+  const problemTotal = (rebootState.failedTotal || 0) + (rebootState.mismatchTotal || 0);
+
+  if (rebootState.status === "error" || rebootState.health === "problem") {
+    return rebootState.reason
+      ? `服务异常：${rebootState.reason}。`
+      : "服务状态为异常；请检查 apply.log 与模块文件是否完整。";
+  }
+
+  if (rebootState.status === "skipped" || rebootState.health === "skipped") {
+    return rebootState.reason
+      ? `服务已跳过：${rebootState.reason}。`
+      : "服务已跳过运行时属性应用；设备可能不在 ColorOS/OPlus 支持范围。";
+  }
+
+  if (problemTotal) {
+    return `服务状态已记录 ${problemTotal} 项写入异常；请优先检查 apply.log 的 Failed/Mismatch。`;
+  }
+
+  if (rebootState.status === "settled" && rebootState.settledAt && hasSettledPass) {
+    return "服务已完成 settled，若首页仍显示待重启，优先检查 config.json 的 pendingSavedAt 或管理器缓存。";
+  }
+
+  if (!rebootState.bootId && rebootState.status !== "settled") {
+    return "未读到 boot_id，且服务未记录 settled；状态仍待重启是合理的。";
+  }
+
+  if (rebootState.status === "settled" && !rebootState.settledAt) {
+    return "服务状态为 settled，但缺少 settled_at；建议重新刷入当前包后重启。";
+  }
+
+  if (!hasSettledPass) {
+    return "apply.log 没有 settled 阶段；开机后需至少等待 3 分钟再判断。";
+  }
+
+  return "重启状态证据不完整；请回传完整诊断文本和 apply.log。";
+}
+
+function createFinalPropSummary(diagnosticState) {
+  const section = createElement("section", "diagnostic-summary");
+  const header = createElement("div", "diagnostic-summary-head");
+  header.append(createElement("strong", "", "最终属性"));
+  header.append(createElement("span", "", buildFinalPropDiagnosticText(diagnosticState)));
+  section.append(header);
+
+  const chips = createElement("div", "diagnostic-chip-row");
+  chips.append(createDiagnosticChip("匹配", diagnosticState.matchedCount, "applied"));
+  chips.append(createDiagnosticChip("后置覆盖", diagnosticState.postApplyOverrides.length, diagnosticState.postApplyOverrides.length ? "mismatch" : "applied"));
+  chips.append(createDiagnosticChip("未解决", diagnosticState.unresolved.length, diagnosticState.unresolved.length ? "failed" : "applied"));
+  chips.append(createDiagnosticChip("缺失", diagnosticState.missing.length, diagnosticState.missing.length ? "mismatch" : "applied"));
+  section.append(chips);
+
+  return section;
+}
+
+function buildFinalPropDiagnosticText(diagnosticState) {
+  if (diagnosticState.unresolved.length || diagnosticState.missing.length) {
+    return `${diagnosticState.unresolved.length + diagnosticState.missing.length} 项最终 getprop 仍未证明生效，需要结合完整 apply.log 继续查。`;
+  }
+
+  if (diagnosticState.postApplyOverrides.length) {
+    return `${diagnosticState.postApplyOverrides.length} 项已由模块写入，但之后被系统改回；这是 ColorOS 后置覆盖，不等同于刷入失败。`;
+  }
+
+  return "最终 getprop 与当前 system.prop 启用项一致。";
+}
+
+function createApplyLogSummary({ groups, passSummaries, summary }, diagnosticState, rebootState) {
   const total = Object.values(groups).reduce((count, rows) => count + rows.length, 0);
   const section = createElement("section", "diagnostic-summary");
 
@@ -449,7 +741,7 @@ function createApplyLogSummary({ groups, passSummaries, summary }) {
   header.append(createElement("strong", "", "apply.log 摘要"));
   header.append(createElement("span", "", summary || (total ? `${total} 条记录` : "未读取到 apply.log 摘要")));
   section.append(header);
-  section.append(createDiagnosticConclusion(groups, passSummaries, total, summary));
+  section.append(createDiagnosticConclusion(groups, passSummaries, total, summary, diagnosticState, rebootState));
 
   const chips = createElement("div", "diagnostic-chip-row");
   chips.append(createDiagnosticChip("失败", groups.failed.length, "failed"));
@@ -470,10 +762,22 @@ function createApplyLogSummary({ groups, passSummaries, summary }) {
     section.append(list);
   }
 
+  const finalProblems = [...diagnosticState.postApplyOverrides, ...diagnosticState.unresolved, ...diagnosticState.missing].slice(0, 8);
+  if (finalProblems.length) {
+    const list = createElement("div", "diagnostic-problems");
+    for (const entry of finalProblems) {
+      const item = createElement("div", "diagnostic-problem mismatch");
+      item.append(createElement("strong", "", entry.prop));
+      item.append(createElement("span", "", `expected=${entry.expected} 路 final=${entry.actual || "<missing>"}`));
+      list.append(item);
+    }
+    section.append(list);
+  }
+
   return section;
 }
 
-function createDiagnosticConclusion(groups, passSummaries, total, summary) {
+function createDiagnosticConclusion(groups, passSummaries, total, summary, diagnosticState, rebootState) {
   const failed = groups.failed.length;
   const mismatch = groups.mismatch.length;
   const hasSettled = passSummaries.some((pass) => pass.phase === "settled");
@@ -483,7 +787,19 @@ function createDiagnosticConclusion(groups, passSummaries, total, summary) {
   let title = "status=not-applied";
   let detail = "没有读取到 apply.log 记录，暂时不能证明模块服务已在开机后运行。";
 
-  if (total || summary) {
+  if (rebootState.status === "error") {
+    tone = "failed";
+    title = "status=service-error";
+    detail = rebootState.reason
+      ? `service-state 报告服务异常：${rebootState.reason}。`
+      : "service-state 报告服务异常；请检查模块文件和 apply.log。";
+  } else if (rebootState.status === "skipped") {
+    tone = "mismatch";
+    title = "status=service-skipped";
+    detail = rebootState.reason
+      ? `service-state 报告已跳过运行时应用：${rebootState.reason}。`
+      : "service-state 报告已跳过运行时应用；设备可能不在 ColorOS/OPlus 支持范围。";
+  } else if (total || summary) {
     if (failed || mismatch) {
       tone = "failed";
       title = "status=apply-problem";
@@ -492,10 +808,18 @@ function createDiagnosticConclusion(groups, passSummaries, total, summary) {
       tone = "mismatch";
       title = "status=partial-apply";
       detail = "apply.log 存在，但没有 settled 阶段；请确认已刷入最新包并开机等待至少 3 分钟。";
+    } else if (diagnosticState.postApplyOverrides.length && !diagnosticState.unresolved.length && !diagnosticState.missing.length) {
+      tone = "mismatch";
+      title = "status=post-apply-override";
+      detail = `apply.log 已写入成功，但 ${diagnosticState.postApplyOverrides.length} 项最终 getprop 被系统后置覆盖。`;
+    } else if (diagnosticState.mismatches.length || diagnosticState.missing.length) {
+      tone = "mismatch";
+      title = "status=needs-follow-up";
+      detail = `${diagnosticState.mismatches.length + diagnosticState.missing.length} 项最终 getprop 与 system.prop 不一致，需要回传完整诊断。`;
     } else {
       tone = "applied";
       title = "status=ok";
-      detail = "initial/recheck/settled 均已记录，且 apply.log 未发现失败或未粘住项。";
+      detail = "initial/recheck/settled 均已记录，system.prop 启用项与最终 getprop 一致，且 apply.log 未发现失败项。";
     }
   }
 
@@ -583,7 +907,15 @@ async function openUrl(url) {
     setStatus("链接还没有填写", "warn");
     return;
   }
-  const result = await exec(`am start -a android.intent.action.VIEW -d "${commandUrl(url)}"`);
+  let quotedUrl;
+  try {
+    quotedUrl = commandUrl(url);
+  } catch (error) {
+    setStatus(`閾炬帴鏃犳晥锛?{error.message}`, "warn");
+    return;
+  }
+
+  const result = await exec(`am start -a android.intent.action.VIEW -d ${quotedUrl}`);
   if (result.code !== 0) {
     setStatus(`打开链接失败：${resultMessage(result)}`, "warn");
   }

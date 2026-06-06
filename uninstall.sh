@@ -3,13 +3,22 @@
 STATE_DIR=/data/adb/dex2oat-lock
 LOG_DIR="$STATE_DIR/logs"
 LOG_FILE="$LOG_DIR/uninstall.log"
+FALLBACK_LOG=/data/adb/dex2oat-lock-uninstall-working.log
 FINAL_LOG=/data/adb/dex2oat-lock-uninstall.log
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 
-mkdir -p "$LOG_DIR"
+if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+  LOG_FILE="$FALLBACK_LOG"
+fi
 
 log_msg() {
-  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE"
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
+}
+
+persist_uninstall_log() {
+  if [ -f "$LOG_FILE" ]; then
+    cp -af "$LOG_FILE" "$FINAL_LOG" 2>/dev/null
+  fi
 }
 
 restore_prop() {
@@ -109,5 +118,5 @@ else
 fi
 
 log_msg "Cleanup completed. Module uninstalled."
-cp -af "$LOG_FILE" "$FINAL_LOG" 2>/dev/null
+persist_uninstall_log
 rm -rf "$STATE_DIR"

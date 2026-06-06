@@ -4,12 +4,69 @@ MODDIR=${0%/*}
 STATE_DIR=/data/adb/dex2oat-lock
 LOG_DIR="$STATE_DIR/logs"
 LOG_FILE="$LOG_DIR/apply.log"
+SERVICE_STATE="$STATE_DIR/service-state.prop"
+FALLBACK_LOG=/data/adb/dex2oat-lock-apply.log
 PROP_FILE="$MODDIR/system.prop"
+TOTAL_PROP_COUNT=0
+TOTAL_APPLIED_COUNT=0
+TOTAL_MATCHED_COUNT=0
+TOTAL_MISMATCH_COUNT=0
+TOTAL_FAILED_COUNT=0
 
-mkdir -p "$LOG_DIR"
+if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+  LOG_FILE="$FALLBACK_LOG"
+fi
 
 log_msg() {
-  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE"
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
+}
+
+write_service_state() {
+  STATE_STATUS="$1"
+  STATE_PHASE="$2"
+  STATE_REASON="$3"
+  BOOT_ID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
+  NOW="$(date '+%s')"
+  STATE_HEALTH="ok"
+
+  case "$STATE_STATUS" in
+    error)
+      STATE_HEALTH="problem"
+      ;;
+    skipped)
+      STATE_HEALTH="skipped"
+      ;;
+    running)
+      STATE_HEALTH="running"
+      ;;
+    *)
+      if [ "${TOTAL_FAILED_COUNT:-0}" -gt 0 ] || [ "${TOTAL_MISMATCH_COUNT:-0}" -gt 0 ]; then
+        STATE_HEALTH="problem"
+      fi
+      ;;
+  esac
+
+  mkdir -p "$STATE_DIR" 2>/dev/null || true
+  {
+    printf 'status=%s\n' "$STATE_STATUS"
+    printf 'phase=%s\n' "$STATE_PHASE"
+    printf 'health=%s\n' "$STATE_HEALTH"
+    [ -n "$STATE_REASON" ] && printf 'reason=%s\n' "$STATE_REASON"
+    printf 'phase_total=%s\n' "${PHASE_PROP_COUNT:-0}"
+    printf 'phase_applied=%s\n' "${PHASE_APPLIED_COUNT:-0}"
+    printf 'phase_matched=%s\n' "${PHASE_MATCHED_COUNT:-0}"
+    printf 'phase_mismatch=%s\n' "${PHASE_MISMATCH_COUNT:-0}"
+    printf 'phase_failed=%s\n' "${PHASE_FAILED_COUNT:-0}"
+    printf 'prop_total=%s\n' "${TOTAL_PROP_COUNT:-0}"
+    printf 'applied_total=%s\n' "${TOTAL_APPLIED_COUNT:-0}"
+    printf 'matched_total=%s\n' "${TOTAL_MATCHED_COUNT:-0}"
+    printf 'mismatch_total=%s\n' "${TOTAL_MISMATCH_COUNT:-0}"
+    printf 'failed_total=%s\n' "${TOTAL_FAILED_COUNT:-0}"
+    printf 'updated_at=%s\n' "$NOW"
+    [ "$STATE_STATUS" = "settled" ] && printf 'settled_at=%s\n' "$NOW"
+    [ -n "$BOOT_ID" ] && printf 'boot_id=%s\n' "$BOOT_ID"
+  } > "$SERVICE_STATE" 2>/dev/null || true
+  chmod 0600 "$SERVICE_STATE" 2>/dev/null || true
 }
 
 apply_prop() {
@@ -103,6 +160,7 @@ stop_service_if_running() {
 # 等待 Android 完成启动
 apply_runtime_props() {
   APPLY_PHASE="$1"
+  write_service_state running "$APPLY_PHASE"
   PHASE_PROP_COUNT=0
   PHASE_APPLIED_COUNT=0
   PHASE_MATCHED_COUNT=0
@@ -148,9 +206,11 @@ apply_runtime_props() {
   done < "$PROP_FILE"
 
   log_msg "Runtime property apply pass completed: phase=$APPLY_PHASE total=$PHASE_PROP_COUNT applied=$PHASE_APPLIED_COUNT matched=$PHASE_MATCHED_COUNT mismatch=$PHASE_MISMATCH_COUNT failed=$PHASE_FAILED_COUNT"
+  write_service_state running "$APPLY_PHASE"
 }
 
 log_msg "Waiting for boot completed..."
+write_service_state running boot-wait boot_wait
 while [ "$(getprop sys.boot_completed)" != "1" ]; do
   sleep 5
 done
@@ -173,6 +233,7 @@ case "$DEVICE_INFO" in
     ;;
   *)
     log_msg "Unsupported device: $DEVICE_INFO. Runtime properties were not applied."
+    write_service_state skipped unsupported-device unsupported_device
     exit 0
     ;;
 esac
@@ -180,6 +241,8 @@ esac
 # 检查配置文件是否存在
 if [ ! -f "$PROP_FILE" ]; then
   log_msg "Error: system.prop not found at $PROP_FILE"
+  TOTAL_FAILED_COUNT=$((TOTAL_FAILED_COUNT + 1))
+  write_service_state error missing-system-prop system_prop_missing
   exit 1
 fi
 
@@ -202,4 +265,5 @@ apply_runtime_props recheck
 sleep 75
 apply_runtime_props settled
 
+write_service_state settled settled
 log_msg "Runtime property apply completed. Total: $TOTAL_PROP_COUNT applied=$TOTAL_APPLIED_COUNT matched=$TOTAL_MATCHED_COUNT mismatch=$TOTAL_MISMATCH_COUNT failed=$TOTAL_FAILED_COUNT"

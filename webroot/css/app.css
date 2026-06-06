@@ -65,7 +65,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   color: var(--text-primary);
-  background: var(--bg-color) url("../assets/background.svg") center top / cover fixed no-repeat;
+  background: var(--bg-color) url("../assets/background.jpg") center top / cover fixed no-repeat;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -662,6 +662,12 @@ select {
   font-size: 12px;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.diagnostic-stack {
+  display: grid;
+  gap: var(--space-12);
+  margin-bottom: var(--space-12);
 }
 
 .diagnostic-summary {

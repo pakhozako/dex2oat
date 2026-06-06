@@ -67,6 +67,21 @@ function computePower(currentNow, voltageNow) {
   return `${(Math.abs(current * voltage) / 1_000_000_000_000).toFixed(2)} W`;
 }
 
+function computePowerFromMicrowatts(powerNow) {
+  const power = toNumber(powerNow);
+  if (power == null || power === 0) return "鏆備笉鍙敤";
+  return `${(Math.abs(power) / 1_000_000).toFixed(2)} W`;
+}
+
+function firstNonZeroNumber(...values) {
+  for (const value of values) {
+    const number = toNumber(value);
+    if (number != null && number !== 0) return value;
+  }
+
+  return values.find((value) => toNumber(value) != null) || "";
+}
+
 export async function readDeviceStats() {
   const command = `
 BAT=/sys/class/power_supply/battery
@@ -77,7 +92,11 @@ read_file() {
 [ -r "$BAT/capacity" ] && printf 'battery_capacity=%s\n' "$(read_file "$BAT/capacity")"
 [ -r "$BAT/status" ] && printf 'battery_status=%s\n' "$(read_file "$BAT/status")"
 [ -r "$BAT/current_now" ] && printf 'current_now=%s\n' "$(read_file "$BAT/current_now")"
+[ -r "$BAT/current_avg" ] && printf 'current_avg=%s\n' "$(read_file "$BAT/current_avg")"
+[ -r "$BAT/input_current_now" ] && printf 'input_current_now=%s\n' "$(read_file "$BAT/input_current_now")"
 [ -r "$BAT/voltage_now" ] && printf 'voltage_now=%s\n' "$(read_file "$BAT/voltage_now")"
+[ -r "$BAT/voltage_avg" ] && printf 'voltage_avg=%s\n' "$(read_file "$BAT/voltage_avg")"
+[ -r "$BAT/power_now" ] && printf 'power_now=%s\n' "$(read_file "$BAT/power_now")"
 [ -r "$BAT/temp" ] && printf 'battery_temp=%s\n' "$(read_file "$BAT/temp")"
 
 while read key value unit; do
@@ -125,13 +144,16 @@ done
   const available = toNumber(data.data_available);
   const swapTotal = toNumber(data.swap_total);
   const swapFree = toNumber(data.swap_free);
+  const directPower = computePowerFromMicrowatts(data.power_now);
+  const current = firstNonZeroNumber(data.current_now, data.current_avg, data.input_current_now);
+  const voltage = firstNonZeroNumber(data.voltage_now, data.voltage_avg);
 
   return {
     available: result.code === 0,
     error: result.code === 0 ? "" : result.stderr || result.stdout || `exit ${result.code}`,
     battery: data.battery_capacity ? `${data.battery_capacity}%` : "暂不可用",
     batteryStatus: data.battery_status || "暂不可用",
-    power: computePower(data.current_now, data.voltage_now),
+    power: directPower === "鏆備笉鍙敤" ? computePower(current, voltage) : directPower,
     batteryTemp: formatTemperature(data.battery_temp),
     socTemp: formatTemperature(data.soc_temp),
     memory: `${formatBytesFromKb(data.mem_available)} / ${formatBytesFromKb(data.mem_total)}`,
