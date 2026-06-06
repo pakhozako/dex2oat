@@ -128,6 +128,7 @@ done
 
   return {
     available: result.code === 0,
+    error: result.code === 0 ? "" : result.stderr || result.stdout || `exit ${result.code}`,
     battery: data.battery_capacity ? `${data.battery_capacity}%` : "暂不可用",
     batteryStatus: data.battery_status || "暂不可用",
     power: computePower(data.current_now, data.voltage_now),

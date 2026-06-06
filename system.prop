@@ -1,6 +1,6 @@
 # ============================================================
 # Dex2oat Lock - system.prop
-# Version: v1.9
+# Version: v2.0
 # 说明：ColorOS dexopt 优化配置
 # 卸载模块后自动恢复系统默认值
 # ============================================================
@@ -113,63 +113,63 @@ oplus.opex.modulemerge=false
 
 
 # ============================================================
-# 🔴 激进 / Aggressive
-# 最大化抑制编译，适合有经验的用户（⚠️ 冷启动可能变慢）
+# 🔴 危险 / Dangerous
+# 强力压制编译与运行时优化，仅适合有经验的用户（⚠️ 性能与兼容性风险更高）
 # ============================================================
 
 # OTA 后编译策略
-# pm.dexopt.boot-after-ota=everything
+# pm.dexopt.boot-after-ota=verify
 
 # Mainline 更新后编译策略
-# pm.dexopt.boot-after-mainline-update=everything
+# pm.dexopt.boot-after-mainline-update=verify
 
 # 安装时编译策略
-# pm.dexopt.install=everything
+# pm.dexopt.install=verify
 
 # 批量安装编译策略
-# pm.dexopt.install-bulk=everything
+# pm.dexopt.install-bulk=verify
 
 # 批量安装降级包编译策略
-# pm.dexopt.install-bulk-downgraded=everything
+# pm.dexopt.install-bulk-downgraded=verify
 
 # 批量安装 secondary dex
-# pm.dexopt.install-bulk-secondary=everything
+# pm.dexopt.install-bulk-secondary=verify
 
 # 批量安装 secondary dex 降级
-# pm.dexopt.install-bulk-secondary-downgraded=everything
+# pm.dexopt.install-bulk-secondary-downgraded=verify
 
 # 快速安装路径编译策略
-# pm.dexopt.install-fast=everything
+# pm.dexopt.install-fast=verify
 
 # 开机后编译策略
-# pm.dexopt.post-boot=everything
+# pm.dexopt.post-boot=verify
 
 # 首次开机编译策略
-# pm.dexopt.first-boot=everything
+# pm.dexopt.first-boot=verify
 
 # 共享库编译策略
-# pm.dexopt.shared=everything
+# pm.dexopt.shared=verify
 
 # 闲置 App 编译策略
-# pm.dexopt.inactive=everything
+# pm.dexopt.inactive=verify
 
 # A/B OTA 编译策略
-# pm.dexopt.ab-ota=everything
+# pm.dexopt.ab-ota=verify
 
 # 手动触发编译策略
-# pm.dexopt.cmdline=everything
+# pm.dexopt.cmdline=verify
 
 # 特权 App 编译策略
-# pm.dexopt.priv-apps-oob=everything
+# pm.dexopt.priv-apps-oob=verify
 
 # 特权 App 列表
 # pm.dexopt.priv-apps-oob-list=ALL
 
 # secondary dex 编译策略
-# pm.dexopt.secondary=everything
+# pm.dexopt.secondary=verify
 
-# 默认 dex2oat 编译过滤器（激进模式）
-# dalvik.vm.dex2oat-filter=everything
+# 默认 dex2oat 编译过滤器（危险模式）
+# dalvik.vm.dex2oat-filter=verify
 
 # 禁用 ART Service 调度器
 # dalvik.vm.useartservice=false
@@ -197,6 +197,21 @@ oplus.opex.modulemerge=false
 
 # bg-dexopt 新方法触发阈值设 0
 # dalvik.vm.bgdexopt.new-methods-percent=0
+
+# 性能初始化后台编译线程数设 0
+# system_perf_init.bg-dex2oat-threads=0
+
+# 性能初始化开机编译线程数设 0
+# system_perf_init.boot-dex2oat-threads=0
+
+# 性能初始化 dex2oat 线程数设 0
+# system_perf_init.dex2oat-threads=0
+
+# 后台 dex2oat 线程数设 0
+# dalvik.vm.background-dex2oat-threads=0
+
+# 持久 dex2oat 线程数设 0
+# persist.dalvik.vm.dex2oat-threads=0
 
 # JIT 代码缓存上限设 0
 # dalvik.vm.jitmaxsize=0

@@ -4,6 +4,7 @@ export const STATE_DIR = "/data/adb/dex2oat-lock";
 let kernelSuApi;
 let kernelSuApiLoaded = false;
 let callbackIndex = 0;
+const EXEC_TIMEOUT_MS = 15000;
 
 function normalizeExecResult(result) {
   if (result == null) {
@@ -73,13 +74,28 @@ export async function exec(command) {
   };
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
 function execWithCallback(bridge, command) {
   return new Promise((resolve) => {
     const callbackName = `dex2oat_exec_${Date.now()}_${callbackIndex++}`;
+    const finish = (result) => {
+      clearTimeout(timer);
+      delete globalThis[callbackName];
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      finish({
+        code: 124,
+        stdout: "",
+        stderr: `WebUI shell bridge timed out after ${EXEC_TIMEOUT_MS}ms.`
+      });
+    }, EXEC_TIMEOUT_MS);
 
     globalThis[callbackName] = (errno, stdout, stderr) => {
-      delete globalThis[callbackName];
-      resolve({
+      finish({
         code: Number(errno || 0),
         stdout: String(stdout || ""),
         stderr: String(stderr || "")
@@ -89,8 +105,7 @@ function execWithCallback(bridge, command) {
     try {
       bridge.exec(command, "{}", callbackName);
     } catch (error) {
-      delete globalThis[callbackName];
-      resolve({
+      finish({
         code: 1,
         stdout: "",
         stderr: String(error)
@@ -100,15 +115,20 @@ function execWithCallback(bridge, command) {
 }
 
 export async function readText(path) {
-  const result = await exec(`cat '${path}' 2>/dev/null`);
+  const result = await exec(`cat ${shellQuote(path)} 2>/dev/null`);
   return result.code === 0 ? result.stdout.trim() : "";
 }
 
 export async function writeBase64(path, content) {
   const encoded = btoa(unescape(encodeURIComponent(content)));
+  const quotedPath = shellQuote(path);
+  const quotedEncoded = shellQuote(encoded);
   const command = [
-    `mkdir -p '${STATE_DIR}/backup'`,
-    `printf '%s' '${encoded}' | base64 -d > '${path}'`
+    `TARGET=${quotedPath}`,
+    `ENCODED=${quotedEncoded}`,
+    `mkdir -p "\${TARGET%/*}"`,
+    `(printf '%s' "$ENCODED" | base64 -d 2>/dev/null || printf '%s' "$ENCODED" | base64 --decode) > "$TARGET"`,
+    `chmod 0600 "$TARGET" 2>/dev/null || true`
   ].join("; ");
   return exec(command);
 }

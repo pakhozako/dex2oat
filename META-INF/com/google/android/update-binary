@@ -1,0 +1,84 @@
+#!/sbin/sh
+
+umask 022
+
+MODID="dex2oat-lock"
+
+print_line() {
+  if command -v ui_print >/dev/null 2>&1; then
+    ui_print "$@"
+  else
+    printf '%s
+' "$@"
+  fi
+}
+
+require_module_manager() {
+  print_line "*******************************"
+  print_line " Install from Magisk, KernelSU "
+  print_line " or APatch module manager.     "
+  print_line "*******************************"
+  exit 1
+}
+
+find_util_functions() {
+  for UTIL_FUNCTIONS in \
+    /data/adb/magisk/util_functions.sh \
+    /data/adb/ksu/util_functions.sh \
+    /data/adb/ap/util_functions.sh \
+    /debug_ramdisk/.magisk/util_functions.sh; do
+    [ -f "$UTIL_FUNCTIONS" ] && return 0
+  done
+
+  return 1
+}
+
+extract_zip() {
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -o "$ZIPFILE" -d "$MODPATH" >/dev/null && return 0
+  fi
+
+  if command -v busybox >/dev/null 2>&1; then
+    busybox unzip -o "$ZIPFILE" -d "$MODPATH" >/dev/null && return 0
+  fi
+
+  for BUSYBOX in \
+    /data/adb/magisk/busybox \
+    /data/adb/ksu/bin/busybox \
+    /data/adb/ap/bin/busybox \
+    /debug_ramdisk/.magisk/busybox; do
+    [ -x "$BUSYBOX" ] && "$BUSYBOX" unzip -o "$ZIPFILE" -d "$MODPATH" >/dev/null && return 0
+  done
+
+  return 1
+}
+
+fallback_install_module() {
+  MODPATH="/data/adb/modules/$MODID"
+
+  print_line "- Using standalone module installer"
+  mount /data 2>/dev/null
+  mkdir -p /data/adb/modules 2>/dev/null || require_module_manager
+  rm -rf "$MODPATH"
+  mkdir -p "$MODPATH" || require_module_manager
+  extract_zip || require_module_manager
+  rm -rf "$MODPATH/META-INF"
+
+  export MODPATH ZIPFILE OUTFD BOOTMODE=true
+  . "$MODPATH/customize.sh"
+}
+
+OUTFD=$2
+ZIPFILE=$3
+
+mount /data 2>/dev/null
+
+if find_util_functions; then
+  . "$UTIL_FUNCTIONS"
+else
+  fallback_install_module
+  exit 0
+fi
+
+install_module
+exit 0

@@ -1,5 +1,14 @@
 import { MODULE_DIR, STATE_DIR, exec, readText, writeBase64 } from "./bridge.js";
 
+const LEGACY_EVERYTHING_DEFAULTS = new Set([
+  "force_install_everything",
+  "force_ota_everything",
+  "force_cmdline_everything",
+  "priv_apps_oob",
+  "secondary_everything",
+  "global_everything"
+]);
+
 export async function loadJson(path, fallback) {
   try {
     const response = await fetch(path, { cache: "no-store" });
@@ -59,9 +68,12 @@ export function mergeConfig(base, incoming) {
 
   for (const [id, value] of Object.entries(incoming.items || {})) {
     if (merged.items[id]) {
+      const incomingValue = String(value.value ?? merged.items[id].value);
       merged.items[id] = {
         enabled: Boolean(value.enabled),
-        value: String(value.value ?? merged.items[id].value)
+        value: LEGACY_EVERYTHING_DEFAULTS.has(id) && incomingValue === "everything"
+          ? merged.items[id].value
+          : incomingValue
       };
     }
   }
@@ -87,9 +99,12 @@ function lineForItem(item, state, owners) {
   const value = state?.value ?? item.defaultValue;
   const enabled = Boolean(state?.enabled) && owners[item.prop] === item.id;
   const prefix = enabled ? "" : "# ";
+  const description = String(item.description || "").replace(/\s+/g, " ").trim();
 
   return [
     `# ${item.label}`,
+    ...(description ? [`# ${description}`] : []),
+    `# 可选值: ${item.values.join(", ")}；当前值: ${value}`,
     `${prefix}${item.prop}=${value}`
   ].join("\n");
 }
@@ -123,6 +138,16 @@ export function resetSafeProfile(options) {
   return buildDefaultConfig(options);
 }
 
+function resultMessage(result) {
+  return result.stderr || result.stdout || `exit ${result.code}`;
+}
+
+function ensureOk(result, action) {
+  if (result.code !== 0) {
+    throw new Error(`${action} failed: ${resultMessage(result)}`);
+  }
+}
+
 export async function saveConfig(options, config) {
   const nextConfig = clone(config);
   nextConfig.pendingReboot = true;
@@ -130,10 +155,10 @@ export async function saveConfig(options, config) {
   const systemProp = generateSystemProp(options, nextConfig);
   const configJson = JSON.stringify(nextConfig, null, 2) + "\n";
 
-  await exec(`mkdir -p '${STATE_DIR}/backup'`);
-  await exec(`[ -f '${MODULE_DIR}/system.prop' ] && cp -af '${MODULE_DIR}/system.prop' '${STATE_DIR}/backup/system.prop.bak'`);
-  await writeBase64(`${MODULE_DIR}/system.prop`, systemProp);
-  await writeBase64(`${STATE_DIR}/config.json`, configJson);
+  ensureOk(await exec(`mkdir -p '${STATE_DIR}/backup'`), "create backup directory");
+  ensureOk(await exec(`[ -f '${MODULE_DIR}/system.prop' ] && cp -af '${MODULE_DIR}/system.prop' '${STATE_DIR}/backup/system.prop.bak'`), "backup system.prop");
+  ensureOk(await writeBase64(`${MODULE_DIR}/system.prop`, systemProp), "write system.prop");
+  ensureOk(await writeBase64(`${STATE_DIR}/config.json`, configJson), "write WebUI config");
 
   return nextConfig;
 }

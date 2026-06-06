@@ -37,7 +37,11 @@ printf 'manufacturer=%s\n' "$(prop_first ro.product.manufacturer)"
 printf 'kernel=%s\n' "$($UNAME -r 2>/dev/null)"
 if [ -d /data/adb/ksu ]; then
   printf 'root=%s\n' 'KernelSU'
+elif [ -n "$KSU" ] || [ -n "$KSU_VER" ] || [ -n "$KernelSU" ]; then
+  printf 'root=%s\n' 'KernelSU'
 elif [ -d /data/adb/ap ]; then
+  printf 'root=%s\n' 'APatch'
+elif [ -n "$APATCH" ] || [ -n "$APATCH_VER" ]; then
   printf 'root=%s\n' 'APatch'
 elif command -v magisk >/dev/null 2>&1; then
   printf 'root=Magisk %s\n' "$(magisk -v 2>/dev/null)"
@@ -51,6 +55,7 @@ fi
   if (result.code !== 0) {
     return {
       available: false,
+      error: result.stderr || result.stdout || `exit ${result.code}`,
       model: "暂不可用",
       android: "暂不可用",
       coloros: "暂不可用",
