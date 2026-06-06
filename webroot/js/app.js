@@ -428,9 +428,13 @@ cat /sys/class/power_supply/battery/status 2>/dev/null
 cat /sys/class/power_supply/battery/temp 2>/dev/null
 echo '--- storage ---'
 df -k /data 2>/dev/null
+echo '--- install state ---'
+cat /data/adb/dex2oat-lock-install.prop 2>/dev/null
 echo '--- reboot state ---'
 cat /proc/sys/kernel/random/boot_id 2>/dev/null
 cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null
+echo '--- uninstall state ---'
+cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null
 echo '--- apply log ---'
 grep -E 'Runtime property apply pass completed|Runtime property apply completed|Applied:|Matched:|Mismatch:|Failed:' /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null | tail -n 80
 echo '--- apply log tail ---'
@@ -586,6 +590,32 @@ function parseDiagnosticRebootState(content) {
   };
 }
 
+function parseDiagnosticStateSection(content, title) {
+  const state = {};
+  let inSection = false;
+
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+
+    if (trimmed === title) {
+      inSection = true;
+      continue;
+    }
+
+    if (inSection && trimmed.startsWith("--- ")) {
+      break;
+    }
+
+    if (!inSection || !trimmed) continue;
+
+    const index = trimmed.indexOf("=");
+    if (index <= 0) continue;
+    state[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+  }
+
+  return state;
+}
+
 function latestApplyByProp(groups) {
   const result = new Map();
 
@@ -631,20 +661,62 @@ function buildDiagnosticState(content, applyLog, desiredProps) {
 
 async function showDiagnosticsDialog(content) {
   const applyLog = parseApplyLog(content);
+  const installState = parseDiagnosticStateSection(content, "--- install state ---");
   const rebootState = parseDiagnosticRebootState(content);
+  const uninstallState = parseDiagnosticStateSection(content, "--- uninstall state ---");
   const desiredProps = parseActiveSystemProp(await readGeneratedSystemProp());
   const diagnosticState = buildDiagnosticState(content, applyLog, desiredProps);
-  showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState), {
+  showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState), {
     savePath: `${STATE_DIR}/logs/webui-diagnostic.txt`
   });
 }
 
-function createDiagnosticSummary(applyLog, diagnosticState, rebootState) {
+function createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState) {
   const section = createElement("section", "diagnostic-stack");
+  section.append(createLifecycleStateSummary(installState, uninstallState));
   section.append(createRebootStateSummary(rebootState, applyLog.passSummaries));
   section.append(createFinalPropSummary(diagnosticState));
   section.append(createApplyLogSummary(applyLog, diagnosticState, rebootState));
   return section;
+}
+
+function createLifecycleStateSummary(installState, uninstallState) {
+  const section = createElement("section", "diagnostic-summary");
+  const header = createElement("div", "diagnostic-summary-head");
+  const installStatus = installState.status || "未知";
+  const uninstallStatus = uninstallState.status || "未记录";
+  header.append(createElement("strong", "", "安装/卸载状态"));
+  header.append(createElement("span", "", buildLifecycleDiagnosticText(installState, uninstallState)));
+  section.append(header);
+
+  const chips = createElement("div", "diagnostic-chip-row");
+  chips.append(createDiagnosticChip("安装", installStatus, installStatus === "ok" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("备份", installState.backup_ready || "未知", installState.backup_ready === "1" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("卸载", uninstallStatus, uninstallStatus === "ok" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("卸载失败", uninstallState.failed || "0", Number(uninstallState.failed || 0) ? "failed" : "applied"));
+  section.append(chips);
+
+  return section;
+}
+
+function buildLifecycleDiagnosticText(installState, uninstallState) {
+  if (installState.status === "failed") {
+    return `安装状态文件报告失败：${installState.reason || "未记录原因"}。`;
+  }
+
+  if (installState.status === "ok" && uninstallState.status === "ok") {
+    return "安装和卸载状态都记录为 ok；若模块仍显示异常，请回传完整日志。";
+  }
+
+  if (installState.status === "ok") {
+    return "安装状态已记录为 ok；未记录卸载状态属于正常运行中的模块。";
+  }
+
+  if (uninstallState.status) {
+    return `已读取卸载状态：${uninstallState.status}，failed=${uninstallState.failed || 0}。`;
+  }
+
+  return "未读取到安装状态文件；请确认刷入包为最新构建并回传 install.log。";
 }
 
 function createRebootStateSummary(rebootState, passSummaries) {
