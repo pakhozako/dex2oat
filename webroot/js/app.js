@@ -991,18 +991,7 @@ async function start() {
   setPage("home");
   await refreshAll();
 
-  let statsTimer = setInterval(refreshStats, 3000);
-  // Pause timer when not on home page
-  const originalSetPage = setPage;
-  setPage = function(page) {
-    if (page === "home" && !statsTimer) {
-      statsTimer = setInterval(refreshStats, 3000);
-    } else if (page !== "home" && statsTimer) {
-      clearInterval(statsTimer);
-      statsTimer = null;
-    }
-    originalSetPage(page);
-  };
+  setInterval(refreshStats, 3000);
 }
 
 start().catch((error) => {

@@ -75,9 +75,7 @@ export async function exec(command) {
   };
 }
 
-function shellQuote(value) {
-  return `'${String(value).replace(/'/g, "'\\''")}'`;
-}
+
 
 function execWithCallback(bridge, command) {
   return new Promise((resolve) => {
