@@ -1,7 +1,7 @@
 id=dex2oat-lock
 name=Dex2oat Lock
-version=v1.9
-versionCode=9
+version=v2.1
+versionCode=21
 author=pakhozako
 description=ColorOS dexopt tuning
 updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json

@@ -117,7 +117,7 @@ function commandUrl(value) {
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v1.9",
+    version: "v2.1",
     edition: "ColorOS Edition"
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
