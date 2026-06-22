@@ -1,4 +1,5 @@
 import { exec } from "./bridge.js";
+import { parseKeyValue } from "./utils.js";
 
 function toNumber(value) {
   const number = Number(String(value || "").trim());
@@ -49,14 +50,6 @@ function formatUptime(seconds) {
   return `${minutes} 分钟`;
 }
 
-function parseKeyValue(stdout) {
-  const data = {};
-  for (const line of stdout.split(/\r?\n/)) {
-    const index = line.indexOf("=");
-    if (index > 0) data[line.slice(0, index)] = line.slice(index + 1);
-  }
-  return data;
-}
 
 function computePower(currentNow, voltageNow) {
   const current = toNumber(currentNow);

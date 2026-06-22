@@ -1,15 +1,7 @@
 import { exec } from "./bridge.js";
+import { parseKeyValue } from "./utils.js";
 
-function parseKeyValue(stdout) {
-  const values = {};
-  for (const line of stdout.split(/\r?\n/)) {
-    const index = line.indexOf("=");
-    if (index > 0) {
-      values[line.slice(0, index)] = line.slice(index + 1);
-    }
-  }
-  return values;
-}
+
 
 export async function readSystemInfo() {
   const command = `

@@ -91,11 +91,9 @@ dex2oat/
 │   │   ├── bridge.js       # 桥接层
 │   │   ├── config.js       # 配置管理
 │   │   ├── device-monitor.js # 设备监控
-│   │   ├── running-apps.js # 运行应用
 │   │   ├── system-info.js  # 系统信息
-│   │   └── ui.js           # UI 工具
-│   ├── vendor/
-│   │   └── lucide.min.js   # 图标库
+│   │   ├── ui.js           # UI 工具
+│   │   └── utils.js        # 共享工具函数
 │   └── index.html          # 入口页面
 ├── CHANGELOG.md            # 更新日志
 ├── customize.sh            # 安装脚本

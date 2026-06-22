@@ -70,7 +70,7 @@ const diagnosticSections = [
 function buildDiagnosticShell() {
   const lines = ["echo '--- bridge ---'", "echo shell_ok"];
   for (const section of diagnosticSections) {
-    lines.push(`echo '${section.title}'`);
+    lines.push(`echo '${section.title.replace(/'/g, "'\"'\"'")}'`);
     for (const prop of section.props) {
       lines.push(`/system/bin/getprop ${prop}`);
     }
@@ -398,30 +398,36 @@ async function showSystemProp() {
   showDialog("system.prop", content || "暂不可用");
 }
 
+
+function buildStaticDiagnosticShell() {
+  return [
+    "echo '--- meminfo ---'",
+    "cat /proc/meminfo | head -n 8",
+    "echo '--- battery ---'",
+    "ls -l /sys/class/power_supply/battery 2>/dev/null",
+    "cat /sys/class/power_supply/battery/capacity 2>/dev/null",
+    "cat /sys/class/power_supply/battery/status 2>/dev/null",
+    "cat /sys/class/power_supply/battery/temp 2>/dev/null",
+    "echo '--- storage ---'",
+    "df -k /data 2>/dev/null",
+    "echo '--- install state ---'",
+    "cat /data/adb/dex2oat-lock-install.prop 2>/dev/null",
+    "echo '--- reboot state ---'",
+    "cat /proc/sys/kernel/random/boot_id 2>/dev/null",
+    "cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null",
+    "echo '--- uninstall state ---'",
+    "cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null",
+    "echo '--- apply log ---'",
+    "grep -E 'Runtime property apply pass completed|Runtime property apply completed|Applied:|Matched:|Mismatch:|Failed:' /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null | tail -n 80",
+    "echo '--- apply log tail ---'",
+    "tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null"
+  ].join("\n");
+}
+
 async function showDiagnostics() {
   setStatus("正在读取诊断输出...");
   const dynamicPart = buildDiagnosticShell();
-  const staticPart = `
-echo '--- meminfo ---'
-cat /proc/meminfo | head -n 8
-echo '--- battery ---'
-ls -l /sys/class/power_supply/battery 2>/dev/null
-cat /sys/class/power_supply/battery/capacity 2>/dev/null
-cat /sys/class/power_supply/battery/status 2>/dev/null
-cat /sys/class/power_supply/battery/temp 2>/dev/null
-echo '--- storage ---'
-df -k /data 2>/dev/null
-echo '--- install state ---'
-cat /data/adb/dex2oat-lock-install.prop 2>/dev/null
-echo '--- reboot state ---'
-cat /proc/sys/kernel/random/boot_id 2>/dev/null
-cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null
-echo '--- uninstall state ---'
-cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null
-echo '--- apply log ---'
-grep -E 'Runtime property apply pass completed|Runtime property apply completed|Applied:|Matched:|Mismatch:|Failed:' /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null | tail -n 80
-echo '--- apply log tail ---'
-tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null`.trim();
+  const staticPart = buildStaticDiagnosticShell();
   const result = await exec(`${dynamicPart}\n${staticPart}`);
 
   await showDiagnosticsDialog(`errno=${result.code}\n\n${result.stdout || ""}\n${result.stderr || ""}`);
@@ -985,7 +991,18 @@ async function start() {
   setPage("home");
   await refreshAll();
 
-  setInterval(refreshStats, 3000);
+  let statsTimer = setInterval(refreshStats, 3000);
+  // Pause timer when not on home page
+  const originalSetPage = setPage;
+  setPage = function(page) {
+    if (page === "home" && !statsTimer) {
+      statsTimer = setInterval(refreshStats, 3000);
+    } else if (page !== "home" && statsTimer) {
+      clearInterval(statsTimer);
+      statsTimer = null;
+    }
+    originalSetPage(page);
+  };
 }
 
 start().catch((error) => {

@@ -1,3 +1,4 @@
+import { shellQuote } from "./utils.js";
 export const MODULE_DIR = "/data/adb/modules/dex2oat-lock";
 export const STATE_DIR = "/data/adb/dex2oat-lock";
 

@@ -551,9 +551,7 @@ select {
   background: linear-gradient(135deg, #ff9d99, #ff453a);
 }
 
-.link-row {
-  grid-template-columns: 1fr;
-}
+
 
 .sticky-actions {
   display: flex;
