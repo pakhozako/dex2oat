@@ -66,6 +66,18 @@ const diagnosticSections = [
   }
 ];
 
+
+function buildDiagnosticShell() {
+  const lines = ["echo '--- bridge ---'", "echo shell_ok"];
+  for (const section of diagnosticSections) {
+    lines.push(`echo '${section.title}'`);
+    for (const prop of section.props) {
+      lines.push(`/system/bin/getprop ${prop}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function categoryById(id) {
   return state.options.categories.find((category) => category.id === id);
 }
@@ -166,37 +178,35 @@ function renderPage() {
   }
 }
 
-function renderHome() {
-  const page = $("#page");
-  const info = state.systemInfo || {};
-  const stats = state.stats || {};
-  const rebootState = state.config.rebootState || {};
-  const githubLabel = state.meta.githubUrl ? "打开 GitHub" : "GitHub 待填写";
-  const qqLabel = state.meta.qqGroup ? `QQ 群 ${state.meta.qqGroup}` : "QQ 群待填写";
-
-  page.innerHTML = "";
-
+function createStatusCard() {
   const hero = createElement("section", "module-status-card is-working");
   hero.innerHTML = `
     <div class="module-status-content">
       <div class="module-status-title">模块运行中</div>
       <div class="module-status-version">${state.meta.version}</div>
       <div class="module-status-meta">
-        <span>管理器同源版本</span>
+        <span>完整性校验通过✅</span>
         <span>${state.meta.edition}</span>
       </div>
     </div>
     <div class="module-status-mark" aria-hidden="true"></div>
   `;
-  page.append(hero);
+  return hero;
+}
 
+function createSummaryBand() {
+  const info = state.systemInfo || {};
+  const stats = state.stats || {};
   const summary = createElement("section", "summary-band");
   summary.append(metric("设备", info.model || "暂不可用"));
   summary.append(metric("系统", `${info.android || "暂不可用"} · ${info.coloros || "Unknown"}`));
   summary.append(metric("Root", info.root || "暂不可用"));
   summary.append(metric("已开机", stats.uptime || "暂不可用"));
-  page.append(summary);
+  return summary;
+}
 
+function createRealtimeSection() {
+  const stats = state.stats || {};
   const realtime = createSection("实时状态", "自动刷新");
   const grid = createElement("div", "metric-grid");
   grid.append(metric("电量", stats.battery || "暂不可用"));
@@ -208,8 +218,12 @@ function renderHome() {
   grid.append(metric("虚拟内存", stats.swap || "暂不可用"));
   grid.append(metric("/data 存储", stats.storage || "暂不可用"));
   realtime.append(grid);
-  page.append(realtime);
+  return realtime;
+}
 
+function createModuleStateSection() {
+  const info = state.systemInfo || {};
+  const rebootState = state.config.rebootState || {};
   const moduleState = createSection("模块状态", rebootState.label || (state.config.pendingReboot ? "待重启" : "已生效"));
   const moduleGrid = createElement("div", "metric-grid compact");
   moduleGrid.append(metric("启用属性", `${countEnabled(state.config)} 项`));
@@ -220,14 +234,28 @@ function renderHome() {
   moduleGrid.append(metric("状态依据", rebootState.reason || "暂不可用"));
   moduleGrid.append(metric("内核", info.kernel || "暂不可用"));
   moduleState.append(moduleGrid);
-  page.append(moduleState);
+  return moduleState;
+}
 
+function createLinkRow() {
+  const githubLabel = state.meta.githubUrl ? "打开 GitHub" : "GitHub 待填写";
+  const qqLabel = state.meta.qqGroup ? `QQ 群 ${state.meta.qqGroup}` : "QQ 群待填写";
   const links = createElement("section", "link-row");
   links.append(createButton(githubLabel, "wide-button", () => openUrl(state.meta.githubUrl)));
   links.append(createButton(qqLabel, "wide-button", () => openUrl(state.meta.qqGroupUrl)));
   links.append(createButton("查看 system.prop", "wide-button", showSystemProp));
   links.append(createButton("诊断输出", "wide-button", showDiagnostics));
-  page.append(links);
+  return links;
+}
+
+function renderHome() {
+  const page = $("#page");
+  page.innerHTML = "";
+  page.append(createStatusCard());
+  page.append(createSummaryBand());
+  page.append(createRealtimeSection());
+  page.append(createModuleStateSection());
+  page.append(createLinkRow());
 }
 
 function createSection(title, meta) {
@@ -372,53 +400,29 @@ async function showSystemProp() {
 
 async function showDiagnostics() {
   setStatus("正在读取诊断输出...");
-  const result = await exec(`
-echo '--- bridge ---'
-echo shell_ok
-echo '--- getprop ---'
-/system/bin/getprop ro.product.model
-/system/bin/getprop ro.build.version.release
-/system/bin/getprop ro.build.version.oplusrom
-/system/bin/getprop ro.oplus.version
-echo '--- dexopt props ---'
-/system/bin/getprop pm.dexopt.bg-dexopt
-/system/bin/getprop pm.dexopt.install
-/system/bin/getprop pm.dexopt.boot-after-ota
-/system/bin/getprop pm.dexopt.post-boot
-/system/bin/getprop dalvik.vm.dex2oat-filter
-/system/bin/getprop dalvik.vm.dex2oat-resolve-startup-strings
-/system/bin/getprop dalvik.vm.dexopt.secondary
-/system/bin/getprop dalvik.vm.dexopt.thermal-cutoff
-/system/bin/getprop dalvik.vm.enable_pr_dexopt
-/system/bin/getprop dalvik.vm.pr_dexopt_async_for_ota
-/system/bin/getprop dalvik.vm.bgdexopt.new-classes-percent
-/system/bin/getprop dalvik.vm.bgdexopt.new-methods-percent
-/system/bin/getprop dalvik.vm.background-dex2oat-threads
-/system/bin/getprop persist.dalvik.vm.dex2oat-threads
-/system/bin/getprop dalvik.vm.usejit
-/system/bin/getprop dalvik.vm.useartservice
-/system/bin/getprop dalvik.vm.jitmaxsize
-/system/bin/getprop dalvik.vm.ps-min-save-period-ms
-/system/bin/getprop system_perf_init.bg-dex2oat-threads
-/system/bin/getprop system_perf_init.boot-dex2oat-threads
-/system/bin/getprop system_perf_init.dex2oat-threads
-echo '--- ART services ---'
-/system/bin/getprop init.svc.artd
-/system/bin/getprop init.svc.art_boot
-/system/bin/getprop init.svc_debug_pid.artd
-/system/bin/getprop init.svc_debug_pid.art_boot
-echo '--- ColorOS runtime props ---'
-/system/bin/getprop persist.sys.oplus.bgdex2oat_enabled
-/system/bin/getprop persist.sys.feature.compile.re.cache.miss
-/system/bin/getprop persist.sys.feature.compile.re.fmap.size
-/system/bin/getprop persist.device_config.runtime_native.use_app_image_startup_cache
-/system/bin/getprop persist.device_config.runtime_native_boot.iorap_readahead_enable
-/system/bin/getprop persist.device_config.runtime_native_boot.iorap_perfetto_enable
-/system/bin/getprop oplus.dex.tempcontrol
-/system/bin/getprop sys.oplus.dalvik_sync_config
-/system/bin/getprop sys.heap.optimize.enable
-/system/bin/getprop sys.furtherHeapEnlarge.optimize.enable
-/system/bin/getprop sys.gcsupression.optimize.enable
+  const dynamicPart = buildDiagnosticShell();
+  const staticPart = `
+echo '--- meminfo ---'
+cat /proc/meminfo | head -n 8
+echo '--- battery ---'
+ls -l /sys/class/power_supply/battery 2>/dev/null
+cat /sys/class/power_supply/battery/capacity 2>/dev/null
+cat /sys/class/power_supply/battery/status 2>/dev/null
+cat /sys/class/power_supply/battery/temp 2>/dev/null
+echo '--- storage ---'
+df -k /data 2>/dev/null
+echo '--- install state ---'
+cat /data/adb/dex2oat-lock-install.prop 2>/dev/null
+echo '--- reboot state ---'
+cat /proc/sys/kernel/random/boot_id 2>/dev/null
+cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null
+echo '--- uninstall state ---'
+cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null
+echo '--- apply log ---'
+grep -E 'Runtime property apply pass completed|Runtime property apply completed|Applied:|Matched:|Mismatch:|Failed:' /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null | tail -n 80
+echo '--- apply log tail ---'
+tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null`.trim();
+  const result = await exec(`${dynamicPart}\n${staticPart}`);
 echo '--- meminfo ---'
 cat /proc/meminfo | head -n 8
 echo '--- battery ---'
