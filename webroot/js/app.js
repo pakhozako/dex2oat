@@ -423,27 +423,6 @@ grep -E 'Runtime property apply pass completed|Runtime property apply completed|
 echo '--- apply log tail ---'
 tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null`.trim();
   const result = await exec(`${dynamicPart}\n${staticPart}`);
-echo '--- meminfo ---'
-cat /proc/meminfo | head -n 8
-echo '--- battery ---'
-ls -l /sys/class/power_supply/battery 2>/dev/null
-cat /sys/class/power_supply/battery/capacity 2>/dev/null
-cat /sys/class/power_supply/battery/status 2>/dev/null
-cat /sys/class/power_supply/battery/temp 2>/dev/null
-echo '--- storage ---'
-df -k /data 2>/dev/null
-echo '--- install state ---'
-cat /data/adb/dex2oat-lock-install.prop 2>/dev/null
-echo '--- reboot state ---'
-cat /proc/sys/kernel/random/boot_id 2>/dev/null
-cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null
-echo '--- uninstall state ---'
-cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null
-echo '--- apply log ---'
-grep -E 'Runtime property apply pass completed|Runtime property apply completed|Applied:|Matched:|Mismatch:|Failed:' /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null | tail -n 80
-echo '--- apply log tail ---'
-tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null
-`.trim());
 
   await showDiagnosticsDialog(`errno=${result.code}\n\n${result.stdout || ""}\n${result.stderr || ""}`);
   setStatus(result.code === 0 ? "诊断输出已生成" : `诊断命令异常：${resultMessage(result)}`, result.code === 0 ? "ok" : "warn");
@@ -987,7 +966,7 @@ async function openUrl(url) {
   try {
     quotedUrl = commandUrl(url);
   } catch (error) {
-    setStatus(`閾炬帴鏃犳晥锛?{error.message}`, "warn");
+    setStatus(`链接无效：${error.message}`, "warn");
     return;
   }
 
