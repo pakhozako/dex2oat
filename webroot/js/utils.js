@@ -14,3 +14,7 @@ export function parseKeyValue(stdout) {
 export function shellQuote(value) {
   return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
+
+export function resultMessage(result) {
+  return result.stderr || result.stdout || `exit ${result.code}`;
+}

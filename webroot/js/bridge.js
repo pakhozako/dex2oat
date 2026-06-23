@@ -1,4 +1,4 @@
-import { shellQuote } from "./utils.js";
+import { shellQuote, resultMessage } from "./utils.js";
 export const MODULE_DIR = "/data/adb/modules/dex2oat-lock";
 export const STATE_DIR = "/data/adb/dex2oat-lock";
 
@@ -119,7 +119,10 @@ export async function readText(path) {
 }
 
 export async function writeBase64(path, content) {
-  const encoded = btoa(unescape(encodeURIComponent(content)));
+  const bytes = new TextEncoder().encode(content);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  const encoded = btoa(binary);
   const quotedPath = shellQuote(path);
   const quotedEncoded = shellQuote(encoded);
   const command = [

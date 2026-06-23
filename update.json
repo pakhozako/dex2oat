@@ -1,6 +1,6 @@
 {
-  "version": "v2.2",
-  "versionCode": 22,
-  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v2.2/dex2oat-v2.2.zip",
+  "version": "v2.3",
+  "versionCode": 23,
+  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v2.3/dex2oat-v2.3.zip",
   "changelog": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/CHANGELOG.md"
 }

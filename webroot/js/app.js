@@ -3,6 +3,7 @@ import { countEnabled, loadJson, loadUserConfig, readGeneratedSystemProp, saveCo
 import { readDeviceStats } from "./device-monitor.js";
 import { readSystemInfo } from "./system-info.js";
 import { $, createElement, metric, setStatus, showConfirm } from "./ui.js";
+import { shellQuote, resultMessage } from "./utils.js";
 
 const state = {
   meta: null,
@@ -97,14 +98,6 @@ function parseModuleProp(content) {
   return result;
 }
 
-function resultMessage(result) {
-  return result.stderr || result.stdout || `exit ${result.code}`;
-}
-
-function shellQuote(value) {
-  return `'${String(value).replace(/'/g, "'\\''")}'`;
-}
-
 function commandUrl(value) {
   const url = new URL(String(value || ""));
   if (!["http:", "https:"].includes(url.protocol)) {
@@ -117,7 +110,7 @@ function commandUrl(value) {
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v2.1",
+    version: "v2.3",
     edition: "ColorOS Edition"
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
@@ -341,7 +334,7 @@ function renderCategory(categoryId) {
 function updateOption(id, patch) {
   if (patch.enabled) {
     const current = state.options.categories.flatMap((category) => category.items).find((item) => item.id === id);
-    if (current) {
+    if (current && current.prop) {
       for (const category of state.options.categories) {
         for (const item of category.items) {
           if (item.id !== id && item.prop === current.prop && state.config.items[item.id]) {
@@ -374,8 +367,9 @@ async function refreshSystemInfo() {
 }
 
 async function refreshStats() {
+  if (state.page !== "home") return;
   state.stats = await readDeviceStats();
-  if (state.page === "home") renderHome();
+  renderHome();
 }
 
 async function saveCurrentConfig() {
@@ -978,6 +972,7 @@ async function openUrl(url) {
 
   const result = await exec(`am start -a android.intent.action.VIEW -d ${quotedUrl}`);
   if (result.code !== 0) {
+    console.warn(`[dex2oat] openUrl failed: ${result.stderr || result.stdout}`);
     setStatus(`打开链接失败：${resultMessage(result)}`, "warn");
   }
 }

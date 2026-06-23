@@ -1,4 +1,5 @@
 import { MODULE_DIR, STATE_DIR, exec, readText, writeBase64 } from "./bridge.js";
+import { shellQuote, resultMessage } from "./utils.js";
 
 const LEGACY_EVERYTHING_DEFAULTS = new Set([
   "force_install_everything",
@@ -321,10 +322,6 @@ export function countEnabled(config) {
   return Object.values(config.items).filter((item) => item.enabled).length;
 }
 
-function resultMessage(result) {
-  return result.stderr || result.stdout || `exit ${result.code}`;
-}
-
 function ensureOk(result, action) {
   if (result.code !== 0) {
     throw new Error(`${action} failed: ${resultMessage(result)}`);
@@ -342,8 +339,8 @@ export async function saveConfig(options, config) {
   const systemProp = generateSystemProp(options, nextConfig);
   const configJson = JSON.stringify(nextConfig, null, 2) + "\n";
 
-  ensureOk(await exec(`mkdir -p '${STATE_DIR}/backup'`), "create backup directory");
-  ensureOk(await exec(`[ -f '${MODULE_DIR}/system.prop' ] && cp -af '${MODULE_DIR}/system.prop' '${STATE_DIR}/backup/system.prop.bak'`), "backup system.prop");
+  ensureOk(await exec(`mkdir -p ${shellQuote(STATE_DIR + '/backup')}`), "create backup directory");
+  ensureOk(await exec(`[ -f ${shellQuote(MODULE_DIR + '/system.prop')} ] && cp -af ${shellQuote(MODULE_DIR + '/system.prop')} ${shellQuote(STATE_DIR + '/backup/system.prop.bak')}`), "backup system.prop");
   ensureOk(await writeBase64(`${MODULE_DIR}/system.prop`, systemProp), "write system.prop");
   ensureOk(await writeBase64(`${STATE_DIR}/config.json`, configJson), "write WebUI config");
 
