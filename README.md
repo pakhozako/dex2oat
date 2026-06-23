@@ -1,6 +1,6 @@
 # Dex2oat Lock
 
-[![Visitors](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fpakhozako%2Fdex2oat&count_bg=%236c8cff&title_bg=%23555555&icon=github.svg&icon_color=%23E7E7E7&title=visits&edge_flat=false)](https://github.com/pakhozako/dex2oat)
+![:name](https://count.getloli.com/@dex2oat?name=dex2oat&theme=moebooru&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
 
 Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制 OPlus / Xiaomi 系设备在后台、安装、OTA 等场景下触发不必要的 dexopt 编译，减少发热、降低功耗、延长电池寿命。内置 WebUI，可在线切换三档方案，无需重新刷入。
 
