@@ -415,6 +415,7 @@ button {
   align-items: start;
   padding: var(--space-12);
   border-radius: var(--radius-lg);
+  cursor: pointer;
   transition: transform var(--motion-fast) var(--ease-standard),
               opacity var(--motion-fast) var(--ease-standard);
 }

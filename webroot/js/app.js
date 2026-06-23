@@ -85,7 +85,7 @@ function commandUrl(value) {
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v2.7",
+    version: "v2.8",
     githubUrl: ""
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
@@ -262,7 +262,7 @@ function renderCategory(categoryId) {
       <div class="option-copy">
         <h3>${item.label}</h3>
         <p>${item.description}</p>
-        <button type="button" class="detail-toggle">展开详情</button>
+        <button type="button" class="detail-toggle">收起卡片</button>
         <code>${item.prop}</code>
       </div>
       <select></select>
@@ -296,9 +296,18 @@ function renderCategory(categoryId) {
       updateOption(item.id, { value: select.value });
     });
 
-    detailToggle.addEventListener("click", () => {
+    detailToggle.hidden = true;
+
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("input, select, button")) return;
       const expanded = row.classList.toggle("expanded");
-      detailToggle.textContent = expanded ? "收起详情" : "展开详情";
+      detailToggle.hidden = !expanded;
+    });
+
+    detailToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      row.classList.remove("expanded");
+      detailToggle.hidden = true;
     });
 
     list.append(row);

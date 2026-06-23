@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.8 (2026-06-23)
+
+### WebUI
+- 点击整张卡片展开选项说明，不再需要"展开详情"按钮
+- 展开后显示"收起卡片"按钮，点击收起
+
+### Options
+- 谨慎档默认值改为最安全的值：`dalvik.vm.dex2oat-filter` 由 `speed-profile` 改为 `verify`；`dalvik.vm.dex2oat-very-large` 由 `everything` 改为 `verify`
+
 ## v2.7 (2026-06-23)
 
 ### Architecture

@@ -62,10 +62,10 @@ dalvik.vm.bgdexopt.new-methods-percent=0
 # ============================================================
 
 # Global dex2oat filter
-# dalvik.vm.dex2oat-filter=speed-profile
+# dalvik.vm.dex2oat-filter=verify
 
 # Large APK policy
-# dalvik.vm.dex2oat-very-large=everything
+# dalvik.vm.dex2oat-very-large=verify
 
 # Startup string resolution
 # dalvik.vm.dex2oat-resolve-startup-strings=false

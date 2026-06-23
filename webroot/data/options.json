@@ -344,7 +344,7 @@
           "description": "设置全局 dex2oat-filter 默认强度。speed-profile 平衡体验，speed/everything 增加编译量，verify 最轻量。",
           "prop": "dalvik.vm.dex2oat-filter",
           "defaultEnabled": false,
-          "defaultValue": "speed-profile",
+          "defaultValue": "verify",
           "values": ["verify", "speed-profile", "speed", "everything"]
         },
         {
@@ -353,7 +353,7 @@
           "description": "控制 very-large APK 的编译策略。everything 全量 AOT 但安装慢、发热高；speed-profile 平衡；verify 轻量。",
           "prop": "dalvik.vm.dex2oat-very-large",
           "defaultEnabled": false,
-          "defaultValue": "everything",
+          "defaultValue": "verify",
           "values": ["verify", "speed-profile", "speed", "everything"]
         },
         {
