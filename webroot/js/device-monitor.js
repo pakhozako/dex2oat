@@ -54,8 +54,8 @@ function formatUptime(seconds) {
 function computePower(currentNow, voltageNow) {
   const current = toNumber(currentNow);
   const voltage = toNumber(voltageNow);
-  if (current == null || voltage == null || current === 0 || voltage === 0) {
-    return "暂不可用";
+  if (current == null || voltage == null) {
+    return null;
   }
   return `${(Math.abs(current * voltage) / 1_000_000_000_000).toFixed(2)} W`;
 }
@@ -90,6 +90,11 @@ read_file() {
 [ -r "$BAT/voltage_now" ] && printf 'voltage_now=%s\n' "$(read_file "$BAT/voltage_now")"
 [ -r "$BAT/voltage_avg" ] && printf 'voltage_avg=%s\n' "$(read_file "$BAT/voltage_avg")"
 [ -r "$BAT/power_now" ] && printf 'power_now=%s\n' "$(read_file "$BAT/power_now")"
+[ ! -r "$BAT/power_now" ] && {
+  C=$(read_file "$BAT/current_now" 2>/dev/null)
+  V=$(read_file "$BAT/voltage_now" 2>/dev/null)
+  [ -n "$C" ] && [ -n "$V" ] && printf 'power_now=%s\n' "$(( C * V / 1000000 ))"
+}
 [ -r "$BAT/temp" ] && printf 'battery_temp=%s\n' "$(read_file "$BAT/temp")"
 
 while read key value unit; do

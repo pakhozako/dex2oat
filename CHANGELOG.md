@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.4 (2026-06-23)
+
+### Bug Fixes
+- 修复实时功耗始终显示 0.00W 或"暂不可用"的问题：修复乱码字符串、优化零值处理、添加 fallback 功耗计算
+- 修复 computePowerFromMicrowatts 返回乱码字符串导致 fallback 逻辑失效
+
+### UI
+- 全新 UI 设计：去除粉色色调，改用蓝灰色系
+- 移除毛玻璃效果，改用半透明纯色背景
+- 降低字重（800 → 600-700），更易阅读
+- 深色模式改用深蓝灰色背景（#0f1117），替代纯黑
+- Profile header 改用左侧色条区分三档
+- Switch 开关重新设计，更简洁
+- 优化卡片间距和圆角
+
 ## v2.3 (2026-06-23)
 
 ### Bug Fixes
@@ -38,11 +53,11 @@
 - 修复 openUrl() 中因 UTF-8/GBK 编码损坏导致的乱码错误提示
 
 ### Refactor
-- 新增 buildDiagnosticShell() 函数，从 diagnosticSections 动态生成诊断 shell 脚本，消除 prop 列表重复维护
+- 新增 buildDiagnosticShell() 函数，从 diagnosticSections 动态生成诊断 shell 脚本
 - 拆分 renderHome() 为五个独立渲染函数
 
 ### CSS
-- 修复 .option-row grid 布局，select 元素改为明确的 grid-row: 2 定位
+- 修复 .option-row grid 布局
 - 移除全局 select { grid-column: 2 } 声明
 
 ## v2.0 (2026-06-06)
