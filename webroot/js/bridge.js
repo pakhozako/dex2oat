@@ -120,18 +120,36 @@ export async function readText(path) {
 
 export async function writeBase64(path, content) {
   const bytes = new TextEncoder().encode(content);
-  const LINES = 40;
-  let base64Block = "";
-  for (let i = 0; i < bytes.length; i += LINES) {
+  const bytesPerChunk = 1536;
+  const base64Chunks = [];
+  for (let i = 0; i < bytes.length; i += bytesPerChunk) {
     let chunk = "";
-    for (let j = i; j < i + LINES && j < bytes.length; j++) {
+    for (let j = i; j < i + bytesPerChunk && j < bytes.length; j++) {
       chunk += String.fromCharCode(bytes[j]);
     }
-    base64Block += btoa(chunk);
+    base64Chunks.push(btoa(chunk));
   }
   const quotedPath = shellQuote(path);
   const dirCmd = `mkdir -p ${shellQuote(path.replace(/\/[^/]*$/, ""))}`;
-  const writeCmd = `printf '%s' ${shellQuote(base64Block)} | base64 -d 2>/dev/null > ${quotedPath}`;
-  const fallbackCmd = `printf '%s' ${shellQuote(base64Block)} | base64 --decode 2>/dev/null > ${quotedPath}`;
-  return exec([dirCmd, `rm -f ${quotedPath}`, `(${writeCmd}) || (${fallbackCmd})`, `chmod 0600 ${quotedPath} 2>/dev/null || true`].join("; "));
+  const tempPath = `${path}.b64.tmp`;
+  const quotedTempPath = shellQuote(tempPath);
+  const appendCommands = base64Chunks.map((chunk) => `printf '%s' ${shellQuote(chunk)} >> ${quotedTempPath}`);
+  const writeCmd = `base64 -d ${quotedTempPath} 2>/dev/null > ${quotedPath}`;
+  const fallbackCmd = `base64 --decode ${quotedTempPath} 2>/dev/null > ${quotedPath}`;
+  let result = await exec([dirCmd, `rm -f ${quotedTempPath} ${quotedPath}`, `: > ${quotedTempPath}`].join("; "));
+  if (result.code !== 0) return result;
+
+  for (const command of appendCommands) {
+    result = await exec(command);
+    if (result.code !== 0) {
+      await exec(`rm -f ${quotedTempPath}`);
+      return result;
+    }
+  }
+
+  result = await exec(`(${writeCmd}) || (${fallbackCmd})`);
+  await exec(`rm -f ${quotedTempPath}`);
+  if (result.code !== 0) return result;
+
+  return exec(`chmod 0600 ${quotedPath} 2>/dev/null || true`);
 }

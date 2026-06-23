@@ -544,7 +544,7 @@ function buildDiagnosticState(content, applyLog, desiredProps) {
   const missing = [];
 
   for (const [prop, expected] of Object.entries(desiredProps)) {
-    if (!Object.hasOwn(actualProps, prop)) {
+    if (!Object.prototype.hasOwnProperty.call(actualProps, prop)) {
       missing.push({ prop, expected });
     } else if (actualProps[prop] !== expected) {
       const latest = latestByProp.get(prop);
@@ -764,7 +764,7 @@ function createDiagnosticConclusion(groups, passSummaries, total, summary, diagn
   const failed = groups.failed.length;
   const mismatch = groups.mismatch.length;
   const hasSettled = passSummaries.some((pass) => pass.phase === "settled");
-  const latestPass = passSummaries.at(-1);
+  const latestPass = passSummaries[passSummaries.length - 1];
   const conclusion = createElement("div", "diagnostic-conclusion");
   let tone = "mismatch";
   let title = "status=not-applied";

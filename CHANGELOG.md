@@ -16,6 +16,8 @@
 - 修复 system.prop 未包含新增的 20 项属性，且危险区域仍为旧 verify 值
 - 修复 README.md 仍引用已删除的 device-monitor.js、安全方案表格仅列 11/36 项
 - service.sh / customize.sh 属性匹配统一使用更宽泛模式避免遗漏
+- 修复 WebUI 保存大文件时 base64 分块 padding 导致解码失败或截断，并保留真实写入错误
+- 替换 `Object.hasOwn` / `Array.at()`，提升旧 WebView 兼容性
 
 **重要**：若你此前安装过 v2.5，请重新刷入此 ZIP 以修复上述问题。无需卸载，覆盖刷入即可。
 
