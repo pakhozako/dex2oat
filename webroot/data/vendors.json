@@ -1,0 +1,16 @@
+{
+  "vendors": [
+    {
+      "id": "oplus",
+      "label": "OPlus-family",
+      "options": "options.json",
+      "detect": ["coloros", "oplus", "oppo", "oneplus", "realme"]
+    },
+    {
+      "id": "xiaomi",
+      "label": "Xiaomi-family",
+      "options": "options-xiaomi.json",
+      "detect": ["xiaomi", "redmi", "poco", "miui", "hyperos"]
+    }
+  ]
+}

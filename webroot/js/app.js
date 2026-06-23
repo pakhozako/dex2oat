@@ -85,7 +85,7 @@ function commandUrl(value) {
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v2.6",
+    version: "v2.7",
     githubUrl: ""
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
@@ -107,7 +107,9 @@ async function loadDeviceState() {
 }
 
 async function loadOptionsForDevice(device) {
-  const optionsPath = device.vendor === "xiaomi" ? "./data/options-xiaomi.json" : "./data/options.json";
+  const vendors = await loadJson("./data/vendors.json", { vendors: [] });
+  const found = vendors.vendors.find((v) => v.id === device.vendor);
+  const optionsPath = found ? `./data/${found.options}` : "./data/options.json";
   return loadJson(optionsPath, { categories: [] });
 }
 
@@ -260,6 +262,7 @@ function renderCategory(categoryId) {
       <div class="option-copy">
         <h3>${item.label}</h3>
         <p>${item.description}</p>
+        <button type="button" class="detail-toggle">展开详情</button>
         <code>${item.prop}</code>
       </div>
       <select></select>
@@ -267,6 +270,7 @@ function renderCategory(categoryId) {
 
     const checkbox = row.querySelector("input");
     const select = row.querySelector("select");
+    const detailToggle = row.querySelector(".detail-toggle");
 
     const safeValue = item.values.includes(itemState.value) ? itemState.value : item.defaultValue;
     for (const value of item.values) {
@@ -290,6 +294,11 @@ function renderCategory(categoryId) {
 
     select.addEventListener("change", () => {
       updateOption(item.id, { value: select.value });
+    });
+
+    detailToggle.addEventListener("click", () => {
+      const expanded = row.classList.toggle("expanded");
+      detailToggle.textContent = expanded ? "收起详情" : "展开详情";
     });
 
     list.append(row);
@@ -371,6 +380,8 @@ function buildStaticDiagnosticShell() {
     "df -k /data 2>/dev/null",
     "echo '--- install state ---'",
     "cat /data/adb/dex2oat-lock-install.prop 2>/dev/null",
+    "echo '--- device state ---'",
+    "cat /data/adb/dex2oat-lock/device.prop 2>/dev/null",
     "echo '--- reboot state ---'",
     "cat /proc/sys/kernel/random/boot_id 2>/dev/null",
     "cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null",

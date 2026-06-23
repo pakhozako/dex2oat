@@ -1,114 +1,113 @@
 # Dex2oat Lock
 
-A Magisk module for OPlus and Xiaomi-family devices that fine-tunes `pm.dexopt.*` and `dalvik.vm.*` system properties to suppress unnecessary dexopt compilation during background tasks, app installation, and OTA updates — reducing heat, lowering power consumption, and extending battery life without compromising app runtime performance. A built-in WebUI allows switching between three preset profiles without reflashing.
+[![Visitors](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fpakhozako%2Fdex2oat&count_bg=%236c8cff&title_bg=%23555555&icon=github.svg&icon_color=%23E7E7E7&title=visits&edge_flat=false)](https://github.com/pakhozako/dex2oat)
 
-针对 OPlus 与 Xiaomi 系设备的 Magisk 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制系统在后台、安装、OTA 等场景下触发不必要的 dexopt 编译行为，从而减少发热、降低功耗、延长电池寿命，同时保持应用的正常运行性能。模块内置 WebUI，支持在线切换三种预设方案，无需重新刷入。
-
----
-
-## ✨ Features / 功能特性
-
-- 🎯 **三档配置方案** — 安全 / 谨慎 / 激进，按需选择
-- 🌐 **WebUI 界面** — 可视化配置，无需手动编辑文件
-- ☁️ **云端更新** — Magisk 自动检测新版本
-- 📝 **详细日志** — 完整的运行日志记录
-- 🔄 **安全回滚** — 卸载模块自动恢复原始配置
-- 🛡️ **设备检测** — 自动识别 OPlus / Xiaomi 系设备，未识别设备拒绝安装
-- 📊 **诊断面板** — 内置属性生效验证与 apply.log 分析
+Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制 OPlus / Xiaomi 系设备在后台、安装、OTA 等场景下触发不必要的 dexopt 编译，减少发热、降低功耗、延长电池寿命。内置 WebUI，可在线切换三档方案，无需重新刷入。
 
 ---
 
-## 📦 Profiles / 配置方案
+## 支持的厂商
 
-### 🟢 Safe / 安全
+| 厂商系列 | 机型示例 | 状态 |
+|:--|:--|:--|
+| OPlus / ColorOS | OnePlus 13, ACE5 至尊版, OPPO/Realme 系列 | ✅ 完整支持 |
+| Xiaomi / MIUI / HyperOS | 小米 13, MIX4, Redmi / POCO 系列 | ✅ 独立配置 |
+| 其他 | — | ❌ 安装时自动拒绝 |
 
-保守策略，适合日常使用。包含 36 项编译控制属性：
-- 所有 `pm.dexopt.*` 场景压制为 `skip`/`verify`/`speed-profile` 组合
-- 禁用 ColorOS 私有后台编译、缓存 miss 触发、opex 合并
-- 禁用 OPlus 编译器服务、ZygoteC/ocomp、runtime dexopt
-- 禁用 PR dexopt、iorap 预读与追踪、调试符号、启动缓存
-- bg-dexopt 新类/新方法阈值降至 0
-
-### 🟡 Caution / 谨慎
-
-在安全基础上叠加 32 项进阶控制（默认注释，按需启用）：全局 dex2oat-filter、线程数控制（6 组独立属性）、CPU 亲和性绑定（4 组）、MTK 激进调度、dex2oat 堆大小、odex/vdex madvise 预读阈值、profile 保存/首次延迟、JIT 缓存上限、温控截断等。
-
-### 🔴 Aggressive / 激进
-
-极致性能配置，9 项全量 AOT 策略。将所有编译场景设为 `everything`，关闭 ART Service 与 JIT，适合愿意接受安装耗时和存储占用以换取极致性能的用户。
-
-> ⚠️ 激进模式会完全关闭运行时优化，可能导致应用冷启动变慢，请在充分了解风险后使用。
+安装时自动识别厂商并加载对应配置，两套 profile 互不干扰，属性不会混用。
 
 ---
 
-## 📋 Requirements / 安装要求
+## 功能特性
+
+- **三档方案** — 安全 / 谨慎 / 危险，按需选择
+- **WebUI** — 可视化配置，展开查看完整属性说明
+- **厂商分离** — OPlus / Xiaomi 独立配置文件和属性模板
+- **安全回滚** — 安装时自动备份原始属性，卸载后完整还原
+- **诊断面板** — 内置属性生效验证与 apply.log 摘要分析
+- **云端更新** — 管理器自动检测新版本
+- **设备检测** — 未识别厂商直接拒绝安装
+
+---
+
+## 配置档位
+
+### 安全档（默认启用）
+
+压制后台、安装、OTA 等场景的额外编译触发：
+
+- **OPlus**（36 项）：pm.dexopt.* 全套策略 + ColorOS 私有触发 + OPlus MTK 编译服务 + runtime dexopt 开关 + iorap/启动缓存
+- **Xiaomi**（24 项）：pm.dexopt.* 全套策略 + MIUI dexfile preload + ART startup class preload + precache + iorap
+
+### 谨慎档（默认关闭）
+
+进阶控制，按需启用：dex2oat 线程数、CPU 亲和性、堆大小、madvise 预读阈值、profile 保存间隔、JIT 配置等。
+
+### 危险档（默认关闭）
+
+全量 AOT 模式：将安装、后台、命令行等策略设为 `everything`，适合愿意接受安装耗时换取极致性能的用户。
+
+---
+
+## 安装要求
 
 | 项目 | 要求 |
-|:-----|:-----|
+|:--|:--|
 | Root 框架 | Magisk / KernelSU / APatch |
-| 系统 | ColorOS/OPlus (OPPO / OnePlus / Realme) 或 Xiaomi/Redmi/POCO |
+| 系统 | OPlus (OPPO/OnePlus/Realme) 或 Xiaomi/Redmi/POCO |
 | Android 版本 | Android 12+ |
 
 ---
 
-## 🚀 Installation / 安装步骤
+## 安装步骤
 
-1. 下载最新版本的模块 zip 文件
-2. 在 Magisk / KernelSU 管理器中选择「从本地安装」
-3. 选取下载的 zip 文件
-4. 重启设备
-5. 打开 WebUI 选择配置方案
-6. 再次重启使属性生效
-
----
-
-## 🔄 Cloud Update / 云端更新
-
-模块已配置 Magisk 云端更新检查，当有新版本发布时，Magisk 管理器会自动显示更新提示，无需手动下载。
+1. 从 [Releases](https://github.com/pakhozako/dex2oat/releases) 下载最新 zip
+2. 在 Magisk / KernelSU / APatch 管理器中选择「从本地安装」
+3. 重启设备
+4. 打开 WebUI 选择配置方案（可选）
+5. 再次重启使属性生效
 
 ---
 
-## 📁 Project Structure / 项目结构
+## 项目结构
 
 ```
 dex2oat/
-├── webroot/                # WebUI 界面（KernelSU 要求）
-│   ├── css/
-│   │   └── app.css         # 样式文件
+├── props/
+│   ├── oplus.prop          # OPlus 默认安全配置模板
+│   └── xiaomi.prop         # Xiaomi 默认安全配置模板
+├── webroot/
+│   ├── css/app.css
 │   ├── data/
-│   │   ├── app-meta.json   # 应用元数据
-│   │   └── options.json    # 配置选项
+│   │   ├── vendors.json    # 厂商元数据（id/label/options/detect）
+│   │   ├── options.json    # OPlus 77 项配置
+│   │   └── options-xiaomi.json  # Xiaomi 57 项配置
 │   ├── js/
-│   │   ├── app.js          # 主应用逻辑
-│   │   ├── bridge.js       # 桥接层
-│   │   ├── config.js       # 配置管理
-│   │   ├── system-info.js  # 系统信息
-│   │   ├── ui.js           # UI 工具
-│   │   └── utils.js        # 共享工具函数
-│   └── index.html          # 入口页面
-├── CHANGELOG.md            # 更新日志
-├── customize.sh            # 安装脚本
-├── module.prop             # 模块属性
-├── props/                  # 厂商默认 system.prop 模板
-├── service.sh              # 服务脚本
-├── system.prop             # 系统属性配置
-├── uninstall.sh            # 卸载脚本
-└── update.json             # 云端更新配置
+│   │   ├── app.js bridge.js config.js utils.js ui.js system-info.js
+│   └── index.html
+├── tools/
+│   ├── validate-options.js # 打包前自动校验
+│   └── build-release.js    # 自动化构建脚本
+├── customize.sh             # 安装脚本（厂商识别 + 模板复制）
+├── service.sh               # 开机属性应用脚本
+├── uninstall.sh             # 卸载还原脚本
+├── system.prop              # 当前生效配置（由 WebUI/安装脚本生成）
+├── module.prop
+└── update.json
 ```
 
 ---
 
-## 📝 Notes / 注意事项
+## 注意事项
 
-- 本模块仅修改系统属性，不涉及任何系统文件，卸载后完全还原
-- 安装时自动识别厂商；OPlus 使用原配置，Xiaomi/Redmi/POCO 使用独立配置
-- 激进模式下关闭 JIT 可能影响性能敏感型应用，请按需选用
-- 每次 OTA 更新后建议确认模块状态
-- iorap 相关属性仅适用于 Android 12，Android 13+ 已移除 iorap
-- 模块包含 77 项可配置属性，首次安装默认启用安全方案（36 项）
+- 仅修改系统属性，不涉及任何系统文件，卸载后完全还原
+- 激进模式下关闭 JIT 可能影响性能敏感型应用，按需选用
+- iorap 相关属性仅适用于 Android 12，Android 13+ 已移除
+- OPlus 使用原 v2.5 策略（36 项），Xiaomi 自 v2.6 起独立配置（57 项）
+- 更新模块后建议重新保存一次配置，以同步新版 system.prop 模板
 
 ---
 
-## 📄 License
+## License
 
 MIT License

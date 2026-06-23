@@ -12,7 +12,6 @@ CONFIG_FILE="$STATE_DIR/config.json"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 PROP_FILE="$MODPATH/system.prop"
 DEVICE_FILE="$STATE_DIR/device.prop"
-XIAOMI_PROP_TEMPLATE="$MODPATH/props/xiaomi.prop"
 INSTALL_STARTED=0
 BACKUP_READY=0
 STATE_CREATED=0
@@ -213,7 +212,7 @@ case "$DEVICE_INFO" in
     ;;
 esac
 
-log_install "- Initializing ColorOS configuration"
+log_install "- Initializing configuration"
 
 # 创建数据目录
 mkdir -p "$BACKUP_DIR" || fail_install "Failed to create backup dir"
@@ -232,11 +231,10 @@ if [ -n "$PREVIOUS_VENDOR" ] && [ "$PREVIOUS_VENDOR" != "$DEVICE_VENDOR" ] && [ 
 fi
 
 case "$DEVICE_VENDOR" in
-  xiaomi)
-    [ -f "$XIAOMI_PROP_TEMPLATE" ] || fail_install "xiaomi.prop not found at $XIAOMI_PROP_TEMPLATE"
-    cp -af "$XIAOMI_PROP_TEMPLATE" "$PROP_FILE" || fail_install "Failed to select Xiaomi system.prop"
-    ;;
-  oplus)
+  oplus|xiaomi)
+    VENDOR_PROP_TEMPLATE="$MODPATH/props/$DEVICE_VENDOR.prop"
+    [ -f "$VENDOR_PROP_TEMPLATE" ] || fail_install "$DEVICE_VENDOR.prop not found at $VENDOR_PROP_TEMPLATE"
+    cp -af "$VENDOR_PROP_TEMPLATE" "$PROP_FILE" || fail_install "Failed to select $DEVICE_VENDOR system.prop"
     ;;
   *)
     fail_install "Unsupported device vendor"
