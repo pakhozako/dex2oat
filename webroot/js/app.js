@@ -8,6 +8,7 @@ const state = {
   meta: null,
   options: null,
   config: null,
+  device: null,
   page: "home",
   systemInfo: null
 };
@@ -84,7 +85,7 @@ function commandUrl(value) {
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v2.5",
+    version: "v2.6",
     githubUrl: ""
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
@@ -94,6 +95,20 @@ async function loadMeta() {
     moduleName: moduleProp.name || meta.moduleName,
     version: moduleProp.version || meta.version
   };
+}
+
+async function loadDeviceState() {
+  const device = parseStateFile(await readText(`${STATE_DIR}/device.prop`));
+  if (!device.vendor) {
+    device.vendor = "oplus";
+    device.label = "OPlus-family";
+  }
+  return device;
+}
+
+async function loadOptionsForDevice(device) {
+  const optionsPath = device.vendor === "xiaomi" ? "./data/options-xiaomi.json" : "./data/options.json";
+  return loadJson(optionsPath, { categories: [] });
 }
 
 function renderShell() {
@@ -168,6 +183,7 @@ function createSummaryBand() {
   const info = state.systemInfo || {};
   const summary = createElement("section", "summary-band");
   summary.append(metric("设备", info.model || "暂不可用"));
+  summary.append(metric("厂商配置", state.device?.label || state.device?.vendor || "OPlus-family"));
   summary.append(metric("系统", `${info.android || "暂不可用"} · ${info.coloros || "Unknown"}`));
   summary.append(metric("Root", info.root || "暂不可用"));
   summary.append(metric("内核", info.kernel || "暂不可用"));
@@ -661,7 +677,7 @@ function buildRebootDiagnosticText(rebootState, passSummaries) {
   if (rebootState.status === "skipped" || rebootState.health === "skipped") {
     return rebootState.reason
       ? `服务已跳过：${rebootState.reason}。`
-      : "服务已跳过运行时属性应用；设备可能不在 ColorOS/OPlus 支持范围。";
+      : "服务已跳过运行时属性应用；设备可能不在 OPlus/Xiaomi 支持范围。";
   }
 
   if (problemTotal) {
@@ -781,7 +797,7 @@ function createDiagnosticConclusion(groups, passSummaries, total, summary, diagn
     title = "status=service-skipped";
     detail = rebootState.reason
       ? `service-state 报告已跳过运行时应用：${rebootState.reason}。`
-      : "service-state 报告已跳过运行时应用；设备可能不在 ColorOS/OPlus 支持范围。";
+        : "service-state 报告已跳过运行时应用；设备可能不在 OPlus/Xiaomi 支持范围。";
   } else if (total || summary) {
     if (failed || mismatch) {
       tone = "failed";
@@ -907,7 +923,8 @@ async function openUrl(url) {
 
 async function start() {
   state.meta = await loadMeta();
-  state.options = await loadJson("./data/options.json", { categories: [] });
+  state.device = await loadDeviceState();
+  state.options = await loadOptionsForDevice(state.device);
   state.config = await loadUserConfig(state.options);
 
   renderShell();

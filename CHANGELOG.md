@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.6 (2026-06-23)
+
+### Multi-Vendor
+- 新增 Xiaomi / Redmi / POCO 支持：安装时自动识别厂商，Xiaomi 设备使用独立 `props/xiaomi.prop` 与 `options-xiaomi.json`
+- OPlus / OPPO / OnePlus / Realme 继续使用原 v2.5 OPlus 配置，避免混用厂商私有属性
+- 未识别设备安装时直接拒绝安装，避免在未知 ROM 上写入不适配属性
+
+### Xiaomi
+- 新增 Xiaomi 安全档：压制后台 dexopt、first-use、MIUI dexfile preload、ART startup class preload、precache、iorap/perfetto、启动缓存等触发项
+- 新增 Xiaomi 谨慎档：dex2oat 线程、system_perf_init 线程、dex2oat/image 堆、madvise、profile 首次保存、secondary dex、thermal-cutoff、JIT profiles、dexpreload CPU 绑定
+- 新增 Xiaomi 危险档：安装、后台、命令行、first-use、secondary dex、全局 filter 的 everything AOT 策略
+
+### WebUI
+- WebUI 启动时读取 `/data/adb/dex2oat-lock/device.prop`，自动加载对应厂商选项文件
+- 首页新增“厂商配置”显示，便于确认当前使用 OPlus 还是 Xiaomi 配置
+
 ## v2.5 (2026-06-23)
 
 

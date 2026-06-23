@@ -192,7 +192,7 @@ function buildRebootState(config, bootId, serviceState) {
       label: serviceStateProblem ? "需检查" : serviceSkipped ? "未应用" : "已生效",
       reason: serviceStateProblem
         ? (serviceReason || `服务已运行，但有 ${serviceProblemTotal} 项写入异常`)
-        : serviceSkipped ? (serviceReason || "设备不在 ColorOS/OPlus 支持范围，运行时属性未应用")
+        : serviceSkipped ? (serviceReason || "设备不在 OPlus/Xiaomi 支持范围，运行时属性未应用")
           : serviceStatus === "settled" ? "服务已完成 settled" : "没有待应用配置",
       bootIdAvailable: Boolean(bootId),
       pendingBootId: "",
@@ -215,7 +215,7 @@ function buildRebootState(config, bootId, serviceState) {
   if (serviceStateProblem) {
     reason = serviceReason || `服务已运行，但有 ${serviceProblemTotal} 项写入异常`;
   } else if (serviceSkipped) {
-    reason = serviceReason || "设备不在 ColorOS/OPlus 支持范围，运行时属性未应用";
+    reason = serviceReason || "设备不在 OPlus/Xiaomi 支持范围，运行时属性未应用";
   } else if (!bootId && serviceStatus !== "settled") {
     reason = "未读到 boot_id，且服务尚未 settled";
   } else if (serviceStatus === "settled" && !serviceSettledAt) {

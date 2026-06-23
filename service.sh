@@ -108,10 +108,16 @@ is_runtime_prop() {
     persist.device_config.runtime_native_boot.*|\
     persist.device_config.runtime.*|\
     persist.dalvik.vm.dex2oat-threads|\
+    persist.miui.*|\
     persist.oplus.*|\
+    persist.sys.app_dexfile_preload.enable|\
+    persist.sys.art_startup_class_preload.enable|\
+    persist.sys.dexpreload.*|\
+    persist.sys.precache.enable|\
     dalvik.vm.dex2oat-minidebuginfo|\
     dalvik.vm.minidebuginfo|\
     dalvik.vm.dex2oat-filter|\
+    dalvik.vm.dex2oat-threads|\
     dalvik.vm.dex2oat-very-large|\
     dalvik.vm.dex2oat-resolve-startup-strings|\
     dalvik.vm.dex2oat-cpu-set|\
@@ -120,11 +126,14 @@ is_runtime_prop() {
     dalvik.vm.image-dex2oat-cpu-set|\
     dalvik.vm.dex2oat-Xms|\
     dalvik.vm.dex2oat-Xmx|\
+    dalvik.vm.image-dex2oat-Xms|\
+    dalvik.vm.image-dex2oat-Xmx|\
     dalvik.vm.bg-dex2oat-threads|\
     dalvik.vm.image-dex2oat-threads|\
     dalvik.vm.boot-dex2oat-threads|\
     dalvik.vm.useartservice|\
     dalvik.vm.usejit|\
+    dalvik.vm.usejitprofiles|\
     dalvik.vm.enable_pr_dexopt|\
     dalvik.vm.pr_dexopt_async_for_ota|\
     dalvik.vm.dexopt.secondary|\
@@ -235,17 +244,24 @@ sleep 10
 log_msg "Boot completed, checking device..."
 
 DEVICE_INFO="$(
-  printf '%s %s %s %s' \
+  printf '%s %s %s %s %s %s %s %s' \
     "$(getprop ro.build.version.oplusrom)" \
     "$(getprop ro.oplus.version)" \
     "$(getprop ro.product.brand)" \
-    "$(getprop ro.product.manufacturer)" |
+    "$(getprop ro.product.manufacturer)" \
+    "$(getprop ro.product.marketname)" \
+    "$(getprop ro.product.bootimage.brand)" \
+    "$(getprop ro.miui.ui.version.name)" \
+    "$(getprop ro.mi.os.version.name)" |
     tr '[:upper:]' '[:lower:]'
 )"
 
 case "$DEVICE_INFO" in
   *coloros*|*oplus*|*oppo*|*oneplus*|*realme*)
     log_msg "Detected supported OPlus-family device: $DEVICE_INFO"
+    ;;
+  *xiaomi*|*redmi*|*poco*|*miui*|*hyperos*)
+    log_msg "Detected supported Xiaomi-family device: $DEVICE_INFO"
     ;;
   *)
     log_msg "Unsupported device: $DEVICE_INFO. Runtime properties were not applied."

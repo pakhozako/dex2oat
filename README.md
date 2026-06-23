@@ -1,8 +1,8 @@
 # Dex2oat Lock
 
-A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm.*` system properties to suppress unnecessary dexopt compilation during background tasks, app installation, and OTA updates — reducing heat, lowering power consumption, and extending battery life without compromising app runtime performance. A built-in WebUI allows switching between three preset profiles without reflashing.
+A Magisk module for OPlus and Xiaomi-family devices that fine-tunes `pm.dexopt.*` and `dalvik.vm.*` system properties to suppress unnecessary dexopt compilation during background tasks, app installation, and OTA updates — reducing heat, lowering power consumption, and extending battery life without compromising app runtime performance. A built-in WebUI allows switching between three preset profiles without reflashing.
 
-针对 ColorOS 设备的 Magisk 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制系统在后台、安装、OTA 等场景下触发不必要的 dexopt 编译行为，从而减少发热、降低功耗、延长电池寿命，同时保持应用的正常运行性能。模块内置 WebUI，支持在线切换三种预设方案，无需重新刷入。
+针对 OPlus 与 Xiaomi 系设备的 Magisk 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制系统在后台、安装、OTA 等场景下触发不必要的 dexopt 编译行为，从而减少发热、降低功耗、延长电池寿命，同时保持应用的正常运行性能。模块内置 WebUI，支持在线切换三种预设方案，无需重新刷入。
 
 ---
 
@@ -13,7 +13,7 @@ A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm
 - ☁️ **云端更新** — Magisk 自动检测新版本
 - 📝 **详细日志** — 完整的运行日志记录
 - 🔄 **安全回滚** — 卸载模块自动恢复原始配置
-- 🛡️ **设备检测** — 仅在 ColorOS/OPlus 设备上生效
+- 🛡️ **设备检测** — 自动识别 OPlus / Xiaomi 系设备，未识别设备拒绝安装
 - 📊 **诊断面板** — 内置属性生效验证与 apply.log 分析
 
 ---
@@ -46,7 +46,7 @@ A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm
 | 项目 | 要求 |
 |:-----|:-----|
 | Root 框架 | Magisk / KernelSU / APatch |
-| 系统 | ColorOS (OPPO / OnePlus / Realme) |
+| 系统 | ColorOS/OPlus (OPPO / OnePlus / Realme) 或 Xiaomi/Redmi/POCO |
 | Android 版本 | Android 12+ |
 
 ---
@@ -89,6 +89,7 @@ dex2oat/
 ├── CHANGELOG.md            # 更新日志
 ├── customize.sh            # 安装脚本
 ├── module.prop             # 模块属性
+├── props/                  # 厂商默认 system.prop 模板
 ├── service.sh              # 服务脚本
 ├── system.prop             # 系统属性配置
 ├── uninstall.sh            # 卸载脚本
@@ -100,6 +101,7 @@ dex2oat/
 ## 📝 Notes / 注意事项
 
 - 本模块仅修改系统属性，不涉及任何系统文件，卸载后完全还原
+- 安装时自动识别厂商；OPlus 使用原配置，Xiaomi/Redmi/POCO 使用独立配置
 - 激进模式下关闭 JIT 可能影响性能敏感型应用，请按需选用
 - 每次 OTA 更新后建议确认模块状态
 - iorap 相关属性仅适用于 Android 12，Android 13+ 已移除 iorap
