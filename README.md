@@ -14,6 +14,7 @@ A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm
 - 📝 **详细日志** — 完整的运行日志记录
 - 🔄 **安全回滚** — 卸载模块自动恢复原始配置
 - 🛡️ **设备检测** — 仅在 ColorOS/OPlus 设备上生效
+- 📊 **诊断面板** — 内置属性生效验证与 apply.log 分析
 
 ---
 
@@ -21,29 +22,20 @@ A Magisk module for ColorOS devices that fine-tunes `pm.dexopt.*` and `dalvik.vm
 
 ### 🟢 Safe / 安全
 
-保守策略，适合日常使用。跳过后台 dexopt，安装时采用 `speed-profile` 编译，开机后及闲置场景仅做 `verify` 验证，禁用 ColorOS 后台编译开关，关闭调试符号生成，并禁用 iorap 预读与追踪。
-
-| Property | Value | Description |
-|:---------|:------|:------------|
-| `pm.dexopt.bg-dexopt` | `skip` | 跳过后台 dexopt |
-| `pm.dexopt.install` | `speed-profile` | 安装时按 profile 编译 |
-| `pm.dexopt.boot-after-ota` | `speed-profile` | OTA 后按 profile 编译 |
-| `pm.dexopt.first-boot` | `verify` | 首次开机仅验证 |
-| `pm.dexopt.post-boot` | `verify` | 开机后仅验证 |
-| `pm.dexopt.inactive` | `verify` | 闲置 App 仅验证 |
-| `pm.dexopt.shared` | `speed` | 共享库 speed 编译 |
-| `pm.dexopt.downgrade_after_inactive_days` | `9999` | 禁用闲置降级 |
-| `dalvik.vm.dex2oat-minidebuginfo` | `false` | 关闭调试符号生成 |
-| `persist.sys.oplus.bgdex2oat_enabled` | `false` | 禁用 ColorOS 后台编译 |
-| `persist.device_config.runtime_native_boot.iorap_readahead_enable` | `false` | 禁用 iorap 预读 |
+保守策略，适合日常使用。包含 36 项编译控制属性：
+- 所有 `pm.dexopt.*` 场景压制为 `skip`/`verify`/`speed-profile` 组合
+- 禁用 ColorOS 私有后台编译、缓存 miss 触发、opex 合并
+- 禁用 OPlus 编译器服务、ZygoteC/ocomp、runtime dexopt
+- 禁用 PR dexopt、iorap 预读与追踪、调试符号、启动缓存
+- bg-dexopt 新类/新方法阈值降至 0
 
 ### 🟡 Caution / 谨慎
 
-在安全基础上叠加更多选项（默认注释，按需启用）：全局编译过滤器、超大 APK 防降级、启动字符串预解析开关、ColorOS 温控编译触发控制，以及 heap 优化触发的 dexopt 抑制。
+在安全基础上叠加 32 项进阶控制（默认注释，按需启用）：全局 dex2oat-filter、线程数控制（6 组独立属性）、CPU 亲和性绑定（4 组）、MTK 激进调度、dex2oat 堆大小、odex/vdex madvise 预读阈值、profile 保存/首次延迟、JIT 缓存上限、温控截断等。
 
 ### 🔴 Aggressive / 激进
 
-最大化抑制所有编译行为，适合有经验的用户。将所有 `pm.dexopt.*` 场景全部设为 `everything` 或彻底禁用，关闭 ART Service 调度器，禁用 JIT 即时编译，移除温控截断，清零 JIT 代码缓存上限。
+极致性能配置，9 项全量 AOT 策略。将所有编译场景设为 `everything`，关闭 ART Service 与 JIT，适合愿意接受安装耗时和存储占用以换取极致性能的用户。
 
 > ⚠️ 激进模式会完全关闭运行时优化，可能导致应用冷启动变慢，请在充分了解风险后使用。
 
@@ -90,7 +82,6 @@ dex2oat/
 │   │   ├── app.js          # 主应用逻辑
 │   │   ├── bridge.js       # 桥接层
 │   │   ├── config.js       # 配置管理
-│   │   ├── device-monitor.js # 设备监控
 │   │   ├── system-info.js  # 系统信息
 │   │   ├── ui.js           # UI 工具
 │   │   └── utils.js        # 共享工具函数
@@ -112,6 +103,7 @@ dex2oat/
 - 激进模式下关闭 JIT 可能影响性能敏感型应用，请按需选用
 - 每次 OTA 更新后建议确认模块状态
 - iorap 相关属性仅适用于 Android 12，Android 13+ 已移除 iorap
+- 模块包含 77 项可配置属性，首次安装默认启用安全方案（36 项）
 
 ---
 

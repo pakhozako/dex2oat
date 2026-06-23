@@ -251,6 +251,13 @@ button {
   line-height: 1;
 }
 
+.module-status-reboot {
+  margin-top: var(--space-12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .module-status-mark {
   position: absolute;
   right: -32px;

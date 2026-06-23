@@ -120,17 +120,18 @@ export async function readText(path) {
 
 export async function writeBase64(path, content) {
   const bytes = new TextEncoder().encode(content);
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  const encoded = btoa(binary);
+  const LINES = 40;
+  let base64Block = "";
+  for (let i = 0; i < bytes.length; i += LINES) {
+    let chunk = "";
+    for (let j = i; j < i + LINES && j < bytes.length; j++) {
+      chunk += String.fromCharCode(bytes[j]);
+    }
+    base64Block += btoa(chunk);
+  }
   const quotedPath = shellQuote(path);
-  const quotedEncoded = shellQuote(encoded);
-  const command = [
-    `TARGET=${quotedPath}`,
-    `ENCODED=${quotedEncoded}`,
-    `mkdir -p "\${TARGET%/*}"`,
-    `(printf '%s' "$ENCODED" | base64 -d 2>/dev/null || printf '%s' "$ENCODED" | base64 --decode) > "$TARGET"`,
-    `chmod 0600 "$TARGET" 2>/dev/null || true`
-  ].join("; ");
-  return exec(command);
+  const dirCmd = `mkdir -p ${shellQuote(path.replace(/\/[^/]*$/, ""))}`;
+  const writeCmd = `printf '%s' ${shellQuote(base64Block)} | base64 -d 2>/dev/null > ${quotedPath}`;
+  const fallbackCmd = `printf '%s' ${shellQuote(base64Block)} | base64 --decode 2>/dev/null > ${quotedPath}`;
+  return exec([dirCmd, `rm -f ${quotedPath}`, `(${writeCmd}) || (${fallbackCmd})`, `chmod 0600 ${quotedPath} 2>/dev/null || true`].join("; "));
 }

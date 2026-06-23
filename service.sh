@@ -106,12 +106,23 @@ is_runtime_prop() {
     persist.sys.feature.compile.*|\
     persist.device_config.runtime_native.*|\
     persist.device_config.runtime_native_boot.*|\
+    persist.device_config.runtime.*|\
     persist.dalvik.vm.dex2oat-threads|\
+    persist.oplus.*|\
     dalvik.vm.dex2oat-minidebuginfo|\
     dalvik.vm.minidebuginfo|\
     dalvik.vm.dex2oat-filter|\
     dalvik.vm.dex2oat-very-large|\
     dalvik.vm.dex2oat-resolve-startup-strings|\
+    dalvik.vm.dex2oat-cpu-set|\
+    dalvik.vm.boot-dex2oat-cpu-set|\
+    dalvik.vm.background-dex2oat-cpu-set|\
+    dalvik.vm.image-dex2oat-cpu-set|\
+    dalvik.vm.dex2oat-Xms|\
+    dalvik.vm.dex2oat-Xmx|\
+    dalvik.vm.bg-dex2oat-threads|\
+    dalvik.vm.image-dex2oat-threads|\
+    dalvik.vm.boot-dex2oat-threads|\
     dalvik.vm.useartservice|\
     dalvik.vm.usejit|\
     dalvik.vm.enable_pr_dexopt|\
@@ -119,11 +130,15 @@ is_runtime_prop() {
     dalvik.vm.dexopt.secondary|\
     dalvik.vm.dexopt.thermal-cutoff|\
     dalvik.vm.madvise.artfile.size|\
+    dalvik.vm.madvise.odexfile.size|\
+    dalvik.vm.madvise.vdexfile.size|\
     dalvik.vm.bgdexopt.*|\
     dalvik.vm.background-dex2oat-threads|\
     dalvik.vm.jitmaxsize|\
     dalvik.vm.ps-min-save-period-ms|\
+    dalvik.vm.ps-min-first-save-ms|\
     system_perf_init.*|\
+    ro.vendor.dex2oat*|\
     oplus.*|\
     sys.oplus.*|\
     sys.heap.*|\
@@ -206,9 +221,15 @@ apply_runtime_props() {
 
 log_msg "Waiting for boot completed..."
 write_service_state running boot-wait boot_wait
-while [ "$(getprop sys.boot_completed)" != "1" ]; do
+BOOT_WAIT=0
+while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$BOOT_WAIT" -lt 120 ]; do
   sleep 5
+  BOOT_WAIT=$((BOOT_WAIT + 1))
 done
+
+if [ "$(getprop sys.boot_completed)" != "1" ]; then
+  log_msg "Boot wait timed out after 600s, continuing anyway"
+fi
 
 sleep 10
 log_msg "Boot completed, checking device..."

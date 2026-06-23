@@ -1,8 +1,5 @@
 {
   "moduleName": "Dex2oat Lock",
-  "version": "v2.4",
-  "edition": "ColorOS Edition",
-  "githubUrl": "https://github.com/pakhozako/dex2oat",
-  "qqGroup": "945546357",
-  "qqGroupUrl": "http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=EQFBWRp56eJlC7vs7eZYMZsVDr3gBlTJ&authKey=wFrP86xU8OKafBmTigk4w1y56S3OEh8MsnV%2BZ4h5fsspaKSLOteldtMYu1dr0C%2Bu&noverify=0&group_code=945546357"
+  "version": "v2.5",
+  "githubUrl": "https://github.com/pakhozako/dex2oat"
 }

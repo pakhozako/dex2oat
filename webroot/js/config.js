@@ -1,5 +1,5 @@
 import { MODULE_DIR, STATE_DIR, exec, readText, writeBase64 } from "./bridge.js";
-import { shellQuote, resultMessage } from "./utils.js";
+import { shellQuote, resultMessage, parseKeyValueLines, parseStateFile } from "./utils.js";
 
 const LEGACY_EVERYTHING_DEFAULTS = new Set([
   "force_install_everything",
@@ -100,36 +100,16 @@ export function mergeConfig(base, incoming) {
   return merged;
 }
 
-function parseSystemPropEntries(content) {
-  const entries = [];
-
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    const enabled = !trimmed.startsWith("#");
-    const body = enabled ? trimmed : trimmed.replace(/^#\s*/, "");
-    const index = body.indexOf("=");
-    if (index <= 0) continue;
-
-    entries.push({
-      prop: body.slice(0, index),
-      value: body.slice(index + 1),
-      enabled
-    });
-  }
-
-  return entries;
-}
-
 export function applySystemPropState(options, config, systemProp) {
   const next = clone(config);
-  const entries = parseSystemPropEntries(systemProp);
-  const propEntries = new Map();
+  const entries = parseKeyValueLines(systemProp, false);
+  const propBestEntry = new Map();
 
   for (const entry of entries) {
-    if (!propEntries.has(entry.prop)) propEntries.set(entry.prop, []);
-    propEntries.get(entry.prop).push(entry);
+    const best = propBestEntry.get(entry.prop);
+    if (!best || (entry.enabled && !best.enabled)) {
+      propBestEntry.set(entry.prop, entry);
+    }
   }
 
   for (const category of options.categories) {
@@ -137,7 +117,7 @@ export function applySystemPropState(options, config, systemProp) {
       const itemState = next.items[item.id];
       if (!itemState) continue;
 
-      const entry = propEntries.get(item.prop)?.shift();
+      const entry = propBestEntry.get(item.prop);
       if (!entry) continue;
 
       itemState.enabled = entry.enabled;
@@ -146,21 +126,6 @@ export function applySystemPropState(options, config, systemProp) {
   }
 
   return next;
-}
-
-function parseStateFile(content) {
-  const state = {};
-
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const index = trimmed.indexOf("=");
-    if (index <= 0) continue;
-    state[trimmed.slice(0, index)] = trimmed.slice(index + 1);
-  }
-
-  return state;
 }
 
 async function readServiceState() {
@@ -175,15 +140,25 @@ function shouldClearPendingReboot(config, bootId, serviceState) {
   }
 
   const settledAt = Number(serviceState.settled_at || 0);
-  if (serviceState.status !== "settled" || !settledAt || hasServiceProblems(serviceState)) {
+  const settled = serviceState.status === "settled";
+
+  if (settled && !settledAt) {
     return false;
   }
 
-  if (config.pendingSavedAt && settledAt >= config.pendingSavedAt) {
+  if (config.pendingSavedAt && settledAt && settledAt >= config.pendingSavedAt) {
     return true;
   }
 
-  return Boolean(config.pendingBootId && serviceState.boot_id && serviceState.boot_id !== config.pendingBootId);
+  if (config.pendingBootId && serviceState.boot_id && serviceState.boot_id !== config.pendingBootId) {
+    return true;
+  }
+
+  if (config.pendingBootId && !bootId && settled && !hasServiceProblems(serviceState)) {
+    return true;
+  }
+
+  return false;
 }
 
 function serviceCount(serviceState, key) {

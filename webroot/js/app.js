@@ -1,79 +1,60 @@
 import { MODULE_DIR, STATE_DIR, exec, readText, writeBase64 } from "./bridge.js";
 import { countEnabled, loadJson, loadUserConfig, readGeneratedSystemProp, saveConfig } from "./config.js";
-import { readDeviceStats } from "./device-monitor.js";
 import { readSystemInfo } from "./system-info.js";
 import { $, createElement, metric, setStatus, showConfirm } from "./ui.js";
-import { shellQuote, resultMessage } from "./utils.js";
+import { shellQuote, resultMessage, parseKeyValueLines, parseStateFile } from "./utils.js";
 
 const state = {
   meta: null,
   options: null,
   config: null,
   page: "home",
-  systemInfo: null,
-  stats: null
+  systemInfo: null
 };
 
-const diagnosticSections = [
-  {
-    title: "--- getprop ---",
-    props: ["ro.product.model", "ro.build.version.release", "ro.build.version.oplusrom", "ro.oplus.version"]
-  },
-  {
-    title: "--- dexopt props ---",
-    props: [
-      "pm.dexopt.bg-dexopt",
-      "pm.dexopt.install",
-      "pm.dexopt.boot-after-ota",
-      "pm.dexopt.post-boot",
-      "dalvik.vm.dex2oat-filter",
-      "dalvik.vm.dex2oat-resolve-startup-strings",
-      "dalvik.vm.dexopt.secondary",
-      "dalvik.vm.dexopt.thermal-cutoff",
-      "dalvik.vm.enable_pr_dexopt",
-      "dalvik.vm.pr_dexopt_async_for_ota",
-      "dalvik.vm.bgdexopt.new-classes-percent",
-      "dalvik.vm.bgdexopt.new-methods-percent",
-      "dalvik.vm.background-dex2oat-threads",
-      "persist.dalvik.vm.dex2oat-threads",
-      "dalvik.vm.usejit",
-      "dalvik.vm.useartservice",
-      "dalvik.vm.jitmaxsize",
-      "dalvik.vm.ps-min-save-period-ms",
-      "system_perf_init.bg-dex2oat-threads",
-      "system_perf_init.boot-dex2oat-threads",
-      "system_perf_init.dex2oat-threads"
-    ]
-  },
-  {
-    title: "--- ART services ---",
-    props: ["init.svc.artd", "init.svc.art_boot", "init.svc_debug_pid.artd", "init.svc_debug_pid.art_boot"]
-  },
-  {
-    title: "--- ColorOS runtime props ---",
-    props: [
-      "persist.sys.oplus.bgdex2oat_enabled",
-      "persist.sys.feature.compile.re.cache.miss",
-      "persist.sys.feature.compile.re.fmap.size",
-      "persist.device_config.runtime_native.use_app_image_startup_cache",
-      "persist.device_config.runtime_native_boot.iorap_readahead_enable",
-      "persist.device_config.runtime_native_boot.iorap_perfetto_enable",
-      "oplus.dex.tempcontrol",
-      "sys.oplus.dalvik_sync_config",
-      "sys.heap.optimize.enable",
-      "sys.furtherHeapEnlarge.optimize.enable",
-      "sys.gcsupression.optimize.enable"
-    ]
+function getDiagnosticSections() {
+  const staticSections = [
+    {
+      title: "--- getprop ---",
+      props: ["ro.product.model", "ro.build.version.release", "ro.build.version.oplusrom", "ro.oplus.version"]
+    },
+    {
+      title: "--- ART services ---",
+      props: ["init.svc.artd", "init.svc.art_boot", "init.svc_debug_pid.artd", "init.svc_debug_pid.art_boot"]
+    }
+  ];
+
+  const allProps = [];
+  if (state.options) {
+    const seen = new Set();
+    for (const category of state.options.categories) {
+      for (const item of category.items) {
+        if (item.prop && !seen.has(item.prop)) {
+          seen.add(item.prop);
+          allProps.push(item.prop);
+        }
+      }
+    }
   }
-];
+
+  return [
+    ...staticSections,
+    { title: "--- managed props ---", props: allProps }
+  ];
+}
 
 
 function buildDiagnosticShell() {
-  const lines = ["echo '--- bridge ---'", "echo shell_ok"];
-  for (const section of diagnosticSections) {
+  const lines = [
+    "echo '--- bridge ---'",
+    "echo shell_ok",
+    "GETPROP=/system/bin/getprop",
+    "[ -x \"$GETPROP\" ] || GETPROP=getprop"
+  ];
+  for (const section of getDiagnosticSections()) {
     lines.push(`echo '${section.title.replace(/'/g, "'\"'\"'")}'`);
     for (const prop of section.props) {
-      lines.push(`/system/bin/getprop ${prop}`);
+      lines.push(`"$GETPROP" ${prop}`);
     }
   }
   return lines.join("\n");
@@ -85,16 +66,9 @@ function categoryById(id) {
 
 function parseModuleProp(content) {
   const result = {};
-
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const index = trimmed.indexOf("=");
-    if (index <= 0) continue;
-    result[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+  for (const entry of parseKeyValueLines(content)) {
+    result[entry.prop] = entry.value;
   }
-
   return result;
 }
 
@@ -110,8 +84,8 @@ function commandUrl(value) {
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v2.3",
-    edition: "ColorOS Edition"
+    version: "v2.5",
+    githubUrl: ""
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
 
@@ -129,7 +103,7 @@ function renderShell() {
         <span class="brand-logo" aria-hidden="true">D</span>
         <div class="brand-text">
           <h1>${state.meta.moduleName}</h1>
-          <p>${state.meta.version} · ${state.meta.edition}</p>
+          <p>${state.meta.version}</p>
         </div>
       </div>
       <div class="top-actions">
@@ -172,15 +146,18 @@ function renderPage() {
 }
 
 function createStatusCard() {
+  const rebootState = state.config.rebootState || {};
+  const isIntact = !state.config.pendingReboot && (!rebootState.serviceFailedTotal || rebootState.serviceFailedTotal === 0) && (!rebootState.serviceMismatchTotal || rebootState.serviceMismatchTotal === 0);
+  const label = state.config.pendingReboot ? "待重启" : (isIntact ? "完整性通过 ✓" : rebootState.label || "已生效");
   const hero = createElement("section", "module-status-card is-working");
   hero.innerHTML = `
     <div class="module-status-content">
       <div class="module-status-title">模块运行中</div>
       <div class="module-status-version">${state.meta.version}</div>
       <div class="module-status-meta">
-        <span>完整性校验通过✅</span>
-        <span>${state.meta.edition}</span>
+        <span>已启用 ${countEnabled(state.config)} 项属性</span>
       </div>
+      <div class="module-status-reboot">${label}</div>
     </div>
     <div class="module-status-mark" aria-hidden="true"></div>
   `;
@@ -189,53 +166,31 @@ function createStatusCard() {
 
 function createSummaryBand() {
   const info = state.systemInfo || {};
-  const stats = state.stats || {};
   const summary = createElement("section", "summary-band");
   summary.append(metric("设备", info.model || "暂不可用"));
   summary.append(metric("系统", `${info.android || "暂不可用"} · ${info.coloros || "Unknown"}`));
   summary.append(metric("Root", info.root || "暂不可用"));
-  summary.append(metric("已开机", stats.uptime || "暂不可用"));
+  summary.append(metric("内核", info.kernel || "暂不可用"));
   return summary;
-}
-
-function createRealtimeSection() {
-  const stats = state.stats || {};
-  const realtime = createSection("实时状态", "自动刷新");
-  const grid = createElement("div", "metric-grid");
-  grid.append(metric("电量", stats.battery || "暂不可用"));
-  grid.append(metric("状态", stats.batteryStatus || "暂不可用"));
-  grid.append(metric("实时功耗", stats.power || "暂不可用"));
-  grid.append(metric("电池温度", stats.batteryTemp || "暂不可用"));
-  grid.append(metric("SoC 温度", stats.socTemp || "暂不可用"));
-  grid.append(metric("物理内存", stats.memory || "暂不可用"));
-  grid.append(metric("虚拟内存", stats.swap || "暂不可用"));
-  grid.append(metric("/data 存储", stats.storage || "暂不可用"));
-  realtime.append(grid);
-  return realtime;
 }
 
 function createModuleStateSection() {
   const info = state.systemInfo || {};
   const rebootState = state.config.rebootState || {};
-  const moduleState = createSection("模块状态", rebootState.label || (state.config.pendingReboot ? "待重启" : "已生效"));
+  const label = rebootState.label || (state.config.pendingReboot ? "待重启" : "已生效");
+  const moduleState = createSection("运行状态", label);
   const moduleGrid = createElement("div", "metric-grid compact");
-  moduleGrid.append(metric("启用属性", `${countEnabled(state.config)} 项`));
-  moduleGrid.append(metric("待重启应用", state.config.pendingReboot ? "是" : "否"));
-  moduleGrid.append(metric("服务阶段", rebootState.servicePhase || rebootState.serviceStatus || "暂不可用"));
-  moduleGrid.append(metric("服务健康", rebootState.serviceHealth || "暂不可用"));
   moduleGrid.append(metric("写入异常", `${rebootState.serviceFailedTotal || 0} 失败 / ${rebootState.serviceMismatchTotal || 0} 未粘住`));
-  moduleGrid.append(metric("状态依据", rebootState.reason || "暂不可用"));
   moduleGrid.append(metric("内核", info.kernel || "暂不可用"));
+  moduleGrid.append(metric("状态依据", rebootState.reason || "暂不可用"));
   moduleState.append(moduleGrid);
   return moduleState;
 }
 
 function createLinkRow() {
   const githubLabel = state.meta.githubUrl ? "打开 GitHub" : "GitHub 待填写";
-  const qqLabel = state.meta.qqGroup ? `QQ 群 ${state.meta.qqGroup}` : "QQ 群待填写";
   const links = createElement("section", "link-row");
   links.append(createButton(githubLabel, "wide-button", () => openUrl(state.meta.githubUrl)));
-  links.append(createButton(qqLabel, "wide-button", () => openUrl(state.meta.qqGroupUrl)));
   links.append(createButton("查看 system.prop", "wide-button", showSystemProp));
   links.append(createButton("诊断输出", "wide-button", showDiagnostics));
   return links;
@@ -246,7 +201,6 @@ function renderHome() {
   page.innerHTML = "";
   page.append(createStatusCard());
   page.append(createSummaryBand());
-  page.append(createRealtimeSection());
   page.append(createModuleStateSection());
   page.append(createLinkRow());
 }
@@ -298,11 +252,12 @@ function renderCategory(categoryId) {
     const checkbox = row.querySelector("input");
     const select = row.querySelector("select");
 
+    const safeValue = item.values.includes(itemState.value) ? itemState.value : item.defaultValue;
     for (const value of item.values) {
       const option = document.createElement("option");
       option.value = value;
       option.textContent = value;
-      option.selected = value === itemState.value;
+      option.selected = value === safeValue;
       select.append(option);
     }
 
@@ -354,7 +309,7 @@ function updateOption(id, patch) {
 async function refreshAll() {
   setStatus("正在刷新设备信息...");
   try {
-    await Promise.all([refreshSystemInfo(), refreshStats()]);
+    state.systemInfo = await readSystemInfo();
     renderPage();
     setStatus("设备信息已刷新", "ok");
   } catch (error) {
@@ -364,12 +319,6 @@ async function refreshAll() {
 
 async function refreshSystemInfo() {
   state.systemInfo = await readSystemInfo();
-}
-
-async function refreshStats() {
-  if (state.page !== "home") return;
-  state.stats = await readDeviceStats();
-  renderHome();
 }
 
 async function saveCurrentConfig() {
@@ -412,9 +361,7 @@ function buildStaticDiagnosticShell() {
     "echo '--- uninstall state ---'",
     "cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null",
     "echo '--- apply log ---'",
-    "grep -E 'Runtime property apply pass completed|Runtime property apply completed|Applied:|Matched:|Mismatch:|Failed:' /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null | tail -n 80",
-    "echo '--- apply log tail ---'",
-    "tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null"
+    "tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null || true"
   ].join("\n");
 }
 
@@ -481,21 +428,15 @@ function parseApplyLog(content) {
 
 function parseActiveSystemProp(content) {
   const props = {};
-
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const index = trimmed.indexOf("=");
-    if (index <= 0) continue;
-    props[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+  for (const entry of parseKeyValueLines(content)) {
+    props[entry.prop] = entry.value;
   }
-
   return props;
 }
 
 function parseDiagnosticGetprop(content) {
   const props = {};
-  const sectionByTitle = new Map(diagnosticSections.map((section) => [section.title, section]));
+  const sectionByTitle = new Map(getDiagnosticSections().map((section) => [section.title, section]));
   let activeSection = null;
   let activeIndex = 0;
 
@@ -523,33 +464,29 @@ function parseDiagnosticGetprop(content) {
 }
 
 function parseDiagnosticRebootState(content) {
-  const state = {};
-  let inSection = false;
+  const lines = [];
   let bootId = "";
+  let inSection = false;
 
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();
-
     if (trimmed === "--- reboot state ---") {
       inSection = true;
       continue;
     }
-
-    if (inSection && trimmed.startsWith("--- ")) {
-      break;
-    }
-
-    if (!inSection || !trimmed) continue;
+    if (inSection && trimmed.startsWith("--- ")) break;
+    if (!inSection) continue;
+    if (!trimmed) continue;
 
     if (!trimmed.includes("=") && !bootId) {
       bootId = trimmed;
       continue;
     }
 
-    const index = trimmed.indexOf("=");
-    if (index <= 0) continue;
-    state[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+    lines.push(line);
   }
+
+  const state = parseStateFile(lines.join("\n"));
 
   return {
     bootId,
@@ -573,30 +510,21 @@ function parseDiagnosticRebootState(content) {
   };
 }
 
-function parseDiagnosticStateSection(content, title) {
-  const state = {};
+function parseDiagnosticSection(content, title) {
+  const sectionLines = [];
   let inSection = false;
 
   for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();
-
     if (trimmed === title) {
       inSection = true;
       continue;
     }
-
-    if (inSection && trimmed.startsWith("--- ")) {
-      break;
-    }
-
-    if (!inSection || !trimmed) continue;
-
-    const index = trimmed.indexOf("=");
-    if (index <= 0) continue;
-    state[trimmed.slice(0, index)] = trimmed.slice(index + 1);
+    if (inSection && trimmed.startsWith("--- ")) break;
+    if (inSection) sectionLines.push(line);
   }
 
-  return state;
+  return parseStateFile(sectionLines.join("\n"));
 }
 
 function latestApplyByProp(groups) {
@@ -644,9 +572,9 @@ function buildDiagnosticState(content, applyLog, desiredProps) {
 
 async function showDiagnosticsDialog(content) {
   const applyLog = parseApplyLog(content);
-  const installState = parseDiagnosticStateSection(content, "--- install state ---");
+  const installState = parseDiagnosticSection(content, "--- install state ---");
   const rebootState = parseDiagnosticRebootState(content);
-  const uninstallState = parseDiagnosticStateSection(content, "--- uninstall state ---");
+  const uninstallState = parseDiagnosticSection(content, "--- uninstall state ---");
   const desiredProps = parseActiveSystemProp(await readGeneratedSystemProp());
   const diagnosticState = buildDiagnosticState(content, applyLog, desiredProps);
   showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState), {
@@ -985,8 +913,6 @@ async function start() {
   renderShell();
   setPage("home");
   await refreshAll();
-
-  setInterval(refreshStats, 3000);
 }
 
 start().catch((error) => {
