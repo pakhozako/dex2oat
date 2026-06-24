@@ -192,11 +192,11 @@ function createStatusCard() {
 function createSummaryBand() {
   const info = state.systemInfo || {};
   const summary = createElement("section", "summary-band");
-  summary.append(metric("设备", info.model || "暂不可用"));
+  summary.append(metric("设备", state.device?.["ro.product.model"] || "暂不可用"));
   summary.append(metric("厂商配置", state.device?.label || state.device?.vendor || "OPlus-family"));
   summary.append(metric("配置来源", sourceLabel(state.configSource)));
   summary.append(metric("模块版本", state.configSource?.version || state.meta.version));
-  summary.append(metric("系统", `${info.android || "暂不可用"} · ${info.coloros || "Unknown"}`));
+  summary.append(metric("系统", state.device?.["ro.build.version.release"] || "暂不可用"));
   summary.append(metric("Root", info.root || "暂不可用"));
   summary.append(metric("内核", info.kernel || "暂不可用"));
   return summary;
@@ -379,8 +379,12 @@ async function saveCurrentConfig() {
   };
   try {
     state.config = await saveConfig(state.options, nextConfig);
-    const preservedVersion = state.configSource?.version || state.meta.version;
-    await writeBase64(`${STATE_DIR}/config-source.prop`, `source=webui-custom\nvendor=${state.device?.vendor || "unknown"}\nupdated_at=${formatTimestamp(new Date())}\nversion=${preservedVersion}\n`);
+    const preservedSource = {
+      ...state.configSource,
+      source: "webui-custom",
+      updated_at: formatTimestamp(new Date())
+    };
+    await writeBase64(`${STATE_DIR}/config-source.prop`, serializeStateFile(preservedSource));
     state.configSource = await loadConfigSource();
     renderPage();
     setStatus("已保存，重启后生效", "warn");
@@ -430,12 +434,50 @@ async function renderHistory() {
   const page = $("#page");
   page.innerHTML = "";
   const section = createSection("安装历史", "install.log");
-  const content = createElement("pre", "history-log", "正在读取...");
+  const content = createElement("div", "history-log", "正在读取...");
   section.append(content);
   page.append(section);
 
   const log = await readText(`${STATE_DIR}/install.log`);
-  content.textContent = log || "暂无安装历史";
+  const entries = parseInstallLog(log || "");
+  content.innerHTML = "";
+  if (!entries.length) {
+    content.textContent = "暂无安装历史";
+    return;
+  }
+  for (const entry of entries) {
+    const card = createElement("div", "history-card");
+    card.append(metric("时间", entry.time || "未知"));
+    card.append(metric("厂商", entry.vendor || "未知"));
+    card.append(metric("来源", sourceLabel({ source: entry.source, matched_total: entry.matched_total })));
+    card.append(metric("匹配数量", entry.matched_total || "0"));
+    card.append(metric("版本", entry.version || "未知"));
+    content.append(card);
+  }
+}
+
+function serializeStateFile(values) {
+  return Object.entries(values || {})
+    .filter(([key]) => key)
+    .map(([key, value]) => `${key}=${value ?? ""}`)
+    .join("\n") + "\n";
+}
+
+function parseInstallLog(content) {
+  const entries = [];
+  let current = null;
+  for (const line of content.split(/\r?\n/)) {
+    if (line.trim() === "--- install ---") {
+      if (current) entries.push(current);
+      current = {};
+      continue;
+    }
+    if (!current) continue;
+    const index = line.indexOf("=");
+    if (index > 0) current[line.slice(0, index)] = line.slice(index + 1);
+  }
+  if (current) entries.push(current);
+  return entries.reverse();
 }
 
 

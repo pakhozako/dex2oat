@@ -23,6 +23,7 @@ STATE_DIR="${REPORT_FILE%/*}"
 KEYS_FILE="$STATE_DIR/captured-keys.txt"
 VALUES_FILE="$STATE_DIR/captured-values.prop"
 OPTIONS_PROPS_FILE="$STATE_DIR/options-props.txt"
+SKIPPED_FILE="$STATE_DIR/skipped-props.txt"
 TMP_OUTPUT="$OUTPUT_FILE.tmp"
 TMP_MATCHED="$MATCHED_FILE.tmp"
 TMP_REPORT="$REPORT_FILE.tmp"
@@ -50,11 +51,13 @@ SKIPPED_INVALID_TOTAL=0
 GENERATED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 
 : > "$TMP_MATCHED" || exit 1
+: > "$SKIPPED_FILE" || exit 1
 
 while IFS= read -r CAPTURED_KEY || [ -n "$CAPTURED_KEY" ]; do
   [ -z "$CAPTURED_KEY" ] && continue
   if ! grep -F -x -q "$CAPTURED_KEY" "$OPTIONS_PROPS_FILE"; then
     SKIPPED_INVALID_TOTAL=$((SKIPPED_INVALID_TOTAL + 1))
+    printf '%s（无定义）\n' "$CAPTURED_KEY" >> "$SKIPPED_FILE"
   fi
 done < "$KEYS_FILE"
 
@@ -91,6 +94,7 @@ done < "$KEYS_FILE"
 
         if [ -n "$CAPTURED_VALUE" ] && ! grep -F -x -q "$PROP_KEY" "$OPTIONS_PROPS_FILE"; then
           SKIPPED_INVALID_TOTAL=$((SKIPPED_INVALID_TOTAL + 1))
+          printf '%s（无定义）\n' "$PROP_KEY" >> "$SKIPPED_FILE"
           printf '%s\n' "$LINE"
           continue
         fi
@@ -98,6 +102,7 @@ done < "$KEYS_FILE"
         if [ -n "$CAPTURED_VALUE" ]; then
           case "$CAPTURED_VALUE" in *[!A-Za-z0-9_.,:/@%+-]*)
             SKIPPED_INVALID_TOTAL=$((SKIPPED_INVALID_TOTAL + 1))
+            printf '%s（值非法）\n' "$PROP_KEY" >> "$SKIPPED_FILE"
             printf '%s\n' "$LINE"
             continue
             ;;
@@ -123,7 +128,7 @@ done < "$KEYS_FILE"
 } > "$TMP_OUTPUT" || exit 1
 
 [ -s "$TMP_OUTPUT" ] || exit 1
-[ "$MATCHED_TOTAL" -gt 0 ] || exit 2
+[ "$MATCHED_TOTAL" -gt 0 ] || exit 1
 
 {
   printf 'generated_at=%s\n' "$GENERATED_AT"
@@ -134,6 +139,8 @@ done < "$KEYS_FILE"
   printf 'template_fallback_total=%s\n' "${TEMPLATE_FALLBACK_TOTAL:-0}"
   printf 'skipped_invalid_total=%s\n' "${SKIPPED_INVALID_TOTAL:-0}"
   printf 'generated_system_prop=%s\n' "$OUTPUT_FILE"
+  printf '[skipped]\n'
+  sort -u "$SKIPPED_FILE" 2>/dev/null
   printf '[diff]\n'
   while IFS='=' read -r DIFF_KEY DIFF_VALUE || [ -n "$DIFF_KEY" ]; do
     [ -z "$DIFF_KEY" ] && continue
@@ -162,6 +169,6 @@ mv -f "$TMP_OUTPUT" "$OUTPUT_FILE" || exit 1
 mv -f "$TMP_MATCHED" "$MATCHED_FILE" || exit 1
 mv -f "$TMP_REPORT" "$REPORT_FILE" || exit 1
 mv -f "$TMP_SOURCE" "$SOURCE_FILE" || exit 1
-chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$KEYS_FILE" "$VALUES_FILE" "$OPTIONS_PROPS_FILE" 2>/dev/null || true
+chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$KEYS_FILE" "$VALUES_FILE" "$OPTIONS_PROPS_FILE" "$SKIPPED_FILE" 2>/dev/null || true
 
 exit 0

@@ -86,14 +86,25 @@ chooseport() {
 chooseport_once() {
   DELAY="${1:-10}"
   EVENT_FILE="${TMPDIR:-/dev}/dex2oat-events"
-  : > "$EVENT_FILE" 2>/dev/null || true
   if command -v timeout >/dev/null 2>&1; then
+    : > "$EVENT_FILE" 2>/dev/null || true
     timeout "$DELAY" /system/bin/getevent -lqc 1 > "$EVENT_FILE" 2>&1
-  else
-    /system/bin/getevent -lqc 1 > "$EVENT_FILE" 2>&1
+    grep -q 'KEY_VOLUMEUP *DOWN' "$EVENT_FILE" 2>/dev/null && return 0
+    grep -q 'KEY_VOLUMEDOWN *DOWN' "$EVENT_FILE" 2>/dev/null && return 1
+    return 2
   fi
-  grep -q 'KEY_VOLUMEUP *DOWN' "$EVENT_FILE" 2>/dev/null && return 0
-  grep -q 'KEY_VOLUMEDOWN *DOWN' "$EVENT_FILE" 2>/dev/null && return 1
+
+  WAITED=0
+  while [ "$WAITED" -lt "$DELAY" ]; do
+    : > "$EVENT_FILE" 2>/dev/null || true
+    /system/bin/getevent -lqc 1 > "$EVENT_FILE" 2>&1 &
+    GETEVENT_PID=$!
+    sleep 1
+    WAITED=$((WAITED + 1))
+    kill "$GETEVENT_PID" 2>/dev/null || true
+    grep -q 'KEY_VOLUMEUP *DOWN' "$EVENT_FILE" 2>/dev/null && return 0
+    grep -q 'KEY_VOLUMEDOWN *DOWN' "$EVENT_FILE" 2>/dev/null && return 1
+  done
   return 2
 }
 
