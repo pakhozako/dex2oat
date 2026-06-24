@@ -9,6 +9,7 @@ const state = {
   options: null,
   config: null,
   device: null,
+  configSource: null,
   page: "home",
   systemInfo: null
 };
@@ -85,7 +86,7 @@ function commandUrl(value) {
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v2.8",
+    version: "v2.9",
     githubUrl: ""
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
@@ -104,6 +105,10 @@ async function loadDeviceState() {
     device.label = "OPlus-family";
   }
   return device;
+}
+
+async function loadConfigSource() {
+  return parseStateFile(await readText(`${STATE_DIR}/config-source.prop`));
 }
 
 async function loadOptionsForDevice(device) {
@@ -134,6 +139,7 @@ function renderShell() {
       <button data-page="safe" class="safe">安全</button>
       <button data-page="caution" class="caution">谨慎</button>
       <button data-page="aggressive" class="aggressive">危险</button>
+      <button data-page="history">历史</button>
     </nav>
     <div class="status" id="statusMessage" data-tone="neutral">准备就绪</div>
   `;
@@ -157,6 +163,8 @@ function setPage(page) {
 function renderPage() {
   if (state.page === "home") {
     renderHome();
+  } else if (state.page === "history") {
+    renderHistory();
   } else {
     renderCategory(state.page);
   }
@@ -186,10 +194,27 @@ function createSummaryBand() {
   const summary = createElement("section", "summary-band");
   summary.append(metric("设备", info.model || "暂不可用"));
   summary.append(metric("厂商配置", state.device?.label || state.device?.vendor || "OPlus-family"));
+  summary.append(metric("配置来源", sourceLabel(state.configSource)));
+  summary.append(metric("模块版本", state.configSource?.version || state.meta.version));
   summary.append(metric("系统", `${info.android || "暂不可用"} · ${info.coloros || "Unknown"}`));
   summary.append(metric("Root", info.root || "暂不可用"));
   summary.append(metric("内核", info.kernel || "暂不可用"));
   return summary;
+}
+
+function sourceLabel(source) {
+  switch (source?.source) {
+    case "dex2oat-match":
+      return `dex2oat 属性抓取匹配 · ${source.matched_total || 0} 项`;
+    case "webui-custom":
+      return "WebUI 自定义";
+    case "template":
+      return "厂商模板";
+    case "template-fallback":
+      return "dex2oat 匹配失败，已回退模板";
+    default:
+      return "暂不可用";
+  }
 }
 
 function createModuleStateSection() {
@@ -211,6 +236,8 @@ function createLinkRow() {
   links.append(createButton(githubLabel, "wide-button", () => openUrl(state.meta.githubUrl)));
   links.append(createButton("查看 system.prop", "wide-button", showSystemProp));
   links.append(createButton("诊断输出", "wide-button", showDiagnostics));
+  links.append(createButton("重新抓取匹配", "wide-button", rerunDex2oatMatch));
+  links.append(createButton("安装历史", "wide-button", () => setPage("history")));
   return links;
 }
 
@@ -262,7 +289,6 @@ function renderCategory(categoryId) {
       <div class="option-copy">
         <h3>${item.label}</h3>
         <p>${item.description}</p>
-        <button type="button" class="detail-toggle">收起卡片</button>
         <code>${item.prop}</code>
       </div>
       <select></select>
@@ -270,7 +296,6 @@ function renderCategory(categoryId) {
 
     const checkbox = row.querySelector("input");
     const select = row.querySelector("select");
-    const detailToggle = row.querySelector(".detail-toggle");
 
     const safeValue = item.values.includes(itemState.value) ? itemState.value : item.defaultValue;
     for (const value of item.values) {
@@ -296,18 +321,9 @@ function renderCategory(categoryId) {
       updateOption(item.id, { value: select.value });
     });
 
-    detailToggle.hidden = true;
-
     row.addEventListener("click", (e) => {
-      if (e.target.closest("input, select, button")) return;
-      const expanded = row.classList.toggle("expanded");
-      detailToggle.hidden = !expanded;
-    });
-
-    detailToggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      row.classList.remove("expanded");
-      detailToggle.hidden = true;
+      if (e.target.closest("input, select")) return;
+      row.classList.toggle("expanded");
     });
 
     list.append(row);
@@ -363,6 +379,8 @@ async function saveCurrentConfig() {
   };
   try {
     state.config = await saveConfig(state.options, nextConfig);
+    await writeBase64(`${STATE_DIR}/config-source.prop`, `source=webui-custom\nvendor=${state.device?.vendor || "unknown"}\nupdated_at=${Math.floor(Date.now() / 1000)}\nversion=${state.configSource?.version || state.meta.version}\n`);
+    state.configSource = await loadConfigSource();
     renderPage();
     setStatus("已保存，重启后生效", "warn");
   } catch (error) {
@@ -373,6 +391,36 @@ async function saveCurrentConfig() {
 async function showSystemProp() {
   const content = await readGeneratedSystemProp();
   showDialog("system.prop", content || "暂不可用");
+}
+
+async function rerunDex2oatMatch() {
+  const ok = showConfirm("重新抓取并匹配会覆盖当前 system.prop，确定继续吗？");
+  if (!ok) return;
+
+  setStatus("正在重新抓取并匹配...");
+  const vendor = state.device?.vendor || "oplus";
+  const optionsFile = vendor === "xiaomi" ? "options-xiaomi.json" : "options.json";
+  const command = [
+    `sh ${shellQuote(`${MODULE_DIR}/scripts/capture-props.sh`)} ${shellQuote(`${STATE_DIR}/captured-props.txt`)} ${shellQuote("/storage/emulated/0/Download/dex2oat-captured-props.txt")}`,
+    `sh ${shellQuote(`${MODULE_DIR}/scripts/match-props.sh`)} ${shellQuote(`${STATE_DIR}/captured-props.txt`)} ${shellQuote(`${MODULE_DIR}/webroot/data/${optionsFile}`)} ${shellQuote(`${MODULE_DIR}/props/${vendor}.prop`)} ${shellQuote(`${MODULE_DIR}/system.prop`)} ${shellQuote(`${STATE_DIR}/matched-props.txt`)} ${shellQuote(`${STATE_DIR}/match-report.txt`)} ${shellQuote(`${STATE_DIR}/config-source.prop`)} ${shellQuote(vendor)} ${shellQuote(state.meta.version)}`
+  ].join(" && ");
+
+  const result = await exec(command);
+  state.configSource = await loadConfigSource();
+  renderPage();
+  setStatus(result.code === 0 ? "重新匹配完成，重启后生效" : `重新匹配失败：${resultMessage(result)}`, result.code === 0 ? "warn" : "warn");
+}
+
+async function renderHistory() {
+  const page = $("#page");
+  page.innerHTML = "";
+  const section = createSection("安装历史", "install.log");
+  const content = createElement("pre", "history-log", "正在读取...");
+  section.append(content);
+  page.append(section);
+
+  const log = await readText(`${STATE_DIR}/install.log`);
+  content.textContent = log || "暂无安装历史";
 }
 
 
@@ -391,13 +439,21 @@ function buildStaticDiagnosticShell() {
     "cat /data/adb/dex2oat-lock-install.prop 2>/dev/null",
     "echo '--- device state ---'",
     "cat /data/adb/dex2oat-lock/device.prop 2>/dev/null",
+    "echo '--- current system.prop ---'",
+    "cat /data/adb/modules/dex2oat-lock/system.prop 2>/dev/null",
+    "echo '--- config source ---'",
+    "cat /data/adb/dex2oat-lock/config-source.prop 2>/dev/null",
+    "echo '--- ds match report ---'",
+    "cat /data/adb/dex2oat-lock/match-report.txt 2>/dev/null",
+    "echo '--- captured props ---'",
+    "cat /data/adb/dex2oat-lock/captured-props.txt 2>/dev/null",
     "echo '--- reboot state ---'",
     "cat /proc/sys/kernel/random/boot_id 2>/dev/null",
     "cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null",
     "echo '--- uninstall state ---'",
     "cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null",
     "echo '--- apply log ---'",
-    "tail -n 80 /data/adb/dex2oat-lock/logs/apply.log 2>/dev/null || true"
+    "tail -n 120 /data/adb/dex2oat-lock/service.log 2>/dev/null || true"
   ].join("\n");
 }
 
@@ -944,6 +1000,7 @@ async function openUrl(url) {
 async function start() {
   state.meta = await loadMeta();
   state.device = await loadDeviceState();
+  state.configSource = await loadConfigSource();
   state.options = await loadOptionsForDevice(state.device);
   state.config = await loadUserConfig(state.options);
 

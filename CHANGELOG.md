@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.9 (2026-06-24)
+
+### Installer
+- 新增安装时询问：是否执行 dex2oat 属性抓取并自动匹配配置
+- 新增 `scripts/capture-props.sh`，安装期抓取当前设备 ART / dexopt / dex2oat 相关属性
+- 新增 `scripts/match-props.sh`，按当前厂商模板和抓取结果生成匹配版 `system.prop`
+- 匹配失败、抓取失败或用户拒绝时自动回退厂商模板，不中断安装
+
+### Diagnostics
+- 新增 `/data/adb/dex2oat-lock/config-source.prop`，记录配置来源：模板、ds 自动匹配或 WebUI 自定义
+- 新增 `/data/adb/dex2oat-lock/captured-props.txt` 与 `match-report.txt`，便于反馈设备适配情况
+- WebUI 首页显示配置来源，诊断输出包含抓取结果和匹配报告
+
+### WebUI
+- 移除选项卡片内的"收起卡片"按钮文字
+- 点击整张卡片展开说明，再次点击同一张卡片收回
+
 ## v2.8 (2026-06-23)
 
 ### WebUI

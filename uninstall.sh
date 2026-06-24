@@ -22,6 +22,22 @@ persist_uninstall_log() {
   fi
 }
 
+cleanup_state_files() {
+  [ -d "$STATE_DIR" ] || return 0
+  rm -f "$STATE_DIR/config-source.prop" 2>/dev/null
+  rm -f "$STATE_DIR/device.prop" 2>/dev/null
+  rm -f "$STATE_DIR/original-props.conf" 2>/dev/null
+  rm -f "$STATE_DIR/matched-props.txt" 2>/dev/null
+  rm -f "$STATE_DIR/captured-keys.txt" 2>/dev/null
+  rm -f "$STATE_DIR/captured-values.prop" 2>/dev/null
+  rm -f "$STATE_DIR/options-props.txt" 2>/dev/null
+  rm -f "$STATE_DIR/service-state.prop" 2>/dev/null
+  rm -f "$STATE_DIR/service.log" 2>/dev/null
+  rm -rf "$STATE_DIR/backup" "$STATE_DIR/logs" 2>/dev/null
+  chmod 0700 "$STATE_DIR" 2>/dev/null || true
+  chmod 0600 "$STATE_DIR/captured-props.txt" "$STATE_DIR/match-report.txt" "$STATE_DIR/install.log" 2>/dev/null || true
+}
+
 write_uninstall_state() {
   UNINSTALL_STATUS="$1"
   UNINSTALL_REASON="$2"
@@ -149,4 +165,4 @@ fi
 
 log_msg "Cleanup completed. Module uninstalled."
 persist_uninstall_log
-rm -rf "$STATE_DIR"
+cleanup_state_files

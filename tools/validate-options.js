@@ -23,7 +23,7 @@ for (const f of ["webroot/js/app.js", "webroot/js/bridge.js", "webroot/js/config
 }
 
 // 3. LF line endings
-for (const f of ["module.prop", "customize.sh", "service.sh", "uninstall.sh", "system.prop"]) {
+for (const f of ["module.prop", "customize.sh", "service.sh", "uninstall.sh", "system.prop", "scripts/capture-props.sh", "scripts/match-props.sh"]) {
   const b = fs.readFileSync(path.join(ROOT, f));
   if (b.includes(Buffer.from("\r\n"))) fail(`CRLF found: ${f}`);
   else pass(`LF: ${f}`);

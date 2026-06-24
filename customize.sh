@@ -1,70 +1,62 @@
 #!/system/bin/sh
 
-# Dex2oat Lock - Module Installer
-# 仅在 OPlus / Xiaomi 系设备上生效
-
 STATE_DIR=/data/adb/dex2oat-lock
 BACKUP_DIR="$STATE_DIR/backup"
 LOG_DIR="$STATE_DIR/logs"
-INSTALL_LOG="$LOG_DIR/install.log"
+INSTALL_LOG="$STATE_DIR/install.log"
 FINAL_INSTALL_STATE=/data/adb/dex2oat-lock-install.prop
 CONFIG_FILE="$STATE_DIR/config.json"
+CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 PROP_FILE="$MODPATH/system.prop"
 DEVICE_FILE="$STATE_DIR/device.prop"
+CAPTURED_PROPS="$STATE_DIR/captured-props.txt"
+MATCHED_PROPS="$STATE_DIR/matched-props.txt"
+MATCH_REPORT="$STATE_DIR/match-report.txt"
+CAPTURE_EXPORT=/storage/emulated/0/Download/dex2oat-captured-props.txt
 INSTALL_STARTED=0
 BACKUP_READY=0
 STATE_CREATED=0
+INSTALL_SOURCE=template
+MATCHED_TOTAL=0
 
 if ! command -v ui_print >/dev/null 2>&1; then
-  ui_print() {
-    printf '%s\n' "$*"
-  }
+  ui_print() { printf '%s\n' "$*"; }
 fi
 
 if ! command -v abort >/dev/null 2>&1; then
-  abort() {
-    ui_print "! $*"
-    exit 1
-  }
+  abort() { ui_print "! $*"; exit 1; }
 fi
 
 if ! command -v set_perm >/dev/null 2>&1; then
-  set_perm() {
-    chown "$2:$3" "$1" 2>/dev/null
-    chmod "$4" "$1" 2>/dev/null
-  }
+  set_perm() { chown "$2:$3" "$1" 2>/dev/null; chmod "$4" "$1" 2>/dev/null; }
 fi
 
 log_install() {
   ui_print "$*"
+  [ "$INSTALL_STARTED" = "1" ] && printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$INSTALL_LOG"
+}
 
-  if [ "$INSTALL_STARTED" = "1" ]; then
-    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$INSTALL_LOG"
-  fi
+write_install_state() {
+  INSTALL_STATUS="$1"
+  INSTALL_REASON="$2"
+  {
+    printf 'status=%s\n' "$INSTALL_STATUS"
+    [ -n "$INSTALL_REASON" ] && printf 'reason=%s\n' "$INSTALL_REASON"
+    printf 'module_path=%s\n' "${MODPATH:-}"
+    printf 'vendor=%s\n' "${DEVICE_VENDOR:-unknown}"
+    printf 'source=%s\n' "${INSTALL_SOURCE:-unknown}"
+    printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
+    printf 'version=%s\n' "${MODULE_VERSION:-unknown}"
+    printf 'updated_at=%s\n' "$(date '+%s')"
+  } > "$FINAL_INSTALL_STATE" 2>/dev/null || true
+  chmod 0600 "$FINAL_INSTALL_STATE" 2>/dev/null || true
 }
 
 cleanup_partial_state() {
   if [ "$STATE_CREATED" = "1" ] && [ "$BACKUP_READY" != "1" ]; then
     rm -rf "$STATE_DIR"
   fi
-}
-
-write_install_state() {
-  INSTALL_STATUS="$1"
-  INSTALL_REASON="$2"
-  NOW="$(date '+%s')"
-
-  {
-    printf 'status=%s\n' "$INSTALL_STATUS"
-    [ -n "$INSTALL_REASON" ] && printf 'reason=%s\n' "$INSTALL_REASON"
-    printf 'module_path=%s\n' "${MODPATH:-}"
-    printf 'state_created=%s\n' "$STATE_CREATED"
-    printf 'backup_ready=%s\n' "$BACKUP_READY"
-    printf 'install_log=%s\n' "$INSTALL_LOG"
-    printf 'updated_at=%s\n' "$NOW"
-  } > "$FINAL_INSTALL_STATE" 2>/dev/null || true
-  chmod 0600 "$FINAL_INSTALL_STATE" 2>/dev/null || true
 }
 
 fail_install() {
@@ -74,248 +66,221 @@ fail_install() {
   abort "$*"
 }
 
-ui_print "- Installing Dex2oat Lock"
-ui_print "- Checking device compatibility..."
-
-if [ -z "$MODPATH" ]; then
-  fail_install "MODPATH is not set. Install this zip from Magisk, KernelSU, or APatch manager."
-fi
-
-if [ ! -f "$PROP_FILE" ]; then
-  fail_install "system.prop not found at $PROP_FILE"
-fi
-
-is_managed_prop() {
-  case "$1" in
-    pm.dexopt.*|\
-    persist.sys.oplus.*|\
-    persist.sys.feature.compile.*|\
-    persist.device_config.runtime_native.*|\
-    persist.device_config.runtime_native_boot.*|\
-    persist.device_config.runtime.*|\
-    persist.dalvik.vm.dex2oat-threads|\
-    persist.miui.*|\
-    persist.oplus.*|\
-    persist.sys.app_dexfile_preload.enable|\
-    persist.sys.art_startup_class_preload.enable|\
-    persist.sys.dexpreload.*|\
-    persist.sys.precache.enable|\
-    dalvik.vm.dex2oat-minidebuginfo|\
-    dalvik.vm.minidebuginfo|\
-    dalvik.vm.dex2oat-filter|\
-    dalvik.vm.dex2oat-threads|\
-    dalvik.vm.dex2oat-very-large|\
-    dalvik.vm.dex2oat-resolve-startup-strings|\
-    dalvik.vm.dex2oat-cpu-set|\
-    dalvik.vm.boot-dex2oat-cpu-set|\
-    dalvik.vm.background-dex2oat-cpu-set|\
-    dalvik.vm.image-dex2oat-cpu-set|\
-    dalvik.vm.dex2oat-Xms|\
-    dalvik.vm.dex2oat-Xmx|\
-    dalvik.vm.image-dex2oat-Xms|\
-    dalvik.vm.image-dex2oat-Xmx|\
-    dalvik.vm.bg-dex2oat-threads|\
-    dalvik.vm.image-dex2oat-threads|\
-    dalvik.vm.boot-dex2oat-threads|\
-    dalvik.vm.useartservice|\
-    dalvik.vm.usejit|\
-    dalvik.vm.usejitprofiles|\
-    dalvik.vm.enable_pr_dexopt|\
-    dalvik.vm.pr_dexopt_async_for_ota|\
-    dalvik.vm.dexopt.secondary|\
-    dalvik.vm.dexopt.thermal-cutoff|\
-    dalvik.vm.madvise.artfile.size|\
-    dalvik.vm.madvise.odexfile.size|\
-    dalvik.vm.madvise.vdexfile.size|\
-    dalvik.vm.bgdexopt.*|\
-    dalvik.vm.background-dex2oat-threads|\
-    dalvik.vm.jitmaxsize|\
-    dalvik.vm.ps-min-save-period-ms|\
-    dalvik.vm.ps-min-first-save-ms|\
-    system_perf_init.*|\
-    ro.vendor.dex2oat*|\
-    oplus.*|\
-    sys.oplus.*|\
-    sys.heap.*|\
-    sys.furtherHeapEnlarge.optimize.enable|\
-    sys.gcsupression.optimize.enable)
-      return 0
-      ;;
-  esac
-
-  return 1
+chooseport() {
+  DELAY="${1:-3}"
+  EVENT_FILE="${TMPDIR:-/dev}/dex2oat-events"
+  while :; do
+    : > "$EVENT_FILE" 2>/dev/null || true
+    if command -v timeout >/dev/null 2>&1; then
+      timeout "$DELAY" /system/bin/getevent -lqc 1 > "$EVENT_FILE" 2>&1 &
+    else
+      /system/bin/getevent -lqc 1 > "$EVENT_FILE" 2>&1 &
+    fi
+    sleep 0.5
+    grep -q 'KEY_VOLUMEUP *DOWN' "$EVENT_FILE" 2>/dev/null && return 0
+    grep -q 'KEY_VOLUMEDOWN *DOWN' "$EVENT_FILE" 2>/dev/null && return 1
+  done
 }
 
-normalize_prop_line() {
-  PROP_LINE="$(printf '%s' "$1" | tr -d '\r')"
-
-  case "$PROP_LINE" in
-    \#*)
-      PROP_LINE="${PROP_LINE#\#}"
-      ;;
-  esac
-
-  while :; do
-    case "$PROP_LINE" in
-      " "*)
-        PROP_LINE="${PROP_LINE# }"
-        ;;
-      *)
-        break
-        ;;
-    esac
-  done
-
-  printf '%s\n' "$PROP_LINE"
+show_prompt() {
+  ui_print " "
+  ui_print "║  $1"
+  ui_print "║"
+  ui_print "║  音量上键: 是"
+  ui_print "║  音量下键: 否"
+  ui_print "╚══════════════════════════════════════"
+  chooseport
+  return $?
 }
 
 chmod_readable_tree() {
   TREE_PATH="$1"
-
   [ -d "$TREE_PATH" ] || return 0
-
   chmod 0755 "$TREE_PATH" || return 1
   find "$TREE_PATH" -type d -exec chmod 0755 {} \; 2>/dev/null || return 1
   find "$TREE_PATH" -type f -exec chmod 0644 {} \; 2>/dev/null || return 1
   return 0
 }
 
-# 检查设备厂商
-DEVICE_INFO="$(
-  printf '%s %s %s %s %s %s %s %s' \
-    "$(getprop ro.build.version.oplusrom)" \
-    "$(getprop ro.oplus.version)" \
-    "$(getprop ro.product.brand)" \
-    "$(getprop ro.product.manufacturer)" \
-    "$(getprop ro.product.marketname)" \
-    "$(getprop ro.product.bootimage.brand)" \
-    "$(getprop ro.miui.ui.version.name)" \
-    "$(getprop ro.mi.os.version.name)" |
-    tr '[:upper:]' '[:lower:]'
-)"
+is_managed_prop() {
+  case "$1" in
+    pm.dexopt.*|persist.sys.oplus.*|persist.sys.feature.compile.*|persist.device_config.runtime_native.*|persist.device_config.runtime_native_boot.*|persist.device_config.runtime.*|persist.dalvik.vm.dex2oat-threads|persist.miui.*|persist.oplus.*|persist.sys.app_dexfile_preload.enable|persist.sys.art_startup_class_preload.enable|persist.sys.dexpreload.*|persist.sys.precache.enable|dalvik.vm.*|system_perf_init.*|ro.vendor.dex2oat*|oplus.*|sys.oplus.*|sys.heap.*|sys.furtherHeapEnlarge.optimize.enable|sys.gcsupression.optimize.enable)
+      return 0 ;;
+  esac
+  return 1
+}
 
-case "$DEVICE_INFO" in
-  *coloros*|*oplus*|*oppo*|*oneplus*|*realme*)
-    DEVICE_VENDOR=oplus
-    DEVICE_LABEL="OPlus-family"
-    log_install "- Detected supported OPlus-family device"
-    ;;
-  *xiaomi*|*redmi*|*poco*|*miui*|*hyperos*)
-    DEVICE_VENDOR=xiaomi
-    DEVICE_LABEL="Xiaomi-family"
-    log_install "- Detected supported Xiaomi-family device"
-    ;;
-  *)
-    log_install "! Unsupported device detected"
-    log_install "! This module only works on OPlus or Xiaomi-family devices"
-    fail_install "Unsupported device"
-    ;;
-esac
+normalize_prop_line() {
+  PROP_LINE="$(printf '%s' "$1" | tr -d '\r')"
+  case "$PROP_LINE" in \#*) PROP_LINE="${PROP_LINE#\#}" ;; esac
+  while :; do
+    case "$PROP_LINE" in " "*) PROP_LINE="${PROP_LINE# }" ;; *) break ;; esac
+  done
+  printf '%s\n' "$PROP_LINE"
+}
 
-log_install "- Initializing configuration"
+write_device_prop() {
+  {
+    printf 'ro.product.model=%s\n' "$(getprop ro.product.model)"
+    printf 'ro.product.manufacturer=%s\n' "$(getprop ro.product.manufacturer)"
+    printf 'ro.build.version.release=%s\n' "$(getprop ro.build.version.release)"
+    printf 'ro.build.version.sdk=%s\n' "$(getprop ro.build.version.sdk)"
+    printf 'vendor=%s\n' "$DEVICE_VENDOR"
+    printf 'label=%s\n' "$DEVICE_LABEL"
+  } > "$DEVICE_FILE" 2>/dev/null || fail_install "Failed to write device.prop"
+}
 
-# 创建数据目录
-mkdir -p "$BACKUP_DIR" || fail_install "Failed to create backup dir"
-STATE_CREATED=1
-mkdir -p "$LOG_DIR" || fail_install "Failed to create log dir"
-INSTALL_STARTED=1
-: > "$INSTALL_LOG"
-log_install "- Installing Dex2oat Lock"
-log_install "- Module path: $MODPATH"
-log_install "- Device info: $DEVICE_INFO"
-log_install "- Device vendor: $DEVICE_VENDOR"
+write_config_source() {
+  SOURCE_MODE="$1"
+  SOURCE_REASON="$2"
+  {
+    printf 'source=%s\n' "$SOURCE_MODE"
+    printf 'vendor=%s\n' "$DEVICE_VENDOR"
+    printf 'version=%s\n' "$MODULE_VERSION"
+    printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
+    [ -n "$SOURCE_REASON" ] && printf 'reason=%s\n' "$SOURCE_REASON"
+    printf 'updated_at=%s\n' "$(date '+%s')"
+  } > "$CONFIG_SOURCE_FILE" 2>/dev/null || true
+  chmod 0600 "$CONFIG_SOURCE_FILE" 2>/dev/null || true
+}
 
-PREVIOUS_VENDOR="$(sed -n 's/^vendor=//p' "$DEVICE_FILE" 2>/dev/null | head -n 1)"
-if [ -n "$PREVIOUS_VENDOR" ] && [ "$PREVIOUS_VENDOR" != "$DEVICE_VENDOR" ] && [ -f "$CONFIG_FILE" ]; then
-  mv -f "$CONFIG_FILE" "$BACKUP_DIR/config.$PREVIOUS_VENDOR.json" 2>/dev/null || fail_install "Failed to backup previous vendor config"
-fi
+append_install_log() {
+  {
+    printf '%s\n' '--- install ---'
+    printf 'time=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+    printf 'vendor=%s\n' "${DEVICE_VENDOR:-unknown}"
+    printf 'source=%s\n' "${INSTALL_SOURCE:-unknown}"
+    printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
+    printf 'version=%s\n' "${MODULE_VERSION:-unknown}"
+  } >> "$INSTALL_LOG" 2>/dev/null || true
+}
 
-case "$DEVICE_VENDOR" in
-  oplus|xiaomi)
-    VENDOR_PROP_TEMPLATE="$MODPATH/props/$DEVICE_VENDOR.prop"
-    [ -f "$VENDOR_PROP_TEMPLATE" ] || fail_install "$DEVICE_VENDOR.prop not found at $VENDOR_PROP_TEMPLATE"
-    cp -af "$VENDOR_PROP_TEMPLATE" "$PROP_FILE" || fail_install "Failed to select $DEVICE_VENDOR system.prop"
-    ;;
-  *)
-    fail_install "Unsupported device vendor"
-    ;;
-esac
-
-{
-  printf 'vendor=%s\n' "$DEVICE_VENDOR"
-  printf 'label=%s\n' "$DEVICE_LABEL"
-} > "$DEVICE_FILE" 2>/dev/null || fail_install "Failed to write device vendor state"
-
-# 备份设备原始属性
-if [ ! -f "$ORIGINAL_PROPS" ]; then
-  : > "$ORIGINAL_PROPS" || fail_install "Failed to create original props backup"
-
+backup_original_props() {
+  : > "$ORIGINAL_PROPS" || fail_install "Failed to create original-props.conf"
   while IFS= read -r RAW_PROP_LINE; do
     PROP_LINE="$(normalize_prop_line "$RAW_PROP_LINE")"
-
-    case "$PROP_LINE" in
-      *=*)
-        PROP_KEY="${PROP_LINE%%=*}"
-        ;;
-      *)
-        continue
-        ;;
-    esac
-
-    case "$PROP_KEY" in
-      ""|\#*)
-        continue
-        ;;
-    esac
-
+    case "$PROP_LINE" in *=*) PROP_KEY="${PROP_LINE%%=*}" ;; *) continue ;; esac
+    [ -z "$PROP_KEY" ] && continue
     if is_managed_prop "$PROP_KEY" && ! grep -F -q "$PROP_KEY=" "$ORIGINAL_PROPS" && ! grep -F -q "@unset:$PROP_KEY" "$ORIGINAL_PROPS"; then
       CURRENT_VALUE="$(getprop "$PROP_KEY")"
-
       if [ -n "$CURRENT_VALUE" ]; then
-        printf '%s=%s\n' "$PROP_KEY" "$CURRENT_VALUE" >> "$ORIGINAL_PROPS" || fail_install "Failed to write original props backup"
+        printf '%s=%s\n' "$PROP_KEY" "$CURRENT_VALUE" >> "$ORIGINAL_PROPS" || fail_install "Failed to write original prop backup"
       else
-        printf '@unset:%s\n' "$PROP_KEY" >> "$ORIGINAL_PROPS" || fail_install "Failed to write original props backup"
+        printf '@unset:%s\n' "$PROP_KEY" >> "$ORIGINAL_PROPS" || fail_install "Failed to write original prop backup"
       fi
     fi
-  done < "$PROP_FILE"
-fi
-BACKUP_READY=1
+  done < "$VENDOR_PROP_TEMPLATE"
+}
 
-# 备份出厂配置
-cp -af "$PROP_FILE" "$BACKUP_DIR/system.prop.factory" || fail_install "Failed to backup factory system.prop"
+use_vendor_template() {
+  REASON="$1"
+  cp -af "$VENDOR_PROP_TEMPLATE" "$PROP_FILE" || fail_install "Failed to copy vendor template"
+  INSTALL_SOURCE="$2"
+  [ -n "$INSTALL_SOURCE" ] || INSTALL_SOURCE=template
+  MATCHED_TOTAL=0
+  write_config_source "$INSTALL_SOURCE" "$REASON"
+}
 
-# 初始化 WebUI 配置
-if [ ! -f "$CONFIG_FILE" ]; then
-  cat > "$CONFIG_FILE" <<'EOF'
+run_dex2oat_match() {
+  CAPTURE_SCRIPT="$MODPATH/scripts/capture-props.sh"
+  MATCH_SCRIPT="$MODPATH/scripts/match-props.sh"
+  OPTIONS_FILE="$MODPATH/webroot/data/options.json"
+  [ "$DEVICE_VENDOR" = "xiaomi" ] && OPTIONS_FILE="$MODPATH/webroot/data/options-xiaomi.json"
+
+  [ -f "$CAPTURE_SCRIPT" ] || return 10
+  [ -f "$MATCH_SCRIPT" ] || return 11
+  chmod 0755 "$CAPTURE_SCRIPT" "$MATCH_SCRIPT" 2>/dev/null || true
+
+  sh "$CAPTURE_SCRIPT" "$CAPTURED_PROPS" "$CAPTURE_EXPORT" || return 12
+  sh "$MATCH_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$VENDOR_PROP_TEMPLATE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$DEVICE_VENDOR" "$MODULE_VERSION" || return $?
+
+  MATCHED_TOTAL="$(sed -n 's/^matched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)"
+  [ -n "$MATCHED_TOTAL" ] || MATCHED_TOTAL=0
+  INSTALL_SOURCE=dex2oat-match
+  return 0
+}
+
+init_webui_config() {
+  if [ ! -f "$CONFIG_FILE" ]; then
+    cat > "$CONFIG_FILE" <<'EOF'
 {
   "profile": "safe",
   "pendingReboot": false
 }
 EOF
+  fi
   [ -f "$CONFIG_FILE" ] || fail_install "Failed to create WebUI config"
+}
+
+ui_print "- Installing Dex2oat Lock"
+
+[ -n "$MODPATH" ] || fail_install "MODPATH is not set"
+[ -f "$PROP_FILE" ] || fail_install "system.prop not found at $PROP_FILE"
+
+MODULE_VERSION="$(sed -n 's/^version=//p' "$MODPATH/module.prop" 2>/dev/null | head -n 1)"
+[ -n "$MODULE_VERSION" ] || MODULE_VERSION=unknown
+
+mkdir -p "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" || fail_install "Failed to create state dirs"
+STATE_CREATED=1
+INSTALL_STARTED=1
+touch "$INSTALL_LOG" || fail_install "Failed to create install.log"
+
+DEVICE_INFO="$(printf '%s %s %s %s %s %s %s %s' "$(getprop ro.build.version.oplusrom)" "$(getprop ro.oplus.version)" "$(getprop ro.product.brand)" "$(getprop ro.product.manufacturer)" "$(getprop ro.product.marketname)" "$(getprop ro.product.bootimage.brand)" "$(getprop ro.miui.ui.version.name)" "$(getprop ro.mi.os.version.name)" | tr '[:upper:]' '[:lower:]')"
+
+case "$DEVICE_INFO" in
+  *coloros*|*oplus*|*oppo*|*oneplus*|*realme*) DEVICE_VENDOR=oplus; DEVICE_LABEL="OPlus-family" ;;
+  *xiaomi*|*redmi*|*poco*|*miui*|*hyperos*) DEVICE_VENDOR=xiaomi; DEVICE_LABEL="Xiaomi-family" ;;
+  *) fail_install "Unsupported device" ;;
+esac
+
+VENDOR_PROP_TEMPLATE="$MODPATH/props/$DEVICE_VENDOR.prop"
+[ -f "$VENDOR_PROP_TEMPLATE" ] || fail_install "$DEVICE_VENDOR.prop not found"
+
+write_device_prop
+backup_original_props
+BACKUP_READY=1
+
+EXISTING_SOURCE="$(sed -n 's/^source=//p' "$CONFIG_SOURCE_FILE" 2>/dev/null | head -n 1)"
+SKIP_CONFIG_GENERATION=0
+if [ "$EXISTING_SOURCE" = "webui-custom" ] && [ -s "$PROP_FILE" ]; then
+  if ! show_prompt "检测到 WebUI 自定义配置，是否覆盖并重新匹配？"; then
+    INSTALL_SOURCE=webui-custom
+    MATCHED_TOTAL="$(sed -n 's/^matched_total=//p' "$CONFIG_SOURCE_FILE" 2>/dev/null | head -n 1)"
+    [ -n "$MATCHED_TOTAL" ] || MATCHED_TOTAL=0
+    write_config_source webui-custom preserved
+    SKIP_CONFIG_GENERATION=1
+  fi
 fi
 
-touch "$LOG_DIR/apply.log" || fail_install "Failed to create apply log"
+if [ "$SKIP_CONFIG_GENERATION" != "1" ]; then
+  if show_prompt "是否执行 dex2oat 属性抓取并自动匹配配置？"; then
+    if run_dex2oat_match; then
+      write_config_source dex2oat-match matched
+    else
+      MATCH_STATUS=$?
+      use_vendor_template "match_failed_$MATCH_STATUS" template-fallback
+    fi
+  else
+    use_vendor_template user_skipped template
+  fi
+fi
 
-# 设置脚本权限（不包含 webroot，KernelSU/APatch 会自动处理）
+cp -af "$PROP_FILE" "$BACKUP_DIR/system.prop.factory" 2>/dev/null || true
+init_webui_config
+touch "$STATE_DIR/service.log" 2>/dev/null || true
+append_install_log
+
 chmod 0755 "$MODPATH" || fail_install "Failed to chmod module dir"
-set_perm "$MODPATH/service.sh" 0 0 0755 || fail_install "Failed to set service.sh permission"
-set_perm "$MODPATH/customize.sh" 0 0 0755 || fail_install "Failed to set customize.sh permission"
-set_perm "$MODPATH/uninstall.sh" 0 0 0755 || fail_install "Failed to set uninstall.sh permission"
-set_perm "$MODPATH/system.prop" 0 0 0644 || fail_install "Failed to set system.prop permission"
-set_perm "$MODPATH/module.prop" 0 0 0644 || fail_install "Failed to set module.prop permission"
-chmod_readable_tree "$MODPATH/props" || fail_install "Failed to set props permissions"
+set_perm "$MODPATH/service.sh" 0 0 0755 || fail_install "Failed to chmod service.sh"
+set_perm "$MODPATH/customize.sh" 0 0 0755 || fail_install "Failed to chmod customize.sh"
+set_perm "$MODPATH/uninstall.sh" 0 0 0755 || fail_install "Failed to chmod uninstall.sh"
+set_perm "$MODPATH/system.prop" 0 0 0644 || fail_install "Failed to chmod system.prop"
+set_perm "$MODPATH/module.prop" 0 0 0644 || fail_install "Failed to chmod module.prop"
+chmod_readable_tree "$MODPATH/props" || fail_install "Failed to chmod props"
+chmod_readable_tree "$MODPATH/scripts" || fail_install "Failed to chmod scripts"
 
-# 设置数据目录权限
-chmod 0700 "$STATE_DIR" || fail_install "Failed to chmod state dir"
-chmod 0700 "$BACKUP_DIR" || fail_install "Failed to chmod backup dir"
-chmod 0700 "$LOG_DIR" || fail_install "Failed to chmod log dir"
-chmod 0600 "$CONFIG_FILE" || fail_install "Failed to chmod WebUI config"
-chmod 0600 "$ORIGINAL_PROPS" || fail_install "Failed to chmod original props"
-chmod 0600 "$DEVICE_FILE" || fail_install "Failed to chmod device state"
-chmod 0600 "$INSTALL_LOG" || fail_install "Failed to chmod install log"
+chmod 0700 "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" 2>/dev/null || true
+chmod 0600 "$CONFIG_FILE" "$CONFIG_SOURCE_FILE" "$DEVICE_FILE" "$ORIGINAL_PROPS" "$INSTALL_LOG" "$CAPTURED_PROPS" "$MATCHED_PROPS" "$MATCH_REPORT" 2>/dev/null || true
 
-log_install "- Safe profile enabled by default"
-log_install "- WebUI data directory: $STATE_DIR"
-log_install "- Installation completed"
+log_install "- Installation completed: vendor=$DEVICE_VENDOR source=$INSTALL_SOURCE matched=$MATCHED_TOTAL version=$MODULE_VERSION"
 write_install_state ok installed

@@ -32,6 +32,8 @@ const FILES = [
   "update.json",
   "props/oplus.prop",
   "props/xiaomi.prop",
+  "scripts/capture-props.sh",
+  "scripts/match-props.sh",
   "webroot/css/app.css",
   "webroot/data/app-meta.json",
   "webroot/data/options.json",
@@ -59,7 +61,7 @@ const ps1 = [
     return `  [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, '${src}', '${f}', [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null`;
   }),
   `} finally { $zip.Dispose() }`,
-  `Write-Host "ZIP: $((Get-Item -LiteralPath $zipPath).Length) bytes -> $zipPath"`,
+  `Write-Host "ZIP: $((Get-Item -LiteralPath $zipPath).Length) bytes $zipPath"`,
 ].join("; ");
 
 console.log(`\n=== Building ${version} ===`);

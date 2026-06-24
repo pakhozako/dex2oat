@@ -3,10 +3,11 @@
 MODDIR=${0%/*}
 STATE_DIR=/data/adb/dex2oat-lock
 LOG_DIR="$STATE_DIR/logs"
-LOG_FILE="$LOG_DIR/apply.log"
+LOG_FILE="$STATE_DIR/service.log"
 SERVICE_STATE="$STATE_DIR/service-state.prop"
-FALLBACK_LOG=/data/adb/dex2oat-lock-apply.log
+FALLBACK_LOG=/data/adb/dex2oat-lock-service.log
 PROP_FILE="$MODDIR/system.prop"
+ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
   LOG_FILE="$FALLBACK_LOG"
@@ -14,6 +15,25 @@ fi
 
 log_msg() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
+}
+
+restore_system_prop_from_original() {
+  [ -s "$ORIGINAL_PROPS" ] || return 1
+  TMP_PROP="$PROP_FILE.tmp"
+  {
+    printf '# Restored by Dex2oat Lock service\n'
+    printf '# source=original-props.conf\n\n'
+    while IFS= read -r PROP_LINE || [ -n "$PROP_LINE" ]; do
+      case "$PROP_LINE" in
+        ""|@unset:*) continue ;;
+        *=*) printf '%s\n' "$PROP_LINE" ;;
+      esac
+    done < "$ORIGINAL_PROPS"
+  } > "$TMP_PROP" 2>/dev/null || return 1
+  [ -s "$TMP_PROP" ] || { rm -f "$TMP_PROP" 2>/dev/null; return 1; }
+  mv -f "$TMP_PROP" "$PROP_FILE" 2>/dev/null || return 1
+  chmod 0644 "$PROP_FILE" 2>/dev/null || true
+  return 0
 }
 
 write_service_state() {
@@ -270,9 +290,21 @@ case "$DEVICE_INFO" in
     ;;
 esac
 
-# 检查配置文件是否存在
-if [ ! -f "$PROP_FILE" ]; then
-  log_msg "Error: system.prop not found at $PROP_FILE"
+# 检查配置文件是否存在且非空，丢失时从 original-props.conf 生成恢复文件
+if [ ! -s "$PROP_FILE" ]; then
+  log_msg "Warning: system.prop missing or empty at $PROP_FILE, trying restore from original-props.conf"
+  if restore_system_prop_from_original; then
+    log_msg "Restored system.prop from $ORIGINAL_PROPS"
+  else
+    log_msg "Error: system.prop restore failed"
+    TOTAL_FAILED_COUNT=$((TOTAL_FAILED_COUNT + 1))
+    write_service_state error missing-system-prop system_prop_missing
+    exit 1
+  fi
+fi
+
+if [ ! -s "$PROP_FILE" ]; then
+  log_msg "Error: system.prop still missing or empty after restore"
   TOTAL_FAILED_COUNT=$((TOTAL_FAILED_COUNT + 1))
   write_service_state error missing-system-prop system_prop_missing
   exit 1
