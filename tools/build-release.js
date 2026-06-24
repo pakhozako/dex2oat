@@ -121,15 +121,8 @@ fs.rmSync(distDir, { recursive: true, force: true });
 fs.mkdirSync(distDir, { recursive: true });
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dex2oat-release-"));
-const sourceStage = path.join(tempRoot, "source");
 const protectedStage = path.join(tempRoot, "protected");
-const sourceZip = path.join(distDir, `Dex2oat-Lock-${version}-webui-source.zip`);
 const protectedZip = path.join(distDir, `Dex2oat-Lock-${version}.zip`);
-
-copyReleaseTree(sourceStage);
-run(process.execPath, [path.join(root, "tools/generate-integrity-baseline.js"), sourceStage]);
-zipDirectory(sourceStage, sourceZip);
-verifyZip(sourceZip, { protectedWebui: false });
 
 copyReleaseTree(protectedStage);
 run(process.execPath, [path.join(root, "tools/protect-webui.js"), protectedStage]);
@@ -139,4 +132,3 @@ verifyZip(protectedZip, { protectedWebui: true });
 
 fs.rmSync(tempRoot, { recursive: true, force: true });
 console.log(`build-release: ${path.relative(root, protectedZip)} public`);
-console.log(`build-release: ${path.relative(root, sourceZip)} source-archive`);
