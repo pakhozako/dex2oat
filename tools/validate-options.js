@@ -8,15 +8,12 @@ const root = path.resolve(__dirname, "..");
 const jsonFiles = [
   "update.json",
   "webroot/data/app-meta.json",
-  "webroot/data/vendors.json",
-  "webroot/data/options.json",
-  "webroot/data/options-xiaomi.json",
-  "webroot/data/options-samsung.json",
-  "webroot/data/options-pixel.json",
-  "webroot/data/options-generic.json"
+  "webroot/data/options.json"
 ];
 
 const jsFiles = [
+  "tools/generate-integrity-baseline.js",
+  "tools/protect-webui.js",
   "webroot/js/app.js",
   "webroot/js/bridge.js",
   "webroot/js/config.js",
@@ -32,7 +29,10 @@ const lfFiles = [
   "uninstall.sh",
   "system.prop",
   "scripts/capture-props.sh",
-  "scripts/match-props.sh",
+  "scripts/generate-props.sh",
+  "core/state.sh",
+  "core/integrity-baseline.prop",
+  "core/integrity-check.sh",
   "core/health-check.sh",
   "core/conflict-detect.sh",
   "core/prop-lock.sh"
@@ -44,21 +44,14 @@ const requiredFiles = [
   "service.sh",
   "uninstall.sh",
   "scripts/capture-props.sh",
-  "scripts/match-props.sh",
+  "scripts/generate-props.sh",
+  "core/state.sh",
+  "core/integrity-baseline.prop",
+  "core/integrity-check.sh",
   "core/health-check.sh",
   "core/conflict-detect.sh",
   "core/prop-lock.sh",
-  "props/oplus.prop",
-  "props/xiaomi.prop",
-  "vendor/samsung.prop",
-  "vendor/pixel.prop",
-  "vendor/miui.prop",
-  "vendor/meizu.prop",
-  "vendor/redmagic.prop",
-  "vendor/generic.prop",
-  "webroot/data/options-samsung.json",
-  "webroot/data/options-pixel.json",
-  "webroot/data/options-generic.json"
+  "webroot/data/options.json"
 ];
 
 function read(relativePath) {
@@ -90,6 +83,11 @@ function runNodeCheck(relativePath) {
 function validateOptionFile(relativePath) {
   const data = parseJson(relativePath);
   assert(Array.isArray(data.categories), `${relativePath}: categories must be an array`);
+  const categoryIds = new Set(data.categories.map((category) => category.id));
+  for (const required of ["safe", "caution", "aggressive"]) {
+    assert(categoryIds.has(required), `${relativePath}: missing risk category ${required}`);
+  }
+  const propOwners = new Map();
   for (const category of data.categories) {
     assert(category.id && category.title && category.tone, `${relativePath}: invalid category`);
     assert(Array.isArray(category.items), `${relativePath}: items must be an array`);
@@ -97,6 +95,11 @@ function validateOptionFile(relativePath) {
       assert(item.id && item.label && item.prop, `${relativePath}: invalid item`);
       assert(Array.isArray(item.values) && item.values.length > 0, `${relativePath}: ${item.id} values missing`);
       assert(item.values.includes(item.defaultValue), `${relativePath}: ${item.id} defaultValue not in values`);
+      const owner = propOwners.get(item.prop);
+      if (owner) {
+        assert(owner === item.id || category.id !== "safe", `${relativePath}: duplicate safe prop ${item.prop}`);
+      }
+      propOwners.set(item.prop, item.id);
     }
   }
 }
@@ -118,8 +121,8 @@ for (const file of jsonFiles.filter((file) => file.includes("options"))) {
 const moduleProp = parseModuleProp();
 const updateJson = parseJson("update.json");
 const appMeta = parseJson("webroot/data/app-meta.json");
-assert(moduleProp.version === "v3.0", "module.prop version must be v3.0");
-assert(String(moduleProp.versionCode) === "30", "module.prop versionCode must be 30");
+assert(moduleProp.version === "v3.1", "module.prop version must be v3.1");
+assert(String(moduleProp.versionCode) === "31", "module.prop versionCode must be 31");
 assert(updateJson.version === moduleProp.version, "update.json version mismatch");
 assert(String(updateJson.versionCode) === String(moduleProp.versionCode), "update.json versionCode mismatch");
 assert(appMeta.version === moduleProp.version, "app-meta version mismatch");

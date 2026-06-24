@@ -1,7 +1,7 @@
 id=dex2oat-lock
 name=Dex2oat Lock
-version=v3.0
-versionCode=30
+version=v3.1
+versionCode=31
 author=pakhozako
-description=Multi-vendor dexopt tuning and self-healing monitor
+description=Rule-driven dexopt tuning and unified state monitor
 updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json

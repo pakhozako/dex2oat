@@ -5,6 +5,7 @@ MODDIR="$1"
 
 STATE_DIR=/data/adb/dex2oat-lock
 HEALTH_LOG="$STATE_DIR/health.log"
+STATE_FILE="$STATE_DIR/state.prop"
 PROP_FILE="$MODDIR/system.prop"
 SYSTEM_PROP_BAK="$STATE_DIR/system.prop.bak"
 DEVICE_FILE="$STATE_DIR/device.prop"
@@ -15,6 +16,10 @@ AUTO_FIXED=no
 STATUS=ok
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
+
+if [ -f "$MODDIR/core/state.sh" ]; then
+  . "$MODDIR/core/state.sh"
+fi
 
 restore_system_prop() {
   [ -s "$SYSTEM_PROP_BAK" ] || return 1
@@ -85,5 +90,16 @@ fi
   [ -n "$BOOT_ID" ] && printf 'boot_id=%s\n' "$BOOT_ID"
 } > "$HEALTH_LOG" 2>/dev/null || true
 chmod 0600 "$HEALTH_LOG" 2>/dev/null || true
+
+if command -v state_update >/dev/null 2>&1; then
+  state_update \
+    "health.status=$STATUS" \
+    "health.files_ok=$FILES_OK" \
+    "health.props_ok=$PROPS_OK" \
+    "health.auto_fixed=$AUTO_FIXED" \
+    "health.checked_at=$(date '+%Y-%m-%d %H:%M:%S')" \
+    "health.boot_id=$BOOT_ID" || true
+  state_recompute_summary || true
+fi
 
 exit 0

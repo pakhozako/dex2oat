@@ -5,12 +5,18 @@ MODDIR="$1"
 
 STATE_DIR=/data/adb/dex2oat-lock
 REPORT_FILE="$STATE_DIR/conflict-report.txt"
+STATE_FILE="$STATE_DIR/state.prop"
 PROP_FILE="$MODDIR/system.prop"
 TMP_FILE="$STATE_DIR/conflict-report.tmp"
 CONFLICT_TOTAL=0
 SCAN_STATUS=ok
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
+
+if [ -f "$MODDIR/core/state.sh" ]; then
+  . "$MODDIR/core/state.sh"
+fi
+
 : > "$TMP_FILE" 2>/dev/null || SCAN_STATUS=error
 
 has_prop_in_module() {
@@ -70,4 +76,11 @@ fi
 
 rm -f "$TMP_FILE" 2>/dev/null || true
 chmod 0600 "$REPORT_FILE" 2>/dev/null || true
+if command -v state_update >/dev/null 2>&1; then
+  state_update \
+    "conflict.status=$SCAN_STATUS" \
+    "conflict.total=$CONFLICT_TOTAL" \
+    "conflict.checked_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+  state_recompute_summary || true
+fi
 exit 0

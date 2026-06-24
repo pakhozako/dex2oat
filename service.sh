@@ -5,6 +5,7 @@ STATE_DIR=/data/adb/dex2oat-lock
 LOG_DIR="$STATE_DIR/logs"
 LOG_FILE="$STATE_DIR/service.log"
 SERVICE_STATE="$STATE_DIR/service-state.prop"
+STATE_FILE="$STATE_DIR/state.prop"
 FALLBACK_LOG=/data/adb/dex2oat-lock-service.log
 PROP_FILE="$MODDIR/system.prop"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
@@ -15,6 +16,10 @@ MATCH_REPORT="$STATE_DIR/match-report.txt"
 PROP_LOCK_LIST="$STATE_DIR/prop-lock.list"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 TRIGGER_REMATCH="$STATE_DIR/trigger-rematch"
+
+if [ -f "$MODDIR/core/state.sh" ]; then
+  . "$MODDIR/core/state.sh"
+fi
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
   LOG_FILE="$FALLBACK_LOG"
@@ -102,46 +107,53 @@ write_service_state() {
     [ -n "$BOOT_ID" ] && printf 'boot_id=%s\n' "$BOOT_ID"
   } > "$SERVICE_STATE" 2>/dev/null || true
   chmod 0600 "$SERVICE_STATE" 2>/dev/null || true
+  if command -v state_update >/dev/null 2>&1; then
+    state_update \
+      "service.status=$STATE_STATUS" \
+      "service.phase=$STATE_PHASE" \
+      "service.health=$STATE_HEALTH" \
+      "service.reason=$STATE_REASON" \
+      "service.prop_total=${TOTAL_PROP_COUNT:-0}" \
+      "service.applied_total=${TOTAL_APPLIED_COUNT:-0}" \
+      "service.matched_total=${TOTAL_MATCHED_COUNT:-0}" \
+      "service.mismatch_total=${TOTAL_MISMATCH_COUNT:-0}" \
+      "service.failed_total=${TOTAL_FAILED_COUNT:-0}" \
+      "service.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" \
+      "service.boot_id=$BOOT_ID" || true
+    state_recompute_summary || true
+  fi
 }
 
 run_trigger_rematch() {
   [ -f "$TRIGGER_REMATCH" ] || return 0
 
-  VENDOR="$(sed -n 's/^vendor=//p' "$STATE_DIR/device.prop" 2>/dev/null | head -n 1)"
-  [ -n "$VENDOR" ] || VENDOR=generic
-  OPTIONS_FILE="$(options_file_for_vendor "$VENDOR")"
-  TEMPLATE_FILE="$(template_file_for_vendor "$VENDOR")"
+  OPTIONS_FILE="$MODDIR/webroot/data/options.json"
+  GENERATE_SCRIPT="$MODDIR/scripts/generate-props.sh"
   MODULE_VERSION="$(sed -n 's/^version=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
 
-  log_msg "Trigger rematch detected: vendor=$VENDOR version=$MODULE_VERSION"
-  if sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "/storage/emulated/0/Download/dex2oat-captured-props.txt" && \
-     sh "$MODDIR/scripts/match-props.sh" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$TEMPLATE_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$VENDOR" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
+  log_msg "Trigger rematch detected: rule-driven version=$MODULE_VERSION"
+  sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "/storage/emulated/0/Download/dex2oat-captured-props.txt" || : > "$CAPTURED_PROPS"
+  if sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
     cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
     chmod 0600 "$SYSTEM_PROP_BAK" 2>/dev/null || true
     write_prop_lock_list || true
+    command -v state_set_config_summary >/dev/null 2>&1 && state_set_config_summary "$PROP_FILE" auto-rules rematch || true
+    command -v state_update >/dev/null 2>&1 && state_update \
+      "match.status=ok" \
+      "match.mode=rule-driven" \
+      "match.matched_total=$(sed -n 's/^matched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.captured_total=$(sed -n 's/^captured_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.default_total=$(sed -n 's/^default_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+    command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
     [ -f "$MODDIR/core/conflict-detect.sh" ] && sh "$MODDIR/core/conflict-detect.sh" "$MODDIR" 2>/dev/null || true
     log_msg "Trigger rematch completed"
   else
+    command -v state_update >/dev/null 2>&1 && state_update "match.status=failed" "match.reason=rematch_failed" "match.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+    command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
     log_msg "Trigger rematch failed; keeping current system.prop"
   fi
   rm -f "$TRIGGER_REMATCH" 2>/dev/null
-}
-
-options_file_for_vendor() {
-  case "$1" in
-    xiaomi|miui) printf '%s\n' "$MODDIR/webroot/data/options-xiaomi.json" ;;
-    samsung) printf '%s\n' "$MODDIR/webroot/data/options-samsung.json" ;;
-    pixel) printf '%s\n' "$MODDIR/webroot/data/options-pixel.json" ;;
-    meizu|redmagic|generic) printf '%s\n' "$MODDIR/webroot/data/options-generic.json" ;;
-    *) printf '%s\n' "$MODDIR/webroot/data/options.json" ;;
-  esac
-}
-
-template_file_for_vendor() {
-  TEMPLATE_FILE="$MODDIR/vendor/$1.prop"
-  [ -f "$TEMPLATE_FILE" ] || TEMPLATE_FILE="$MODDIR/props/$1.prop"
-  [ -f "$TEMPLATE_FILE" ] || TEMPLATE_FILE="$MODDIR/vendor/generic.prop"
-  printf '%s\n' "$TEMPLATE_FILE"
 }
 
 apply_prop() {
@@ -321,44 +333,20 @@ if [ "$(getprop sys.boot_completed)" != "1" ]; then
 fi
 
 sleep 10
-log_msg "Boot completed, checking device..."
+log_msg "Boot completed, checking rule-driven state..."
 run_trigger_rematch
 
 if [ -f "$MODDIR/core/health-check.sh" ]; then
   sh "$MODDIR/core/health-check.sh" "$MODDIR" 2>/dev/null || true
 fi
 
+if [ -f "$MODDIR/core/integrity-check.sh" ]; then
+  sh "$MODDIR/core/integrity-check.sh" "$MODDIR" 2>/dev/null || true
+fi
+
 if [ -f "$MODDIR/core/prop-lock.sh" ]; then
   sh "$MODDIR/core/prop-lock.sh" "$MODDIR" 2>/dev/null || true
 fi
-
-DEVICE_INFO="$(
-  printf '%s %s %s %s %s %s %s %s' \
-    "$(getprop ro.build.version.oplusrom)" \
-    "$(getprop ro.oplus.version)" \
-    "$(getprop ro.product.brand)" \
-    "$(getprop ro.product.manufacturer)" \
-    "$(getprop ro.product.marketname)" \
-    "$(getprop ro.product.bootimage.brand)" \
-    "$(getprop ro.miui.ui.version.name)" \
-    "$(getprop ro.mi.os.version.name)" |
-    tr '[:upper:]' '[:lower:]'
-)"
-
-case "$DEVICE_INFO" in
-  *coloros*|*oplus*|*oppo*|*oneplus*|*realme*)
-    log_msg "Detected supported OPlus-family device: $DEVICE_INFO"
-    ;;
-  *xiaomi*|*redmi*|*poco*|*miui*|*hyperos*)
-    log_msg "Detected supported Xiaomi-family device: $DEVICE_INFO"
-    ;;
-  *samsung*|*google*|*pixel*|*meizu*|*redmagic*|*nubia*)
-    log_msg "Detected supported multi-vendor device: $DEVICE_INFO"
-    ;;
-  *)
-    log_msg "Unknown device: $DEVICE_INFO. Applying generic runtime properties."
-    ;;
-esac
 
 # 检查配置文件是否存在且非空，丢失时从 system.prop.bak 恢复
 if [ ! -s "$PROP_FILE" ]; then

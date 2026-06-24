@@ -1,721 +1,721 @@
 {
-  "categories": [
-    {
-      "id": "safe",
-      "title": "安全",
-      "tone": "safe",
-      "description": "日常推荐配置，优先降低后台编译、缓存预读和厂商私有触发项带来的负载，适合长期启用。",
-      "items": [
-        {
-          "id": "pm_bg_dexopt",
-          "label": "跳过后台 dexopt",
-          "description": "作用：控制系统空闲时触发的后台 dexopt 维护任务。可选值：skip 表示跳过后台重编译；speed-profile 按运行画像做性能编译；verify 仅做字节码校验。场景：希望减少待机发热、后台 I/O 和无感重编译时建议使用 skip；如果更看重后台逐步优化应用启动速度，可改为 speed-profile。",
-          "prop": "pm.dexopt.bg-dexopt",
-          "defaultEnabled": true,
-          "defaultValue": "skip",
-          "values": ["skip", "speed-profile", "verify"]
-        },
-        {
-          "id": "pm_boot_after_ota",
-          "label": "OTA 后编译策略",
-          "description": "作用：定义系统 OTA 更新后首次启动阶段的包编译策略。可选值：verify 仅校验；speed-profile 基于 profile 编译热点路径；speed 编译更多代码以提升运行速度；everything 尽可能全量 AOT。场景：日常推荐 speed-profile，兼顾 OTA 后恢复速度和后续性能；低存储或怕发热可选 verify；只在愿意接受更长更新后维护时间时使用 speed/everything。",
-          "prop": "pm.dexopt.boot-after-ota",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_mainline",
-          "label": "Mainline 更新后编译策略",
-          "description": "作用：控制 ART/Mainline 模块更新后的 dexopt 行为。可选值：verify、speed-profile、speed、everything，编译强度依次升高。场景：Mainline 更新频率较高，默认 verify 可减少更新后的后台负载；遇到运行时组件更新后应用启动异常或性能波动，可临时改为 speed-profile。",
-          "prop": "pm.dexopt.boot-after-mainline-update",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_install",
-          "label": "安装时编译策略",
-          "description": "作用：控制普通安装路径下新安装或更新应用的 dexopt 策略。可选值：verify 最快但优化最少；speed-profile 以 profile 为准进行平衡优化；speed 更偏性能；everything 编译最彻底但安装最慢。场景：日常安装推荐 speed-profile；频繁安装测试包可选 verify；大型游戏或长期使用应用可在可接受安装耗时的情况下选择 speed。",
-          "prop": "pm.dexopt.install",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_install_bulk",
-          "label": "批量安装编译策略",
-          "description": "作用：控制批量安装多应用时的编译策略，例如恢复备份、应用商店批量更新。可选值：verify、speed-profile、speed、everything。场景：批量安装对耗时和温度更敏感，推荐 speed-profile；大量恢复应用且希望尽快完成安装时可用 verify；不建议在批量场景使用 everything。",
-          "prop": "pm.dexopt.install-bulk",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_install_bulk_downgraded",
-          "label": "批量安装降级包策略",
-          "description": "作用：控制批量安装降级 APK 时的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：降级包更容易出现 oat/art 产物不匹配，默认 verify 可减少无效编译；如果确认降级包稳定且希望保留运行性能，可改为 speed-profile。",
-          "prop": "pm.dexopt.install-bulk-downgraded",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_install_bulk_secondary",
-          "label": "批量安装 secondary dex",
-          "description": "作用：控制批量安装时 secondary dex 的处理策略，secondary dex 常见于插件化、动态加载或多 dex 应用。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可减少批量安装负载；如果常用大型插件化应用并希望安装后立即优化，可选择 speed-profile。",
-          "prop": "pm.dexopt.install-bulk-secondary",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_install_bulk_secondary_downgraded",
-          "label": "批量降级 secondary dex",
-          "description": "作用：控制批量安装降级包时 secondary dex 的编译策略。可选值：verify、speed-profile、speed、everything。场景：降级和 secondary dex 叠加时兼容性风险更高，推荐 verify；仅在明确需要性能优化且确认应用兼容时使用 speed-profile 或更高档位。",
-          "prop": "pm.dexopt.install-bulk-secondary-downgraded",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_install_fast",
-          "label": "快速安装路径策略",
-          "description": "作用：控制 fast install 路径使用的 dexopt 策略，这类路径通常强调安装完成速度。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可最大化安装速度；如果安装后首次启动性能更重要，可切到 speed-profile。",
-          "prop": "pm.dexopt.install-fast",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_post_boot",
-          "label": "开机后编译策略",
-          "description": "作用：控制系统启动完成后的 post-boot dexopt 维护策略。可选值：verify、speed-profile、speed、everything。场景：推荐 verify，减少开机后温度和 I/O 峰值；如果设备性能充足且希望系统在开机后自动补齐优化，可选择 speed-profile。",
-          "prop": "pm.dexopt.post-boot",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_first_boot",
-          "label": "首次开机编译策略",
-          "description": "作用：控制首次启动、恢复出厂或系统初始化后的编译策略。可选值：verify、speed-profile、speed、everything。场景：首次启动阶段任务密集，默认 verify 可缩短进入系统时间；刷机后愿意等待完整优化时可选择 speed-profile 或 speed。",
-          "prop": "pm.dexopt.first-boot",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_shared",
-          "label": "共享库编译策略",
-          "description": "作用：控制共享库和被多应用依赖组件的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：共享库影响范围更大，默认 speed 可提升依赖应用的公共路径性能；低端设备或存储紧张时可降为 speed-profile。",
-          "prop": "pm.dexopt.shared",
-          "defaultEnabled": true,
-          "defaultValue": "speed",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_inactive",
-          "label": "闲置 App 编译策略",
-          "description": "作用：控制长期未使用应用被维护任务触发时的编译策略。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可避免为低频应用浪费编译时间和存储；如果某些应用偶尔使用但启动体验重要，可改为 speed-profile。",
-          "prop": "pm.dexopt.inactive",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_ab_ota",
-          "label": "A/B OTA 编译策略",
-          "description": "作用：控制 A/B 分区 OTA 场景下的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：A/B OTA 可在后台准备更新产物，speed-profile 通常能平衡后台耗时与更新后性能；低温控余量设备可降为 verify。",
-          "prop": "pm.dexopt.ab-ota",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_cmdline",
-          "label": "手动触发编译策略",
-          "description": "作用：控制命令行或工具手动触发 dexopt 时的默认策略。可选值：verify、speed-profile、speed、everything。场景：常配合 adb shell cmd package compile 使用，默认 speed-profile 适合手动维护；需要强制性能优化时再手动切换 speed/everything。",
-          "prop": "pm.dexopt.cmdline",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "pm_downgrade_days",
-          "label": "闲置降级阈值",
-          "description": "作用：设置应用闲置多少天后允许系统降低其编译优化等级。可选值：15、90、365、9999，数值越大越不容易降级。场景：推荐 9999，用于避免系统频繁回收或降级编译产物；存储空间紧张且愿意牺牲低频应用性能时可选择较小天数。",
-          "prop": "pm.dexopt.downgrade_after_inactive_days",
-          "defaultEnabled": true,
-          "defaultValue": "9999",
-          "values": ["15", "90", "365", "9999"]
-        },
-        {
-          "id": "mini_debug",
-          "label": "关闭 dex2oat 调试符号",
-          "description": "作用：控制 dex2oat 是否生成 mini debug info。可选值：false 表示不生成，减少编译产物体积；true 表示保留调试信息，便于底层诊断。场景：普通用户推荐 false；只有在分析 ART 崩溃、native 堆栈或开发调试时才考虑 true。",
-          "prop": "dalvik.vm.dex2oat-minidebuginfo",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "mini_debug_vm",
-          "label": "关闭 VM 调试符号",
-          "description": "作用：控制 Dalvik/ART VM 层面的 mini debug info。可选值：false 关闭，true 开启。场景：日常使用推荐 false，以减少产物和日志负担；开发者定位运行时异常时可临时开启。",
-          "prop": "dalvik.vm.minidebuginfo",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "oplus_bgdex2oat",
-          "label": "ColorOS 后台编译开关",
-          "description": "作用：控制 OPlus/ColorOS 私有后台 dex2oat 触发开关。可选值：false 关闭私有后台编译；true 允许系统按厂商策略执行。场景：推荐 false，减少系统在后台自行触发编译；如果遇到厂商应用更新后性能异常，可临时恢复 true。",
-          "prop": "persist.sys.oplus.bgdex2oat_enabled",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "compile_cache_miss",
-          "label": "ColorOS 编译缓存 miss 触发",
-          "description": "作用：控制 ColorOS 编译缓存 miss 后是否触发额外重编译。可选值：0 表示关闭该触发；1 表示启用厂商逻辑。场景：推荐 0，避免缓存未命中导致频繁后台编译；仅在确认厂商缓存机制对当前 ROM 有正向收益时使用 1。",
-          "prop": "persist.sys.feature.compile.re.cache.miss",
-          "defaultEnabled": true,
-          "defaultValue": "0",
-          "values": ["0", "1"]
-        },
-        {
-          "id": "compile_cache_fmap",
-          "label": "ColorOS 编译缓存 fmap",
-          "description": "作用：控制 ColorOS 编译缓存 fmap size 相关私有特性。可选值：0 关闭；1 启用。场景：默认 0 更保守，可降低未知 ROM 私有逻辑带来的副作用；除非已验证当前机型启用后有收益，否则不建议打开。",
-          "prop": "persist.sys.feature.compile.re.fmap.size",
-          "defaultEnabled": true,
-          "defaultValue": "0",
-          "values": ["0", "1"]
-        },
-        {
-          "id": "startup_cache",
-          "label": "禁用启动镜像缓存",
-          "description": "作用：控制 runtime_native 的 app image startup cache。可选值：false 禁用；true 启用。场景：禁用可减少启动缓存写入和缓存失效后的维护负担；如果追求应用冷启动缓存收益且设备存储压力不大，可尝试 true。",
-          "prop": "persist.device_config.runtime_native.use_app_image_startup_cache",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "iorap_readahead",
-          "label": "禁用 iorap 预读",
-          "description": "作用：控制 iorap readahead 预读机制。可选值：false 禁用；true 启用。场景：Android 12 以后 iorap 在不同 ROM 上差异较大，推荐 false 以减少启动轨迹学习和预读负担；如果当前系统仍依赖 iorap 优化冷启动，可测试 true。",
-          "prop": "persist.device_config.runtime_native_boot.iorap_readahead_enable",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "iorap_perfetto",
-          "label": "禁用 iorap 追踪",
-          "description": "作用：控制 iorap perfetto trace 采集。可选值：false 禁用追踪；true 启用追踪。场景：推荐 false，避免为启动预测持续采样；只有在调试启动预读行为或厂商 ROM 明确依赖该链路时才开启。",
-          "prop": "persist.device_config.runtime_native_boot.iorap_perfetto_enable",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "opex_merge",
-          "label": "ColorOS opex merge 触发",
-          "description": "作用：控制 OPlus opex merge 私有触发项。可选值：false 关闭；true 启用。场景：该项属于厂商私有行为，跨版本含义可能变化，推荐 false；仅在确认 ROM 需要 opex merge 维护时开启。",
-          "prop": "oplus.opex.merge",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "opex_modulemerge",
-          "label": "ColorOS opex modulemerge",
-          "description": "作用：控制 OPlus opex modulemerge 私有触发项。可选值：false 关闭；true 启用。场景：推荐 false，减少无法预期的厂商后台维护任务；如果系统模块更新后出现厂商组件优化异常，可临时测试 true。",
-          "prop": "oplus.opex.modulemerge",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "ocompiler",
-          "label": "OPlus 编译器服务",
-          "description": "控制 OPlus 私有编译器服务（ocompiler），MTK 平台常见。false 关闭，减少厂商独立触发编译。",
-          "prop": "persist.oplus.ocompiler",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "zygote_c",
-          "label": "ZygoteC",
-          "description": "控制 OPlus ZygoteC 特性（MTK）。false 关闭，减少额外编译链路。",
-          "prop": "persist.oplus.zygote_c.enable",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "zygote_ocomp",
-          "label": "Zygote ocomp",
-          "description": "控制 OPlus Zygote ocomp 优化（MTK）。false 关闭，减少 zygote 阶段编译。",
-          "prop": "persist.oplus.zygote_ocomp",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "runtime_dexopt",
-          "label": "禁用运行时 dexopt",
-          "description": "控制设备配置文件命名空间的 dexopt 开关。false 关闭，阻止 runtime 层触发重编译。",
-          "prop": "persist.device_config.runtime.dexopt.enabled",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "runtime_bg_dexopt",
-          "label": "禁用运行时后台 dexopt",
-          "description": "控制设备配置文件命名空间的后台 dexopt。false 关闭，减少空闲维护编译。",
-          "prop": "persist.device_config.runtime.bg_dexopt.enabled",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "runtime_profile_merge",
-          "label": "禁用运行时 profile merge",
-          "description": "控制设备配置文件命名空间的 profile 合并。false 关闭，减少合并触发 I/O。",
-          "prop": "persist.device_config.runtime.profile_merge",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "disable_pr_dexopt",
-          "label": "禁用 PR dexopt",
-          "description": "禁用 Package Reference dexopt profile 链路。false 关闭，减少 profile 维护开销。",
-          "prop": "dalvik.vm.enable_pr_dexopt",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "disable_ota_pr",
-          "label": "禁用 OTA 异步 PR",
-          "description": "禁用 OTA 后异步 pr_dexopt。false 关闭，减少 OTA 后台负载。",
-          "prop": "dalvik.vm.pr_dexopt_async_for_ota",
-          "defaultEnabled": true,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "bgdexopt_new_classes",
-          "label": "bg-dexopt 新类阈值",
-          "description": "后台 dexopt 因新增类触发的比例阈值。0 最小触发，10/20 允许一定增量编译。",
-          "prop": "dalvik.vm.bgdexopt.new-classes-percent",
-          "defaultEnabled": true,
-          "defaultValue": "0",
-          "values": ["0", "10", "20"]
-        },
-        {
-          "id": "bgdexopt_new_methods",
-          "label": "bg-dexopt 新方法阈值",
-          "description": "后台 dexopt 因新增方法触发的比例阈值。0 最小触发，10/20 允许一定增量编译。",
-          "prop": "dalvik.vm.bgdexopt.new-methods-percent",
-          "defaultEnabled": true,
-          "defaultValue": "0",
-          "values": ["0", "10", "20"]
-        }
-      ]
-    },
-    {
-      "id": "caution",
-      "title": "谨慎",
-      "tone": "caution",
-      "description": "进阶配置，涉及全局 dex2oat filter、线程调度、JIT、profile 和厂商私有优化。建议逐项了解后再启用。",
-      "items": [
-        {
-          "id": "dex2oat_filter",
-          "label": "默认 dex2oat 编译过滤器",
-          "description": "设置全局 dex2oat-filter 默认强度。speed-profile 平衡体验，speed/everything 增加编译量，verify 最轻量。",
-          "prop": "dalvik.vm.dex2oat-filter",
-          "defaultEnabled": false,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "very_large",
-          "label": "超大 APK 编译策略",
-          "description": "控制 very-large APK 的编译策略。everything 全量 AOT 但安装慢、发热高；speed-profile 平衡；verify 轻量。",
-          "prop": "dalvik.vm.dex2oat-very-large",
-          "defaultEnabled": false,
-          "defaultValue": "verify",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "resolve_startup",
-          "label": "启动字符串预解析",
-          "description": "控制 dex2oat 是否预解析启动路径字符串。false 减少编译工作，true 可能改善冷启动。",
-          "prop": "dalvik.vm.dex2oat-resolve-startup-strings",
-          "defaultEnabled": false,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "oplus_tempcontrol",
-          "label": "温控编译触发",
-          "description": "控制 OPlus 温控与编译联动。false 关闭，避免温控额外触发编译。",
-          "prop": "oplus.dex.tempcontrol",
-          "defaultEnabled": false,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "dalvik_sync",
-          "label": "dalvik 同步任务",
-          "description": "配置 OPlus dalvik 周期同步参数。关闭可减少后台维护负载。",
-          "prop": "sys.oplus.dalvik_sync_config",
-          "defaultEnabled": false,
-          "defaultValue": "0,0,0,0,0",
-          "values": ["0,0,0,0,0", "1,1,1,1,1"]
-        },
-        {
-          "id": "heap_optimize",
-          "label": "heap optimize 触发",
-          "description": "控制 heap optimize 私有触发项。0 关闭，减少与 dexopt 的耦合。",
-          "prop": "sys.heap.optimize.enable",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1"]
-        },
-        {
-          "id": "heap_enlarge",
-          "label": "further heap enlarge",
-          "description": "控制 furtherHeapEnlarge 优化。0 关闭避免影响进程堆策略。",
-          "prop": "sys.furtherHeapEnlarge.optimize.enable",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1"]
-        },
-        {
-          "id": "gc_suppression",
-          "label": "GC suppression",
-          "description": "控制 GC suppression 优化。0 关闭，避免厂商策略干扰 ART 默认 GC 行为。",
-          "prop": "sys.gcsupression.optimize.enable",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1"]
-        },
-        {
-          "id": "disable_secondary_auto",
-          "label": "禁用 secondary 自动编译",
-          "description": "禁用 secondary dex 自动编译链路。false 关闭自动维护。",
-          "prop": "dalvik.vm.dexopt.secondary",
-          "defaultEnabled": false,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "disable_thermal_cutoff",
-          "label": "dexopt 温控截断",
-          "description": "控制 dexopt 温控截断策略。0 系统默认，修改可能增加持续编译发热。",
-          "prop": "dalvik.vm.dexopt.thermal-cutoff",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2"]
-        },
-        {
-          "id": "disable_artfile_madvise",
-          "label": "ART 文件预读缓存",
-          "description": "控制 ART madvise 预读缓存大小。0 关闭，极大值增加不确定性。",
-          "prop": "dalvik.vm.madvise.artfile.size",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "2147483647"]
-        },
-        {
-          "id": "jit_max_zero",
-          "label": "JIT 代码缓存上限",
-          "description": "JIT code cache 最大值。0 极限压制，64m 宽松上限。",
-          "prop": "dalvik.vm.jitmaxsize",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "64m"]
-        },
-        {
-          "id": "profile_save_max",
-          "label": "profile 保存间隔",
-          "description": "ART profile 最小保存间隔（毫秒）。30000 约30秒，2147483647 压制频繁保存。",
-          "prop": "dalvik.vm.ps-min-save-period-ms",
-          "defaultEnabled": false,
-          "defaultValue": "2147483647",
-          "values": ["30000", "2147483647"]
-        },
-        {
-          "id": "perf_init_bg_threads_zero",
-          "label": "perf_init 后台线程数",
-          "description": "system_perf_init 阶段后台 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
-          "prop": "system_perf_init.bg-dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4"]
-        },
-        {
-          "id": "perf_init_boot_threads_zero",
-          "label": "perf_init 开机线程数",
-          "description": "system_perf_init 阶段 boot dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
-          "prop": "system_perf_init.boot-dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4"]
-        },
-        {
-          "id": "perf_init_threads_zero",
-          "label": "perf_init 编译线程数",
-          "description": "system_perf_init 阶段通用 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
-          "prop": "system_perf_init.dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4"]
-        },
-        {
-          "id": "background_dex2oat_threads_zero",
-          "label": "后台 dex2oat 线程数",
-          "description": "dalvik.vm 后台 dex2oat 线程数。0 压制，1/2/4 允许对应并发。",
-          "prop": "dalvik.vm.background-dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4"]
-        },
-        {
-          "id": "persist_dex2oat_threads_zero",
-          "label": "持久 dex2oat 线程数",
-          "description": "persist 持久编译线程数。0 压制并发，1/2/4/8 允许对应线程。",
-          "prop": "persist.dalvik.vm.dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4", "8"]
-        },
-        {
-          "id": "dex2oat_cpu_set",
-          "label": "dex2oat CPU 亲和性",
-          "description": "绑定 dex2oat 到指定 CPU 核心集。留空使用默认，可指定如 4-7 限制到大核。",
-          "prop": "dalvik.vm.dex2oat-cpu-set",
-          "defaultEnabled": false,
-          "defaultValue": "",
-          "values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
-        },
-        {
-          "id": "boot_dex2oat_cpu_set",
-          "label": "开机 dex2oat CPU 亲和性",
-          "description": "绑定开机阶段 dex2oat 到指定 CPU 核心集。留空默认，限制可减少开机阶段发热。",
-          "prop": "dalvik.vm.boot-dex2oat-cpu-set",
-          "defaultEnabled": false,
-          "defaultValue": "",
-          "values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
-        },
-        {
-          "id": "bg_dex2oat_cpu_set",
-          "label": "后台 dex2oat CPU 亲和性",
-          "description": "绑定后台 dex2oat 到指定 CPU 核心集。留空默认，限制可减少后台编译发热。",
-          "prop": "dalvik.vm.background-dex2oat-cpu-set",
-          "defaultEnabled": false,
-          "defaultValue": "",
-          "values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
-        },
-        {
-          "id": "image_dex2oat_cpu_set",
-          "label": "镜像 dex2oat CPU 亲和性",
-          "description": "绑定镜像编译阶段 dex2oat 到指定 CPU 核心集。留空默认。",
-          "prop": "dalvik.vm.image-dex2oat-cpu-set",
-          "defaultEnabled": false,
-          "defaultValue": "",
-          "values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
-        },
-        {
-          "id": "bg_dex2oat_threads",
-          "label": "后台 dex2oat 线程数（短名）",
-          "description": "另一组后台 dex2oat 线程控制属性（dalvik.vm.bg-dex2oat-threads），与 background-dex2oat-threads 独立。0 压制，1/2/4 允许并发。",
-          "prop": "dalvik.vm.bg-dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4"]
-        },
-        {
-          "id": "image_dex2oat_threads",
-          "label": "镜像 dex2oat 线程数",
-          "description": "镜像编译阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。",
-          "prop": "dalvik.vm.image-dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4", "5"]
-        },
-        {
-          "id": "boot_dex2oat_threads",
-          "label": "开机 dex2oat 线程数",
-          "description": "开机阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。",
-          "prop": "dalvik.vm.boot-dex2oat-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "1", "2", "4", "5"]
-        },
-        {
-          "id": "mtk_aggressive_cpu",
-          "label": "MTK 激进 CPU 亲和性",
-          "description": "MTK 平台 dex2oat 激进调度 CPU 核心集。默认 0,1,2,3,4 绑定所有性能核。",
-          "prop": "ro.vendor.dex2oat-aggressive-cpu-set",
-          "defaultEnabled": false,
-          "defaultValue": "0,1,2,3,4",
-          "values": ["0,1,2,3,4", ""]
-        },
-        {
-          "id": "mtk_aggressive_threads",
-          "label": "MTK 激进线程数",
-          "description": "MTK 平台 dex2oat 激进调度线程数。默认 5，设为 0 可压制。",
-          "prop": "ro.vendor.dex2oat-aggressive-threads",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "5"]
-        },
-        {
-          "id": "dex2oat_xms",
-          "label": "dex2oat 最小堆",
-          "description": "dex2oat 进程最小堆大小。64m 默认，减小可节省内存但增加 GC。",
-          "prop": "dalvik.vm.dex2oat-Xms",
-          "defaultEnabled": false,
-          "defaultValue": "32m",
-          "values": ["32m", "64m", "128m"]
-        },
-        {
-          "id": "dex2oat_xmx",
-          "label": "dex2oat 最大堆",
-          "description": "dex2oat 进程最大堆大小。512m 默认，减小可预防 OOM。",
-          "prop": "dalvik.vm.dex2oat-Xmx",
-          "defaultEnabled": false,
-          "defaultValue": "256m",
-          "values": ["256m", "512m", "1024m"]
-        },
-        {
-          "id": "odex_madvise",
-          "label": "odex 预读缓存",
-          "description": "odex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。",
-          "prop": "dalvik.vm.madvise.odexfile.size",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "104857600", "2147483647"]
-        },
-        {
-          "id": "vdex_madvise",
-          "label": "vdex 预读缓存",
-          "description": "vdex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。",
-          "prop": "dalvik.vm.madvise.vdexfile.size",
-          "defaultEnabled": false,
-          "defaultValue": "0",
-          "values": ["0", "104857600", "2147483647"]
-        },
-        {
-          "id": "profile_first_save",
-          "label": "profile 首次保存延迟",
-          "description": "应用首次 profile 保存的最小延迟时间（毫秒）。5000 约5秒，10000 约10秒。",
-          "prop": "dalvik.vm.ps-min-first-save-ms",
-          "defaultEnabled": false,
-          "defaultValue": "2147483647",
-          "values": ["5000", "10000", "2147483647"]
-        }
-      ]
-    },
-    {
-      "id": "aggressive",
-      "title": "危险",
-      "tone": "aggressive",
-      "description": "全量 AOT 性能配置。将所有 dexopt 策略设为 everything，最大化运行时性能。适合愿意接受安装耗时、发热和存储占用以换取极致性能的用户。",
-      "items": [
-        {
-          "id": "force_install_everything",
-          "label": "安装时全量 AOT",
-          "description": "将安装编译策略设为 everything，安装时全量 AOT 编译，追求运行性能。",
-          "prop": "pm.dexopt.install",
-          "defaultEnabled": true,
-          "defaultValue": "everything",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "force_ota_everything",
-          "label": "OTA 后全量 AOT",
-          "description": "将 OTA 后编译策略设为 everything，更新后全量 AOT，提升更新后性能。",
-          "prop": "pm.dexopt.boot-after-ota",
-          "defaultEnabled": true,
-          "defaultValue": "everything",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "force_cmdline_everything",
-          "label": "手动编译全量 AOT",
-          "description": "将命令行手动触发 dexopt 策略设为 everything。",
-          "prop": "pm.dexopt.cmdline",
-          "defaultEnabled": true,
-          "defaultValue": "everything",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "priv_apps_oob",
-          "label": "特权 App 全量 AOT",
-          "description": "将特权应用离线编译策略设为 everything。",
-          "prop": "pm.dexopt.priv-apps-oob",
-          "defaultEnabled": true,
-          "defaultValue": "everything",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "secondary_everything",
-          "label": "secondary dex 全量 AOT",
-          "description": "将 secondary dex 编译策略设为 everything，插件化应用全量编译。",
-          "prop": "pm.dexopt.secondary",
-          "defaultEnabled": true,
-          "defaultValue": "everything",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "global_everything",
-          "label": "全局 dex2oat filter AOT",
-          "description": "将全局 dex2oat-filter 设为 everything，兜底全量 AOT。",
-          "prop": "dalvik.vm.dex2oat-filter",
-          "defaultEnabled": true,
-          "defaultValue": "everything",
-          "values": ["verify", "speed-profile", "speed", "everything"]
-        },
-        {
-          "id": "priv_apps_oob_list",
-          "label": "特权 App OOB 列表",
-          "description": "指定参与 priv-apps-oob 的特权应用列表。ALL 表示全部。",
-          "prop": "pm.dexopt.priv-apps-oob-list",
-          "defaultEnabled": true,
-          "defaultValue": "ALL",
-          "values": ["ALL"]
-        },
-        {
-          "id": "disable_art_service",
-          "label": "禁用 ART Service",
-          "description": "禁用 ART Service 调度器，可能阻断系统正常 dexopt 维护和 OTA 后优化。",
-          "prop": "dalvik.vm.useartservice",
-          "defaultEnabled": false,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        },
-        {
-          "id": "disable_jit",
-          "label": "禁用 JIT",
-          "description": "禁用 ART JIT 即时编译。可减少运行时编译，但降低热点代码性能。",
-          "prop": "dalvik.vm.usejit",
-          "defaultEnabled": false,
-          "defaultValue": "false",
-          "values": ["false", "true"]
-        }
-      ]
-    }
-  ]
+"categories": [
+{
+"id": "safe",
+"title": "安全",
+"tone": "safe",
+"description": "日常推荐配置，优先降低后台编译、缓存预读和厂商私有触发项带来的负载，适合长期启用。",
+"items": [
+{
+"id": "pm_bg_dexopt",
+"label": "跳过后台 dexopt",
+"description": "作用：控制系统空闲时触发的后台 dexopt 维护任务。可选值：skip 表示跳过后台重编译；speed-profile 按运行画像做性能编译；verify 仅做字节码校验。场景：希望减少待机发热、后台 I/O 和无感重编译时建议使用 skip；如果更看重后台逐步优化应用启动速度，可改为 speed-profile。",
+"prop": "pm.dexopt.bg-dexopt",
+"defaultEnabled": true,
+"defaultValue": "skip",
+"values": ["skip", "speed-profile", "verify"]
+},
+{
+"id": "pm_boot_after_ota",
+"label": "OTA 后编译策略",
+"description": "作用：定义系统 OTA 更新后首次启动阶段的包编译策略。可选值：verify 仅校验；speed-profile 基于 profile 编译热点路径；speed 编译更多代码以提升运行速度；everything 尽可能全量 AOT。场景：日常推荐 speed-profile，兼顾 OTA 后恢复速度和后续性能；低存储或怕发热可选 verify；只在愿意接受更长更新后维护时间时使用 speed/everything。",
+"prop": "pm.dexopt.boot-after-ota",
+"defaultEnabled": true,
+"defaultValue": "speed-profile",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_mainline",
+"label": "Mainline 更新后编译策略",
+"description": "作用：控制 ART/Mainline 模块更新后的 dexopt 行为。可选值：verify、speed-profile、speed、everything，编译强度依次升高。场景：Mainline 更新频率较高，默认 verify 可减少更新后的后台负载；遇到运行时组件更新后应用启动异常或性能波动，可临时改为 speed-profile。",
+"prop": "pm.dexopt.boot-after-mainline-update",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_install",
+"label": "安装时编译策略",
+"description": "作用：控制普通安装路径下新安装或更新应用的 dexopt 策略。可选值：verify 最快但优化最少；speed-profile 以 profile 为准进行平衡优化；speed 更偏性能；everything 编译最彻底但安装最慢。场景：日常安装推荐 speed-profile；频繁安装测试包可选 verify；大型游戏或长期使用应用可在可接受安装耗时的情况下选择 speed。",
+"prop": "pm.dexopt.install",
+"defaultEnabled": true,
+"defaultValue": "speed-profile",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_install_bulk",
+"label": "批量安装编译策略",
+"description": "作用：控制批量安装多应用时的编译策略，例如恢复备份、应用商店批量更新。可选值：verify、speed-profile、speed、everything。场景：批量安装对耗时和温度更敏感，推荐 speed-profile；大量恢复应用且希望尽快完成安装时可用 verify；不建议在批量场景使用 everything。",
+"prop": "pm.dexopt.install-bulk",
+"defaultEnabled": true,
+"defaultValue": "speed-profile",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_install_bulk_downgraded",
+"label": "批量安装降级包策略",
+"description": "作用：控制批量安装降级 APK 时的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：降级包更容易出现 oat/art 产物不匹配，默认 verify 可减少无效编译；如果确认降级包稳定且希望保留运行性能，可改为 speed-profile。",
+"prop": "pm.dexopt.install-bulk-downgraded",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_install_bulk_secondary",
+"label": "批量安装 secondary dex",
+"description": "作用：控制批量安装时 secondary dex 的处理策略，secondary dex 常见于插件化、动态加载或多 dex 应用。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可减少批量安装负载；如果常用大型插件化应用并希望安装后立即优化，可选择 speed-profile。",
+"prop": "pm.dexopt.install-bulk-secondary",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_install_bulk_secondary_downgraded",
+"label": "批量降级 secondary dex",
+"description": "作用：控制批量安装降级包时 secondary dex 的编译策略。可选值：verify、speed-profile、speed、everything。场景：降级和 secondary dex 叠加时兼容性风险更高，推荐 verify；仅在明确需要性能优化且确认应用兼容时使用 speed-profile 或更高档位。",
+"prop": "pm.dexopt.install-bulk-secondary-downgraded",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_install_fast",
+"label": "快速安装路径策略",
+"description": "作用：控制 fast install 路径使用的 dexopt 策略，这类路径通常强调安装完成速度。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可最大化安装速度；如果安装后首次启动性能更重要，可切到 speed-profile。",
+"prop": "pm.dexopt.install-fast",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_post_boot",
+"label": "开机后编译策略",
+"description": "作用：控制系统启动完成后的 post-boot dexopt 维护策略。可选值：verify、speed-profile、speed、everything。场景：推荐 verify，减少开机后温度和 I/O 峰值；如果设备性能充足且希望系统在开机后自动补齐优化，可选择 speed-profile。",
+"prop": "pm.dexopt.post-boot",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_first_boot",
+"label": "首次开机编译策略",
+"description": "作用：控制首次启动、恢复出厂或系统初始化后的编译策略。可选值：verify、speed-profile、speed、everything。场景：首次启动阶段任务密集，默认 verify 可缩短进入系统时间；刷机后愿意等待完整优化时可选择 speed-profile 或 speed。",
+"prop": "pm.dexopt.first-boot",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_shared",
+"label": "共享库编译策略",
+"description": "作用：控制共享库和被多应用依赖组件的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：共享库影响范围更大，默认 speed 可提升依赖应用的公共路径性能；低端设备或存储紧张时可降为 speed-profile。",
+"prop": "pm.dexopt.shared",
+"defaultEnabled": true,
+"defaultValue": "speed",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_inactive",
+"label": "闲置 App 编译策略",
+"description": "作用：控制长期未使用应用被维护任务触发时的编译策略。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可避免为低频应用浪费编译时间和存储；如果某些应用偶尔使用但启动体验重要，可改为 speed-profile。",
+"prop": "pm.dexopt.inactive",
+"defaultEnabled": true,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_ab_ota",
+"label": "A/B OTA 编译策略",
+"description": "作用：控制 A/B 分区 OTA 场景下的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：A/B OTA 可在后台准备更新产物，speed-profile 通常能平衡后台耗时与更新后性能；低温控余量设备可降为 verify。",
+"prop": "pm.dexopt.ab-ota",
+"defaultEnabled": true,
+"defaultValue": "speed-profile",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_cmdline",
+"label": "手动触发编译策略",
+"description": "作用：控制命令行或工具手动触发 dexopt 时的默认策略。可选值：verify、speed-profile、speed、everything。场景：常配合 adb shell cmd package compile 使用，默认 speed-profile 适合手动维护；需要强制性能优化时再手动切换 speed/everything。",
+"prop": "pm.dexopt.cmdline",
+"defaultEnabled": true,
+"defaultValue": "speed-profile",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "pm_downgrade_days",
+"label": "闲置降级阈值",
+"description": "作用：设置应用闲置多少天后允许系统降低其编译优化等级。可选值：15、90、365、9999，数值越大越不容易降级。场景：推荐 9999，用于避免系统频繁回收或降级编译产物；存储空间紧张且愿意牺牲低频应用性能时可选择较小天数。",
+"prop": "pm.dexopt.downgrade_after_inactive_days",
+"defaultEnabled": true,
+"defaultValue": "9999",
+"values": ["15", "90", "365", "9999"]
+},
+{
+"id": "mini_debug",
+"label": "关闭 dex2oat 调试符号",
+"description": "作用：控制 dex2oat 是否生成 mini debug info。可选值：false 表示不生成，减少编译产物体积；true 表示保留调试信息，便于底层诊断。场景：普通用户推荐 false；只有在分析 ART 崩溃、native 堆栈或开发调试时才考虑 true。",
+"prop": "dalvik.vm.dex2oat-minidebuginfo",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "mini_debug_vm",
+"label": "关闭 VM 调试符号",
+"description": "作用：控制 Dalvik/ART VM 层面的 mini debug info。可选值：false 关闭，true 开启。场景：日常使用推荐 false，以减少产物和日志负担；开发者定位运行时异常时可临时开启。",
+"prop": "dalvik.vm.minidebuginfo",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "oplus_bgdex2oat",
+"label": "ColorOS 后台编译开关",
+"description": "作用：控制 OPlus/ColorOS 私有后台 dex2oat 触发开关。可选值：false 关闭私有后台编译；true 允许系统按厂商策略执行。场景：推荐 false，减少系统在后台自行触发编译；如果遇到厂商应用更新后性能异常，可临时恢复 true。",
+"prop": "persist.sys.oplus.bgdex2oat_enabled",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "compile_cache_miss",
+"label": "ColorOS 编译缓存 miss 触发",
+"description": "作用：控制 ColorOS 编译缓存 miss 后是否触发额外重编译。可选值：0 表示关闭该触发；1 表示启用厂商逻辑。场景：推荐 0，避免缓存未命中导致频繁后台编译；仅在确认厂商缓存机制对当前 ROM 有正向收益时使用 1。",
+"prop": "persist.sys.feature.compile.re.cache.miss",
+"defaultEnabled": true,
+"defaultValue": "0",
+"values": ["0", "1"]
+},
+{
+"id": "compile_cache_fmap",
+"label": "ColorOS 编译缓存 fmap",
+"description": "作用：控制 ColorOS 编译缓存 fmap size 相关私有特性。可选值：0 关闭；1 启用。场景：默认 0 更保守，可降低未知 ROM 私有逻辑带来的副作用；除非已验证当前机型启用后有收益，否则不建议打开。",
+"prop": "persist.sys.feature.compile.re.fmap.size",
+"defaultEnabled": true,
+"defaultValue": "0",
+"values": ["0", "1"]
+},
+{
+"id": "startup_cache",
+"label": "禁用启动镜像缓存",
+"description": "作用：控制 runtime_native 的 app image startup cache。可选值：false 禁用；true 启用。场景：禁用可减少启动缓存写入和缓存失效后的维护负担；如果追求应用冷启动缓存收益且设备存储压力不大，可尝试 true。",
+"prop": "persist.device_config.runtime_native.use_app_image_startup_cache",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "iorap_readahead",
+"label": "禁用 iorap 预读",
+"description": "作用：控制 iorap readahead 预读机制。可选值：false 禁用；true 启用。场景：Android 12 以后 iorap 在不同 ROM 上差异较大，推荐 false 以减少启动轨迹学习和预读负担；如果当前系统仍依赖 iorap 优化冷启动，可测试 true。",
+"prop": "persist.device_config.runtime_native_boot.iorap_readahead_enable",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "iorap_perfetto",
+"label": "禁用 iorap 追踪",
+"description": "作用：控制 iorap perfetto trace 采集。可选值：false 禁用追踪；true 启用追踪。场景：推荐 false，避免为启动预测持续采样；只有在调试启动预读行为或厂商 ROM 明确依赖该链路时才开启。",
+"prop": "persist.device_config.runtime_native_boot.iorap_perfetto_enable",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "opex_merge",
+"label": "ColorOS opex merge 触发",
+"description": "作用：控制 OPlus opex merge 私有触发项。可选值：false 关闭；true 启用。场景：该项属于厂商私有行为，跨版本含义可能变化，推荐 false；仅在确认 ROM 需要 opex merge 维护时开启。",
+"prop": "oplus.opex.merge",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "opex_modulemerge",
+"label": "ColorOS opex modulemerge",
+"description": "作用：控制 OPlus opex modulemerge 私有触发项。可选值：false 关闭；true 启用。场景：推荐 false，减少无法预期的厂商后台维护任务；如果系统模块更新后出现厂商组件优化异常，可临时测试 true。",
+"prop": "oplus.opex.modulemerge",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "ocompiler",
+"label": "OPlus 编译器服务",
+"description": "控制 OPlus 私有编译器服务（ocompiler），MTK 平台常见。false 关闭，减少厂商独立触发编译。",
+"prop": "persist.oplus.ocompiler",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "zygote_c",
+"label": "ZygoteC",
+"description": "控制 OPlus ZygoteC 特性（MTK）。false 关闭，减少额外编译链路。",
+"prop": "persist.oplus.zygote_c.enable",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "zygote_ocomp",
+"label": "Zygote ocomp",
+"description": "控制 OPlus Zygote ocomp 优化（MTK）。false 关闭，减少 zygote 阶段编译。",
+"prop": "persist.oplus.zygote_ocomp",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "runtime_dexopt",
+"label": "禁用运行时 dexopt",
+"description": "控制设备配置文件命名空间的 dexopt 开关。false 关闭，阻止 runtime 层触发重编译。",
+"prop": "persist.device_config.runtime.dexopt.enabled",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "runtime_bg_dexopt",
+"label": "禁用运行时后台 dexopt",
+"description": "控制设备配置文件命名空间的后台 dexopt。false 关闭，减少空闲维护编译。",
+"prop": "persist.device_config.runtime.bg_dexopt.enabled",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "runtime_profile_merge",
+"label": "禁用运行时 profile merge",
+"description": "控制设备配置文件命名空间的 profile 合并。false 关闭，减少合并触发 I/O。",
+"prop": "persist.device_config.runtime.profile_merge",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "disable_pr_dexopt",
+"label": "禁用 PR dexopt",
+"description": "禁用 Package Reference dexopt profile 链路。false 关闭，减少 profile 维护开销。",
+"prop": "dalvik.vm.enable_pr_dexopt",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "disable_ota_pr",
+"label": "禁用 OTA 异步 PR",
+"description": "禁用 OTA 后异步 pr_dexopt。false 关闭，减少 OTA 后台负载。",
+"prop": "dalvik.vm.pr_dexopt_async_for_ota",
+"defaultEnabled": true,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "bgdexopt_new_classes",
+"label": "bg-dexopt 新类阈值",
+"description": "后台 dexopt 因新增类触发的比例阈值。0 最小触发，10/20 允许一定增量编译。",
+"prop": "dalvik.vm.bgdexopt.new-classes-percent",
+"defaultEnabled": true,
+"defaultValue": "0",
+"values": ["0", "10", "20"]
+},
+{
+"id": "bgdexopt_new_methods",
+"label": "bg-dexopt 新方法阈值",
+"description": "后台 dexopt 因新增方法触发的比例阈值。0 最小触发，10/20 允许一定增量编译。",
+"prop": "dalvik.vm.bgdexopt.new-methods-percent",
+"defaultEnabled": true,
+"defaultValue": "0",
+"values": ["0", "10", "20"]
+}
+]
+},
+{
+"id": "caution",
+"title": "谨慎",
+"tone": "caution",
+"description": "进阶配置，涉及全局 dex2oat filter、线程调度、JIT、profile 和厂商私有优化。建议逐项了解后再启用。",
+"items": [
+{
+"id": "dex2oat_filter",
+"label": "默认 dex2oat 编译过滤器",
+"description": "设置全局 dex2oat-filter 默认强度。speed-profile 平衡体验，speed/everything 增加编译量，verify 最轻量。",
+"prop": "dalvik.vm.dex2oat-filter",
+"defaultEnabled": false,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "very_large",
+"label": "超大 APK 编译策略",
+"description": "控制 very-large APK 的编译策略。everything 全量 AOT 但安装慢、发热高；speed-profile 平衡；verify 轻量。",
+"prop": "dalvik.vm.dex2oat-very-large",
+"defaultEnabled": false,
+"defaultValue": "verify",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "resolve_startup",
+"label": "启动字符串预解析",
+"description": "控制 dex2oat 是否预解析启动路径字符串。false 减少编译工作，true 可能改善冷启动。",
+"prop": "dalvik.vm.dex2oat-resolve-startup-strings",
+"defaultEnabled": false,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "oplus_tempcontrol",
+"label": "温控编译触发",
+"description": "控制 OPlus 温控与编译联动。false 关闭，避免温控额外触发编译。",
+"prop": "oplus.dex.tempcontrol",
+"defaultEnabled": false,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "dalvik_sync",
+"label": "dalvik 同步任务",
+"description": "配置 OPlus dalvik 周期同步参数。关闭可减少后台维护负载。",
+"prop": "sys.oplus.dalvik_sync_config",
+"defaultEnabled": false,
+"defaultValue": "0,0,0,0,0",
+"values": ["0,0,0,0,0", "1,1,1,1,1"]
+},
+{
+"id": "heap_optimize",
+"label": "heap optimize 触发",
+"description": "控制 heap optimize 私有触发项。0 关闭，减少与 dexopt 的耦合。",
+"prop": "sys.heap.optimize.enable",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1"]
+},
+{
+"id": "heap_enlarge",
+"label": "further heap enlarge",
+"description": "控制 furtherHeapEnlarge 优化。0 关闭避免影响进程堆策略。",
+"prop": "sys.furtherHeapEnlarge.optimize.enable",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1"]
+},
+{
+"id": "gc_suppression",
+"label": "GC suppression",
+"description": "控制 GC suppression 优化。0 关闭，避免厂商策略干扰 ART 默认 GC 行为。",
+"prop": "sys.gcsupression.optimize.enable",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1"]
+},
+{
+"id": "disable_secondary_auto",
+"label": "禁用 secondary 自动编译",
+"description": "禁用 secondary dex 自动编译链路。false 关闭自动维护。",
+"prop": "dalvik.vm.dexopt.secondary",
+"defaultEnabled": false,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "disable_thermal_cutoff",
+"label": "dexopt 温控截断",
+"description": "控制 dexopt 温控截断策略。0 系统默认，修改可能增加持续编译发热。",
+"prop": "dalvik.vm.dexopt.thermal-cutoff",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2"]
+},
+{
+"id": "disable_artfile_madvise",
+"label": "ART 文件预读缓存",
+"description": "控制 ART madvise 预读缓存大小。0 关闭，极大值增加不确定性。",
+"prop": "dalvik.vm.madvise.artfile.size",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "2147483647"]
+},
+{
+"id": "jit_max_zero",
+"label": "JIT 代码缓存上限",
+"description": "JIT code cache 最大值。0 极限压制，64m 宽松上限。",
+"prop": "dalvik.vm.jitmaxsize",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "64m"]
+},
+{
+"id": "profile_save_max",
+"label": "profile 保存间隔",
+"description": "ART profile 最小保存间隔（毫秒）。30000 约30秒，2147483647 压制频繁保存。",
+"prop": "dalvik.vm.ps-min-save-period-ms",
+"defaultEnabled": false,
+"defaultValue": "2147483647",
+"values": ["30000", "2147483647"]
+},
+{
+"id": "perf_init_bg_threads_zero",
+"label": "perf_init 后台线程数",
+"description": "system_perf_init 阶段后台 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
+"prop": "system_perf_init.bg-dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4"]
+},
+{
+"id": "perf_init_boot_threads_zero",
+"label": "perf_init 开机线程数",
+"description": "system_perf_init 阶段 boot dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
+"prop": "system_perf_init.boot-dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4"]
+},
+{
+"id": "perf_init_threads_zero",
+"label": "perf_init 编译线程数",
+"description": "system_perf_init 阶段通用 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
+"prop": "system_perf_init.dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4"]
+},
+{
+"id": "background_dex2oat_threads_zero",
+"label": "后台 dex2oat 线程数",
+"description": "dalvik.vm 后台 dex2oat 线程数。0 压制，1/2/4 允许对应并发。",
+"prop": "dalvik.vm.background-dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4"]
+},
+{
+"id": "persist_dex2oat_threads_zero",
+"label": "持久 dex2oat 线程数",
+"description": "persist 持久编译线程数。0 压制并发，1/2/4/8 允许对应线程。",
+"prop": "persist.dalvik.vm.dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4", "8"]
+},
+{
+"id": "dex2oat_cpu_set",
+"label": "dex2oat CPU 亲和性",
+"description": "绑定 dex2oat 到指定 CPU 核心集。留空使用默认，可指定如 4-7 限制到大核。",
+"prop": "dalvik.vm.dex2oat-cpu-set",
+"defaultEnabled": false,
+"defaultValue": "",
+"values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
+},
+{
+"id": "boot_dex2oat_cpu_set",
+"label": "开机 dex2oat CPU 亲和性",
+"description": "绑定开机阶段 dex2oat 到指定 CPU 核心集。留空默认，限制可减少开机阶段发热。",
+"prop": "dalvik.vm.boot-dex2oat-cpu-set",
+"defaultEnabled": false,
+"defaultValue": "",
+"values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
+},
+{
+"id": "bg_dex2oat_cpu_set",
+"label": "后台 dex2oat CPU 亲和性",
+"description": "绑定后台 dex2oat 到指定 CPU 核心集。留空默认，限制可减少后台编译发热。",
+"prop": "dalvik.vm.background-dex2oat-cpu-set",
+"defaultEnabled": false,
+"defaultValue": "",
+"values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
+},
+{
+"id": "image_dex2oat_cpu_set",
+"label": "镜像 dex2oat CPU 亲和性",
+"description": "绑定镜像编译阶段 dex2oat 到指定 CPU 核心集。留空默认。",
+"prop": "dalvik.vm.image-dex2oat-cpu-set",
+"defaultEnabled": false,
+"defaultValue": "",
+"values": ["", "4,5,6,7", "0,1,2,3,4,5,6,7"]
+},
+{
+"id": "bg_dex2oat_threads",
+"label": "后台 dex2oat 线程数（短名）",
+"description": "另一组后台 dex2oat 线程控制属性（dalvik.vm.bg-dex2oat-threads），与 background-dex2oat-threads 独立。0 压制，1/2/4 允许并发。",
+"prop": "dalvik.vm.bg-dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4"]
+},
+{
+"id": "image_dex2oat_threads",
+"label": "镜像 dex2oat 线程数",
+"description": "镜像编译阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。",
+"prop": "dalvik.vm.image-dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4", "5"]
+},
+{
+"id": "boot_dex2oat_threads",
+"label": "开机 dex2oat 线程数",
+"description": "开机阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。",
+"prop": "dalvik.vm.boot-dex2oat-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "1", "2", "4", "5"]
+},
+{
+"id": "mtk_aggressive_cpu",
+"label": "MTK 激进 CPU 亲和性",
+"description": "MTK 平台 dex2oat 激进调度 CPU 核心集。默认 0,1,2,3,4 绑定所有性能核。",
+"prop": "ro.vendor.dex2oat-aggressive-cpu-set",
+"defaultEnabled": false,
+"defaultValue": "0,1,2,3,4",
+"values": ["0,1,2,3,4", ""]
+},
+{
+"id": "mtk_aggressive_threads",
+"label": "MTK 激进线程数",
+"description": "MTK 平台 dex2oat 激进调度线程数。默认 5，设为 0 可压制。",
+"prop": "ro.vendor.dex2oat-aggressive-threads",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "5"]
+},
+{
+"id": "dex2oat_xms",
+"label": "dex2oat 最小堆",
+"description": "dex2oat 进程最小堆大小。64m 默认，减小可节省内存但增加 GC。",
+"prop": "dalvik.vm.dex2oat-Xms",
+"defaultEnabled": false,
+"defaultValue": "32m",
+"values": ["32m", "64m", "128m"]
+},
+{
+"id": "dex2oat_xmx",
+"label": "dex2oat 最大堆",
+"description": "dex2oat 进程最大堆大小。512m 默认，减小可预防 OOM。",
+"prop": "dalvik.vm.dex2oat-Xmx",
+"defaultEnabled": false,
+"defaultValue": "256m",
+"values": ["256m", "512m", "1024m"]
+},
+{
+"id": "odex_madvise",
+"label": "odex 预读缓存",
+"description": "odex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。",
+"prop": "dalvik.vm.madvise.odexfile.size",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "104857600", "2147483647"]
+},
+{
+"id": "vdex_madvise",
+"label": "vdex 预读缓存",
+"description": "vdex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。",
+"prop": "dalvik.vm.madvise.vdexfile.size",
+"defaultEnabled": false,
+"defaultValue": "0",
+"values": ["0", "104857600", "2147483647"]
+},
+{
+"id": "profile_first_save",
+"label": "profile 首次保存延迟",
+"description": "应用首次 profile 保存的最小延迟时间（毫秒）。5000 约5秒，10000 约10秒。",
+"prop": "dalvik.vm.ps-min-first-save-ms",
+"defaultEnabled": false,
+"defaultValue": "2147483647",
+"values": ["5000", "10000", "2147483647"]
+}
+]
+},
+{
+"id": "aggressive",
+"title": "危险",
+"tone": "aggressive",
+"description": "全量 AOT 性能配置。将所有 dexopt 策略设为 everything，最大化运行时性能。适合愿意接受安装耗时、发热和存储占用以换取极致性能的用户。",
+"items": [
+{
+"id": "force_install_everything",
+"label": "安装时全量 AOT",
+"description": "将安装编译策略设为 everything，安装时全量 AOT 编译，追求运行性能。",
+"prop": "pm.dexopt.install",
+"defaultEnabled": true,
+"defaultValue": "everything",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "force_ota_everything",
+"label": "OTA 后全量 AOT",
+"description": "将 OTA 后编译策略设为 everything，更新后全量 AOT，提升更新后性能。",
+"prop": "pm.dexopt.boot-after-ota",
+"defaultEnabled": true,
+"defaultValue": "everything",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "force_cmdline_everything",
+"label": "手动编译全量 AOT",
+"description": "将命令行手动触发 dexopt 策略设为 everything。",
+"prop": "pm.dexopt.cmdline",
+"defaultEnabled": true,
+"defaultValue": "everything",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "priv_apps_oob",
+"label": "特权 App 全量 AOT",
+"description": "将特权应用离线编译策略设为 everything。",
+"prop": "pm.dexopt.priv-apps-oob",
+"defaultEnabled": true,
+"defaultValue": "everything",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "secondary_everything",
+"label": "secondary dex 全量 AOT",
+"description": "将 secondary dex 编译策略设为 everything，插件化应用全量编译。",
+"prop": "pm.dexopt.secondary",
+"defaultEnabled": true,
+"defaultValue": "everything",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "global_everything",
+"label": "全局 dex2oat filter AOT",
+"description": "将全局 dex2oat-filter 设为 everything，兜底全量 AOT。",
+"prop": "dalvik.vm.dex2oat-filter",
+"defaultEnabled": true,
+"defaultValue": "everything",
+"values": ["verify", "speed-profile", "speed", "everything"]
+},
+{
+"id": "priv_apps_oob_list",
+"label": "特权 App OOB 列表",
+"description": "指定参与 priv-apps-oob 的特权应用列表。ALL 表示全部。",
+"prop": "pm.dexopt.priv-apps-oob-list",
+"defaultEnabled": true,
+"defaultValue": "ALL",
+"values": ["ALL"]
+},
+{
+"id": "disable_art_service",
+"label": "禁用 ART Service",
+"description": "禁用 ART Service 调度器，可能阻断系统正常 dexopt 维护和 OTA 后优化。",
+"prop": "dalvik.vm.useartservice",
+"defaultEnabled": false,
+"defaultValue": "false",
+"values": ["false", "true"]
+},
+{
+"id": "disable_jit",
+"label": "禁用 JIT",
+"description": "禁用 ART JIT 即时编译。可减少运行时编译，但降低热点代码性能。",
+"prop": "dalvik.vm.usejit",
+"defaultEnabled": false,
+"defaultValue": "false",
+"values": ["false", "true"]
+}
+]
+}
+]
 }

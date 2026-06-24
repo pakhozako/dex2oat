@@ -2,33 +2,29 @@
 
 ![:name](https://count.getloli.com/@dex2oat?name=dex2oat&theme=moebooru&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
 
-Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制多厂商设备在后台、安装、OTA 等场景下触发不必要的 dexopt 编译，减少发热、降低功耗、延长电池寿命。内置 WebUI，可在线切换三档方案，无需重新刷入。
+Magisk / KernelSU / APatch 模块，通过规则驱动的属性抓取、匹配与生成链路，精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，减少后台、安装、OTA 等场景下不必要的 dexopt 编译。内置 WebUI，可在线切换三档方案，无需重新刷入。
 
 ---
 
-## 支持的厂商
+## 3.1 架构
 
-| 厂商系列 | 机型示例 | 状态 |
-|:--|:--|:--|
-| OPlus / ColorOS | OnePlus 13, ACE5 至尊版, OPPO/Realme 系列 | ✅ 完整支持 |
-| Xiaomi / MIUI / HyperOS | 小米 13, MIX4, Redmi / POCO 系列 | ✅ 独立配置 |
-| Samsung | Galaxy 系列 | ✅ 独立配置 |
-| Pixel | Google Pixel 系列 | ✅ 独立配置 |
-| Meizu / RedMagic / 其他 | 魅族、红魔、未识别设备 | ✅ Generic 兜底配置 |
+v3.1 不再通过厂商识别选择模板，而是走 `capture-props.sh` 抓取当前设备实际属性，再由 `generate-props.sh` 根据 `webroot/data/options.json` 的规则目录生成最终 `system.prop`。
 
-安装时自动识别厂商并加载对应配置，未命中特定厂商时使用 Generic 兜底模板，属性不会混用。
+运行状态统一汇总到 `/data/adb/dex2oat-lock/state.prop`，WebUI 首页、诊断页、service、health-check 和 conflict-detect 都优先读取或写入这一个主状态源。
 
 ---
 
 ## 功能特性
 
-- **三档方案** — 安全 / 谨慎 / 危险，按需选择
-- **WebUI** — 可视化配置，展开查看完整属性说明
-- **厂商分离** — OPlus / Xiaomi / Samsung / Pixel 独立配置文件和属性模板，其他厂商使用 Generic 兜底
+- **三档风险模式** — 安全 / 谨慎 / 危险集成在自定义工作台
+- **规则驱动** — 设备属性抓取后按规则目录生成最终配置，不再维护厂商模板
+- **WebUI** — 首页真实状态总览、自定义工作台、关于页三导航
+- **风险协议** — 自定义和危险模式需要 30 秒等待、算术验证和显式同意
+- **完整性校验** — 校验 WebUI、脚本、规则和关键模块文件，结果进入首页和诊断
 - **安全回滚** — 安装时自动备份原始属性，卸载后完整还原
 - **诊断面板** — 内置属性生效验证与 apply.log 摘要分析
 - **云端更新** — 管理器自动检测新版本
-- **设备检测** — 自动识别厂商并记录识别来源，未识别时回退 Generic
+- **统一状态** — `state.prop` 汇总配置来源、prop 摘要、匹配结果、健康状态和冲突状态
 
 ---
 
@@ -36,11 +32,7 @@ Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik
 
 ### 安全档（默认启用）
 
-压制后台、安装、OTA 等场景的额外编译触发：
-
-- **OPlus**：pm.dexopt.* 全套策略 + ColorOS 私有触发 + OPlus MTK 编译服务 + runtime dexopt 开关 + iorap/启动缓存
-- **Xiaomi / MIUI**：pm.dexopt.* 全套策略 + MIUI dexfile preload + ART startup class preload + precache + iorap
-- **Samsung / Pixel / Generic**：基于通用 dexopt / ART 属性的安全默认配置
+压制后台、安装、OTA 等场景的额外编译触发。安装期会优先复用当前设备已存在的相关属性值，未抓到的规则使用安全默认值。
 
 ### 谨慎档（默认关闭）
 
@@ -57,7 +49,7 @@ Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik
 | 项目 | 要求 |
 |:--|:--|
 | Root 框架 | Magisk / KernelSU / APatch |
-| 系统 | OPlus、Xiaomi/MIUI、Samsung、Pixel 或 Generic 兜底设备 |
+| 系统 | Android 12+，不依赖显式厂商模板 |
 | Android 版本 | Android 12+ |
 
 ---
@@ -76,32 +68,29 @@ Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik
 
 ```
 dex2oat/
-├── props/
-│   ├── oplus.prop          # OPlus 默认安全配置模板
-│   └── xiaomi.prop         # Xiaomi 默认安全配置模板
-├── vendor/
-│   ├── samsung.prop        # Samsung 默认安全配置模板
-│   ├── pixel.prop          # Pixel 默认安全配置模板
-│   ├── miui.prop           # MIUI 默认安全配置模板
-│   ├── meizu.prop          # Meizu 默认安全配置模板
-│   ├── redmagic.prop       # RedMagic 默认安全配置模板
-│   └── generic.prop        # Generic 兜底配置模板
+├── core/
+│   ├── state.sh            # 统一状态读写 helper
+│   ├── integrity-check.sh  # WebUI / 脚本 / 规则完整性校验
+│   ├── integrity-baseline.prop # 发布构建生成的完整性基线
+│   ├── health-check.sh     # 健康检查与自愈
+│   ├── conflict-detect.sh  # 模块间属性冲突检测
+│   └── prop-lock.sh        # 运行时属性保护
+├── scripts/
+│   ├── capture-props.sh    # 抓取 ART/dex2oat 相关设备属性
+│   └── generate-props.sh   # 规则驱动生成 system.prop
 ├── webroot/
 │   ├── css/app.css
 │   ├── data/
-│   │   ├── vendors.json    # 厂商元数据（id/label/options/detect）
-│   │   ├── options.json    # OPlus 配置
-│   │   ├── options-xiaomi.json  # Xiaomi / MIUI 配置
-│   │   ├── options-samsung.json # Samsung 配置
-│   │   ├── options-pixel.json   # Pixel 配置
-│   │   └── options-generic.json # Generic 配置
+│   │   ├── options.json    # 规则目录与 WebUI 配置 schema
+│   │   └── app-meta.json
 │   ├── js/
 │   │   ├── app.js bridge.js config.js utils.js ui.js system-info.js
 │   └── index.html
 ├── tools/
 │   ├── validate-options.js # 打包前自动校验
+│   ├── generate-integrity-baseline.js # 生成完整性 hash 基线
 │   └── build-release.js    # 自动化构建脚本
-├── customize.sh             # 安装脚本（厂商识别 + 模板复制）
+├── customize.sh             # 安装脚本（抓取 + 规则生成）
 ├── service.sh               # 开机属性应用脚本
 ├── uninstall.sh             # 卸载还原脚本
 ├── system.prop              # 当前生效配置（由 WebUI/安装脚本生成）
@@ -116,8 +105,8 @@ dex2oat/
 - 仅修改系统属性，不涉及任何系统文件，卸载后完全还原
 - 激进模式下关闭 JIT 可能影响性能敏感型应用，按需选用
 - iorap 相关属性仅适用于 Android 12，Android 13+ 已移除
-- v3.0 新增 Samsung、Pixel、MIUI、Meizu、RedMagic 与 Generic 兜底模板
-- 更新模块后建议重新保存一次配置，以同步新版 system.prop 模板
+- v3.1 已移除厂商模板主链路，更新后建议执行一次“重新抓取匹配”或重新保存配置
+- 首页和诊断可直接查看；自定义配置和危险模式需先完成风险协议确认
 
 ---
 

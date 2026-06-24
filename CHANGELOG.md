@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.1 (2026-06-25)
+
+### Architecture
+- 移除厂商检测、vendor 模板和 vendor/options 映射主链路。
+- 新增 `scripts/generate-props.sh`，按抓取值和 `options.json` 规则目录生成最终 `system.prop`。
+- 新增 `core/state.sh` 与 `/data/adb/dex2oat-lock/state.prop`，统一记录配置来源、prop 摘要、规则匹配、服务、健康和冲突状态。
+- 新增 `core/integrity-check.sh`、`core/integrity-baseline.prop` 与构建期 hash 基线生成，校验 WebUI、脚本、规则和关键文件。
+
+### Runtime
+- 安装期和 re-match 改为自动执行抓取与规则生成，不再询问或回退厂商模板。
+- `service.sh`、`health-check.sh`、`conflict-detect.sh` 写入统一状态，同时保留迁移期兼容状态文件。
+
+### WebUI
+- 首页改为状态总览面板，优先展示模块状态、配置来源、prop 摘要、最近应用和冲突数量。
+- 底部导航收敛为首页 / 自定义 / 关于；GitHub 和诊断入口进入关于页或首页快捷入口。
+- 自定义页整合安全 / 谨慎 / 危险风险模式，保存前展示启用项、变更项、高风险项和覆盖自动匹配提示。
+- 配置项开关移动到右侧，开关点击只切换状态，卡片主体点击才展开说明。
+- 新增风险协议门槛：30 秒等待、算术验证、勾选同意，并持久化协议版本和解锁状态。
+- 诊断摘要卡片化，新增统一状态、规则匹配、配置生成、完整性校验等卡片。
+- WebUI 保存配置时同步更新 `state.prop`。
+
 ## v3.0 (2026-06-25)
 
 ### Multi-Vendor
