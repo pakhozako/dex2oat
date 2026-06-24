@@ -1,7 +1,7 @@
 id=dex2oat-lock
 name=Dex2oat Lock
-version=v2.9
-versionCode=29
+version=v3.0
+versionCode=30
 author=pakhozako
-description=OPlus/Xiaomi dexopt tuning
+description=Multi-vendor dexopt tuning and self-healing monitor
 updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json

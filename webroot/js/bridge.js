@@ -132,23 +132,28 @@ export async function writeBase64(path, content) {
   const quotedPath = shellQuote(path);
   const dirCmd = `mkdir -p ${shellQuote(path.replace(/\/[^/]*$/, ""))}`;
   const tempPath = `${path}.b64.tmp`;
+  const outputTempPath = `${path}.write.tmp`;
   const quotedTempPath = shellQuote(tempPath);
+  const quotedOutputTempPath = shellQuote(outputTempPath);
   const appendCommands = base64Chunks.map((chunk) => `printf '%s' ${shellQuote(chunk)} >> ${quotedTempPath}`);
-  const writeCmd = `base64 -d ${quotedTempPath} 2>/dev/null > ${quotedPath}`;
-  const fallbackCmd = `base64 --decode ${quotedTempPath} 2>/dev/null > ${quotedPath}`;
-  let result = await exec([dirCmd, `rm -f ${quotedTempPath} ${quotedPath}`, `: > ${quotedTempPath}`].join("; "));
+  const writeCmd = `base64 -d ${quotedTempPath} 2>/dev/null > ${quotedOutputTempPath}`;
+  const fallbackCmd = `base64 --decode ${quotedTempPath} 2>/dev/null > ${quotedOutputTempPath}`;
+  let result = await exec([dirCmd, `rm -f ${quotedTempPath} ${quotedOutputTempPath}`, `: > ${quotedTempPath}`].join("; "));
   if (result.code !== 0) return result;
 
   for (const command of appendCommands) {
     result = await exec(command);
     if (result.code !== 0) {
-      await exec(`rm -f ${quotedTempPath}`);
+      await exec(`rm -f ${quotedTempPath} ${quotedOutputTempPath}`);
       return result;
     }
   }
 
   result = await exec(`(${writeCmd}) || (${fallbackCmd})`);
-  await exec(`rm -f ${quotedTempPath}`);
+  if (result.code === 0) {
+    result = await exec(`mv -f ${quotedOutputTempPath} ${quotedPath}`);
+  }
+  await exec(`rm -f ${quotedTempPath} ${quotedOutputTempPath}`);
   if (result.code !== 0) return result;
 
   return exec(`chmod 0600 ${quotedPath} 2>/dev/null || true`);

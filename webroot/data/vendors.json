@@ -11,6 +11,42 @@
       "label": "Xiaomi-family",
       "options": "options-xiaomi.json",
       "detect": ["xiaomi", "redmi", "poco", "miui", "hyperos"]
+    },
+    {
+      "id": "miui",
+      "label": "MIUI-family",
+      "options": "options-xiaomi.json",
+      "detect": ["xiaomi", "redmi", "poco", "miui", "hyperos"]
+    },
+    {
+      "id": "samsung",
+      "label": "Samsung",
+      "options": "options-samsung.json",
+      "detect": ["samsung"]
+    },
+    {
+      "id": "pixel",
+      "label": "Pixel",
+      "options": "options-pixel.json",
+      "detect": ["google", "pixel"]
+    },
+    {
+      "id": "meizu",
+      "label": "Meizu",
+      "options": "options-generic.json",
+      "detect": ["meizu"]
+    },
+    {
+      "id": "redmagic",
+      "label": "RedMagic",
+      "options": "options-generic.json",
+      "detect": ["redmagic", "nubia"]
+    },
+    {
+      "id": "generic",
+      "label": "Generic",
+      "options": "options-generic.json",
+      "detect": []
     }
   ]
 }

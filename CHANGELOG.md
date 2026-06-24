@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.0 (2026-06-25)
+
+### Multi-Vendor
+- 新增 Samsung、Pixel、MIUI、Meizu、RedMagic 与 Generic 兜底模板。
+- 安装期按 `ro.product.manufacturer` -> `ro.product.brand` -> `ro.product.system.manufacturer` 自动识别厂商。
+- `device.prop` 新增 `detected_vendor`、`detected_source`、`detected_value`，便于诊断识别路径。
+- 统一安装期、re-match 与 WebUI 的 vendor/options 映射，保留旧 `xiaomi` 状态兼容。
+
+### Self-Healing
+- 新增 `core/health-check.sh`、`core/conflict-detect.sh`、`core/prop-lock.sh`。
+- 开机生成 `health.log`，检测关键文件与属性状态，并在关键文件缺失时自愈。
+- 安装期与 re-match 后生成 `prop-lock.list`，避免 WebUI 保存后被旧锁定值覆盖。
+- 冲突报告新增扫描状态、同名同值/异值标记与双方属性值。
+
+### WebUI
+- 首页新增健康状态指示，诊断输出新增 `health.log` 与 `conflict-report.txt`。
+- 保存配置时同步 `system.prop.bak` 与 `prop-lock.list`，并保留未被 options 管理的启用属性。
+- WebUI 写文件改为临时文件成功后再覆盖，降低写入失败导致配置损坏的风险。
+
+### Reliability
+- 扩大 dex2oat 自动匹配抓取范围，覆盖 `pm.dexopt.*`、`persist.device_config.*` 与厂商相关属性。
+- `service.log` 与 `install.log` 增加轻量轮转，降低长期运行日志膨胀风险。
+- 卸载清理 v3.0 新增状态文件，降低卸载重装污染。
+
 ## v2.9 (2026-06-24)
 
 ### Installer

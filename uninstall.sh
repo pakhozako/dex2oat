@@ -43,6 +43,10 @@ cleanup_state_files() {
   rm -f "$STATE_DIR/options-props.txt" 2>/dev/null
   rm -f "$STATE_DIR/service-state.prop" 2>/dev/null
   rm -f "$STATE_DIR/service.log" 2>/dev/null
+  rm -f "$STATE_DIR/health.log" 2>/dev/null
+  rm -f "$STATE_DIR/conflict-report.txt" 2>/dev/null
+  rm -f "$STATE_DIR/conflict-report.tmp" 2>/dev/null
+  rm -f "$STATE_DIR/prop-lock.list" 2>/dev/null
   rm -rf "$STATE_DIR/backup" "$STATE_DIR/logs" 2>/dev/null
   chmod 0700 "$STATE_DIR" 2>/dev/null || true
   chmod 0600 "$STATE_DIR/captured-props.txt" "$STATE_DIR/match-report.txt" "$STATE_DIR/install.log" 2>/dev/null || true

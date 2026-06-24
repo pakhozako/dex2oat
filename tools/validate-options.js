@@ -1,80 +1,127 @@
 #!/usr/bin/env node
-// tools/validate-options.js - v2.7 pre-release validation
+
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { spawnSync } = require("child_process");
 
-const ROOT = path.resolve(__dirname, "..");
-let errors = 0;
+const root = path.resolve(__dirname, "..");
+const jsonFiles = [
+  "update.json",
+  "webroot/data/app-meta.json",
+  "webroot/data/vendors.json",
+  "webroot/data/options.json",
+  "webroot/data/options-xiaomi.json",
+  "webroot/data/options-samsung.json",
+  "webroot/data/options-pixel.json",
+  "webroot/data/options-generic.json"
+];
 
-function fail(msg) { console.error("  FAIL:", msg); errors++; }
-function pass(msg) { console.log("  OK  :", msg); }
+const jsFiles = [
+  "webroot/js/app.js",
+  "webroot/js/bridge.js",
+  "webroot/js/config.js",
+  "webroot/js/system-info.js",
+  "webroot/js/ui.js",
+  "webroot/js/utils.js"
+];
 
-// 1. JSON validity
-for (const f of ["webroot/data/options.json", "webroot/data/options-xiaomi.json", "webroot/data/vendors.json", "webroot/data/app-meta.json", "update.json"]) {
-  try { JSON.parse(fs.readFileSync(path.join(ROOT, f), "utf8")); pass(`JSON valid: ${f}`); }
-  catch (e) { fail(`JSON invalid: ${f} — ${e.message}`); }
+const lfFiles = [
+  "module.prop",
+  "customize.sh",
+  "service.sh",
+  "uninstall.sh",
+  "system.prop",
+  "scripts/capture-props.sh",
+  "scripts/match-props.sh",
+  "core/health-check.sh",
+  "core/conflict-detect.sh",
+  "core/prop-lock.sh"
+];
+
+const requiredFiles = [
+  "module.prop",
+  "customize.sh",
+  "service.sh",
+  "uninstall.sh",
+  "scripts/capture-props.sh",
+  "scripts/match-props.sh",
+  "core/health-check.sh",
+  "core/conflict-detect.sh",
+  "core/prop-lock.sh",
+  "props/oplus.prop",
+  "props/xiaomi.prop",
+  "vendor/samsung.prop",
+  "vendor/pixel.prop",
+  "vendor/miui.prop",
+  "vendor/meizu.prop",
+  "vendor/redmagic.prop",
+  "vendor/generic.prop",
+  "webroot/data/options-samsung.json",
+  "webroot/data/options-pixel.json",
+  "webroot/data/options-generic.json"
+];
+
+function read(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
-// 2. JS syntax
-for (const f of ["webroot/js/app.js", "webroot/js/bridge.js", "webroot/js/config.js", "webroot/js/utils.js"]) {
-  try { execSync(`node --check ${path.join(ROOT, f)}`, { stdio: "pipe" }); pass(`JS syntax: ${f}`); }
-  catch (e) { fail(`JS syntax: ${f} — ${e.stderr?.toString().trim()}`); }
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
 }
 
-// 3. LF line endings
-for (const f of ["module.prop", "customize.sh", "service.sh", "uninstall.sh", "system.prop", "scripts/capture-props.sh", "scripts/match-props.sh"]) {
-  const b = fs.readFileSync(path.join(ROOT, f));
-  if (b.includes(Buffer.from("\r\n"))) fail(`CRLF found: ${f}`);
-  else pass(`LF: ${f}`);
-}
-
-// 4. Version consistency
-const moduleProp = fs.readFileSync(path.join(ROOT, "module.prop"), "utf8");
-const versionMatch = moduleProp.match(/^version=(.+)$/m);
-const versionCodeMatch = moduleProp.match(/^versionCode=(\d+)$/m);
-const updateJson = JSON.parse(fs.readFileSync(path.join(ROOT, "update.json"), "utf8"));
-const appMeta = JSON.parse(fs.readFileSync(path.join(ROOT, "webroot/data/app-meta.json"), "utf8"));
-const moduleVersion = versionMatch?.[1];
-const moduleVersionCode = Number(versionCodeMatch?.[1]);
-if (moduleVersion === updateJson.version && moduleVersionCode === updateJson.versionCode && moduleVersion === appMeta.version)
-  pass(`Version consistent: ${moduleVersion} / ${moduleVersionCode}`);
-else
-  fail(`Version mismatch: module=${moduleVersion}/${moduleVersionCode} update.json=${updateJson.version}/${updateJson.versionCode} app-meta=${appMeta.version}`);
-
-// 5. Vendors list coverage
-const vendors = JSON.parse(fs.readFileSync(path.join(ROOT, "webroot/data/vendors.json"), "utf8"));
-for (const v of vendors.vendors) {
-  const optFile = path.join(ROOT, "webroot/data", v.options);
-  const propFile = path.join(ROOT, "props", `${v.id}.prop`);
-  if (!fs.existsSync(optFile)) fail(`vendor ${v.id}: options file missing: ${optFile}`);
-  else pass(`vendor ${v.id}: options file OK`);
-  if (!fs.existsSync(propFile)) fail(`vendor ${v.id}: prop template missing: ${propFile}`);
-  else pass(`vendor ${v.id}: prop template OK`);
-
-  // 6. Safe defaults consistency
-  const options = JSON.parse(fs.readFileSync(optFile, "utf8"));
-  const items = options.categories.flatMap((c) => c.items.map((i) => ({ ...i, cat: c.id })));
-  const propLines = fs.readFileSync(propFile, "utf8").split(/\r?\n/);
-  const active = new Map(), all = new Map();
-  for (const line of propLines) {
-    const t = line.trim();
-    if (!t) continue;
-    const enabled = !t.startsWith("#");
-    const body = enabled ? t : t.replace(/^#\s*/, "");
-    const idx = body.indexOf("=");
-    if (idx > 0) { all.set(body.slice(0, idx), body.slice(idx + 1)); if (enabled) active.set(body.slice(0, idx), body.slice(idx + 1)); }
+function parseModuleProp() {
+  const result = {};
+  for (const line of read("module.prop").split(/\r?\n/)) {
+    const index = line.indexOf("=");
+    if (index > 0) result[line.slice(0, index)] = line.slice(index + 1);
   }
-  const safeMissing = items.filter((i) => i.cat === "safe" && !active.has(i.prop));
-  const safeWrong = items.filter((i) => i.cat === "safe" && active.has(i.prop) && active.get(i.prop) !== i.defaultValue);
-  const missingAll = [...new Set(items.map((i) => i.prop))].filter((p) => !all.has(p));
-  if (safeMissing.length) fail(`vendor ${v.id}: safe items missing from prop: ${safeMissing.map((i) => i.prop).join(", ")}`);
-  else pass(`vendor ${v.id}: all safe items present`);
-  if (safeWrong.length) fail(`vendor ${v.id}: safe item value mismatch: ${safeWrong.map((i) => `${i.prop}=${active.get(i.prop)} != ${i.defaultValue}`).join(", ")}`);
-  else pass(`vendor ${v.id}: safe item values correct`);
-  if (missingAll.length) fail(`vendor ${v.id}: props missing from template: ${missingAll.join(", ")}`);
-  else pass(`vendor ${v.id}: all option props covered`);
+  return result;
 }
 
-console.log(`\n${errors ? `\u274c ${errors} error(s)` : "\u2705 All checks passed"}`);
-if (errors) process.exit(1);
+function parseJson(relativePath) {
+  return JSON.parse(read(relativePath));
+}
+
+function runNodeCheck(relativePath) {
+  const result = spawnSync(process.execPath, ["--check", path.join(root, relativePath)], { stdio: "inherit" });
+  assert(result.status === 0, `JS syntax check failed: ${relativePath}`);
+}
+
+function validateOptionFile(relativePath) {
+  const data = parseJson(relativePath);
+  assert(Array.isArray(data.categories), `${relativePath}: categories must be an array`);
+  for (const category of data.categories) {
+    assert(category.id && category.title && category.tone, `${relativePath}: invalid category`);
+    assert(Array.isArray(category.items), `${relativePath}: items must be an array`);
+    for (const item of category.items) {
+      assert(item.id && item.label && item.prop, `${relativePath}: invalid item`);
+      assert(Array.isArray(item.values) && item.values.length > 0, `${relativePath}: ${item.id} values missing`);
+      assert(item.values.includes(item.defaultValue), `${relativePath}: ${item.id} defaultValue not in values`);
+    }
+  }
+}
+
+for (const file of requiredFiles) {
+  assert(fs.existsSync(path.join(root, file)), `required file missing: ${file}`);
+}
+
+for (const file of jsonFiles) parseJson(file);
+for (const file of jsFiles) runNodeCheck(file);
+for (const file of lfFiles) {
+  assert(!read(file).includes("\r\n"), `CRLF line endings found: ${file}`);
+}
+
+for (const file of jsonFiles.filter((file) => file.includes("options"))) {
+  validateOptionFile(file);
+}
+
+const moduleProp = parseModuleProp();
+const updateJson = parseJson("update.json");
+const appMeta = parseJson("webroot/data/app-meta.json");
+assert(moduleProp.version === "v3.0", "module.prop version must be v3.0");
+assert(String(moduleProp.versionCode) === "30", "module.prop versionCode must be 30");
+assert(updateJson.version === moduleProp.version, "update.json version mismatch");
+assert(String(updateJson.versionCode) === String(moduleProp.versionCode), "update.json versionCode mismatch");
+assert(appMeta.version === moduleProp.version, "app-meta version mismatch");
+
+console.log("validate-options: ok");

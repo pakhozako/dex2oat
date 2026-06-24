@@ -10,6 +10,7 @@ const state = {
   config: null,
   device: null,
   configSource: null,
+  health: null,
   page: "home",
   systemInfo: null
 };
@@ -83,10 +84,19 @@ function commandUrl(value) {
   return shellQuote(url.href);
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function loadMeta() {
   const meta = await loadJson("./data/app-meta.json", {
     moduleName: "Dex2oat Lock",
-    version: "v2.9",
+    version: "v3.0",
     githubUrl: ""
   });
   const moduleProp = parseModuleProp(await readText(`${MODULE_DIR}/module.prop`));
@@ -101,8 +111,8 @@ async function loadMeta() {
 async function loadDeviceState() {
   const device = parseStateFile(await readText(`${STATE_DIR}/device.prop`));
   if (!device.vendor) {
-    device.vendor = "oplus";
-    device.label = "OPlus-family";
+    device.vendor = "generic";
+    device.label = "Generic";
   }
   return device;
 }
@@ -111,11 +121,20 @@ async function loadConfigSource() {
   return parseStateFile(await readText(`${STATE_DIR}/config-source.prop`));
 }
 
+async function loadHealthState() {
+  return parseStateFile(await readText(`${STATE_DIR}/health.log`));
+}
+
 async function loadOptionsForDevice(device) {
   const vendors = await loadJson("./data/vendors.json", { vendors: [] });
   const found = vendors.vendors.find((v) => v.id === device.vendor);
-  const optionsPath = found ? `./data/${found.options}` : "./data/options.json";
-  return loadJson(optionsPath, { categories: [] });
+  const optionsPath = found ? `./data/${found.options}` : "./data/options-generic.json";
+  const options = await loadJson(optionsPath, { categories: [] });
+  if (options.categories?.length) return options;
+  if (optionsPath !== "./data/options-generic.json") {
+    return loadJson("./data/options-generic.json", { categories: [] });
+  }
+  return options;
 }
 
 function renderShell() {
@@ -124,8 +143,8 @@ function renderShell() {
       <div class="brand">
         <span class="brand-logo" aria-hidden="true">D</span>
         <div class="brand-text">
-          <h1>${state.meta.moduleName}</h1>
-          <p>${state.meta.version}</p>
+          <h1>${escapeHtml(state.meta.moduleName)}</h1>
+          <p>${escapeHtml(state.meta.version)}</p>
         </div>
       </div>
       <div class="top-actions">
@@ -178,11 +197,11 @@ function createStatusCard() {
   hero.innerHTML = `
     <div class="module-status-content">
       <div class="module-status-title">模块运行中</div>
-      <div class="module-status-version">${state.meta.version}</div>
+      <div class="module-status-version">${escapeHtml(state.meta.version)}</div>
       <div class="module-status-meta">
         <span>已启用 ${countEnabled(state.config)} 项属性</span>
       </div>
-      <div class="module-status-reboot">${label}</div>
+      <div class="module-status-reboot">${escapeHtml(label)}</div>
     </div>
     <div class="module-status-mark" aria-hidden="true"></div>
   `;
@@ -193,7 +212,7 @@ function createSummaryBand() {
   const info = state.systemInfo || {};
   const summary = createElement("section", "summary-band");
   summary.append(metric("设备", state.device?.["ro.product.model"] || "暂不可用"));
-  summary.append(metric("厂商配置", state.device?.label || state.device?.vendor || "OPlus-family"));
+  summary.append(metric("厂商配置", state.device?.label || state.device?.vendor || "Generic"));
   summary.append(metric("配置来源", sourceLabel(state.configSource)));
   summary.append(metric("模块版本", state.configSource?.version || state.meta.version));
   summary.append(metric("系统", state.device?.["ro.build.version.release"] || "暂不可用"));
@@ -230,6 +249,21 @@ function createModuleStateSection() {
   return moduleState;
 }
 
+function createHealthSection() {
+  const health = state.health || {};
+  const status = health.status || "warn";
+  const labels = { ok: "正常", warn: "警告", error: "异常" };
+  const section = createSection("健康状态", labels[status] || "警告");
+  section.classList.add("health-section", `health-${status}`);
+  const grid = createElement("div", "metric-grid compact");
+  grid.append(metric("状态", labels[status] || status));
+  grid.append(metric("文件", health.files_ok || "unknown"));
+  grid.append(metric("属性", health.props_ok || "unknown"));
+  grid.append(metric("自愈", health.auto_fixed || "unknown"));
+  section.append(grid);
+  return section;
+}
+
 function createLinkRow() {
   const githubLabel = state.meta.githubUrl ? "打开 GitHub" : "GitHub 待填写";
   const links = createElement("section", "link-row");
@@ -245,6 +279,7 @@ function renderHome() {
   const page = $("#page");
   page.innerHTML = "";
   page.append(createStatusCard());
+  page.append(createHealthSection());
   page.append(createSummaryBand());
   page.append(createModuleStateSection());
   page.append(createLinkRow());
@@ -254,8 +289,8 @@ function createSection(title, meta) {
   const section = createElement("section", "section");
   section.innerHTML = `
     <div class="section-title">
-      <h2>${title}</h2>
-      ${meta ? `<span>${meta}</span>` : ""}
+      <h2>${escapeHtml(title)}</h2>
+      ${meta ? `<span>${escapeHtml(meta)}</span>` : ""}
     </div>
   `;
   return section;
@@ -271,9 +306,13 @@ function renderCategory(categoryId) {
   const category = categoryById(categoryId);
   const page = $("#page");
   page.innerHTML = "";
+  if (!category) {
+    page.append(createSection("配置不可用", "options 文件为空或损坏"));
+    return;
+  }
 
   const header = createElement("section", `profile-header ${category.tone}`);
-  header.innerHTML = `<h2>${category.title}</h2><p>${category.description}</p>`;
+  header.innerHTML = `<h2>${escapeHtml(category.title)}</h2><p>${escapeHtml(category.description)}</p>`;
   page.append(header);
 
   const list = createElement("section", "option-list");
@@ -287,9 +326,9 @@ function renderCategory(categoryId) {
         <span></span>
       </label>
       <div class="option-copy">
-        <h3>${item.label}</h3>
-        <p>${item.description}</p>
-        <code>${item.prop}</code>
+        <h3>${escapeHtml(item.label)}</h3>
+        <p>${escapeHtml(item.description)}</p>
+        <code>${escapeHtml(item.prop)}</code>
       </div>
       <select></select>
     `;
@@ -360,6 +399,7 @@ async function refreshAll() {
   setStatus("正在刷新设备信息...");
   try {
     state.systemInfo = await readSystemInfo();
+    state.health = await loadHealthState();
     renderPage();
     setStatus("设备信息已刷新", "ok");
   } catch (error) {
@@ -507,6 +547,10 @@ function buildStaticDiagnosticShell() {
     "echo '--- reboot state ---'",
     "cat /proc/sys/kernel/random/boot_id 2>/dev/null",
     "cat /data/adb/dex2oat-lock/service-state.prop 2>/dev/null",
+    "echo '--- health log ---'",
+    "cat /data/adb/dex2oat-lock/health.log 2>/dev/null",
+    "echo '--- conflict report ---'",
+    "cat /data/adb/dex2oat-lock/conflict-report.txt 2>/dev/null",
     "echo '--- uninstall state ---'",
     "cat /data/adb/dex2oat-lock-uninstall.prop 2>/dev/null",
     "echo '--- apply log ---'",
@@ -728,19 +772,46 @@ async function showDiagnosticsDialog(content) {
   const originalPropsContent = await readText(`${STATE_DIR}/original-props.conf`);
   const currentSystemProp = await readGeneratedSystemProp();
   const diagnosticState = buildDiagnosticState(content, applyLog, desiredProps);
-  showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp), {
+  const healthState = parseDiagnosticSection(content, "--- health log ---");
+  const conflictState = parseDiagnosticSection(content, "--- conflict report ---");
+  showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp, healthState, conflictState), {
     copyLabel: "复制全部诊断信息",
     savePath: `${STATE_DIR}/logs/webui-diagnostic.txt`
   });
 }
 
-function createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp) {
+function createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp, healthState, conflictState) {
   const section = createElement("section", "diagnostic-stack");
+  section.append(createConflictBanner(conflictState));
+  section.append(createHealthLogSummary(healthState, conflictState));
   section.append(createLifecycleStateSummary(installState, uninstallState));
   section.append(createRebootStateSummary(rebootState, applyLog.passSummaries));
   section.append(createPropCompareSection(originalPropsContent, currentSystemProp));
   section.append(createFinalPropSummary(diagnosticState));
   section.append(createApplyLogSummary(applyLog, diagnosticState, rebootState));
+  return section;
+}
+
+function createConflictBanner(conflictState) {
+  const total = Number(conflictState.conflict_total || 0);
+  const banner = createElement("div", `diagnostic-conflict-banner ${total > 0 ? "show" : "hide"}`);
+  banner.textContent = total > 0 ? `检测到 ${total} 项属性冲突，请查看 conflict-report.txt` : "";
+  return banner;
+}
+
+function createHealthLogSummary(healthState, conflictState) {
+  const status = healthState.status || "unknown";
+  const section = createElement("section", "diagnostic-summary");
+  const header = createElement("div", "diagnostic-summary-head");
+  header.append(createElement("strong", "", "自愈监控"));
+  header.append(createElement("span", "", `health=${status} conflict=${conflictState.conflict_total || 0}`));
+  section.append(header);
+  const chips = createElement("div", "diagnostic-chip-row");
+  chips.append(createDiagnosticChip("健康", status, status === "ok" ? "applied" : status === "error" ? "failed" : "mismatch"));
+  chips.append(createDiagnosticChip("文件", healthState.files_ok || "unknown", healthState.files_ok === "yes" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("属性", healthState.props_ok || "unknown", healthState.props_ok === "yes" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("冲突", conflictState.conflict_total || 0, Number(conflictState.conflict_total || 0) > 0 ? "failed" : "applied"));
+  section.append(chips);
   return section;
 }
 
@@ -858,7 +929,7 @@ function buildRebootDiagnosticText(rebootState, passSummaries) {
   if (rebootState.status === "skipped" || rebootState.health === "skipped") {
     return rebootState.reason
       ? `服务已跳过：${rebootState.reason}。`
-      : "服务已跳过运行时属性应用；设备可能不在 OPlus/Xiaomi 支持范围。";
+      : "服务已跳过运行时属性应用；设备可能未匹配到可应用的运行时属性。";
   }
 
   if (problemTotal) {
@@ -978,7 +1049,7 @@ function createDiagnosticConclusion(groups, passSummaries, total, summary, diagn
     title = "status=service-skipped";
     detail = rebootState.reason
       ? `service-state 报告已跳过运行时应用：${rebootState.reason}。`
-        : "service-state 报告已跳过运行时应用；设备可能不在 OPlus/Xiaomi 支持范围。";
+        : "service-state 报告已跳过运行时应用；设备可能未匹配到可应用的运行时属性。";
   } else if (total || summary) {
     if (failed || mismatch) {
       tone = "failed";
@@ -1022,10 +1093,10 @@ function showDialog(title, content, beforeContent, options = {}) {
   dialog.innerHTML = `
     <div class="dialog-panel">
       <div class="section-title">
-        <h2>${title}</h2>
+        <h2>${escapeHtml(title)}</h2>
         <div class="dialog-actions">
           ${saveButton}
-          <button class="text-button" data-action="copy">${options.copyLabel || "复制"}</button>
+          <button class="text-button" data-action="copy">${escapeHtml(options.copyLabel || "复制")}</button>
           <button class="text-button" data-action="close">关闭</button>
         </div>
       </div>
@@ -1106,6 +1177,7 @@ async function start() {
   state.meta = await loadMeta();
   state.device = await loadDeviceState();
   state.configSource = await loadConfigSource();
+  state.health = await loadHealthState();
   state.options = await loadOptionsForDevice(state.device);
   state.config = await loadUserConfig(state.options);
 

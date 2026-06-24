@@ -12,6 +12,7 @@ SYSTEM_PROP_BAK="$STATE_DIR/system.prop.bak"
 CAPTURED_PROPS="$STATE_DIR/captured-props.txt"
 MATCHED_PROPS="$STATE_DIR/matched-props.txt"
 MATCH_REPORT="$STATE_DIR/match-report.txt"
+PROP_LOCK_LIST="$STATE_DIR/prop-lock.list"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 TRIGGER_REMATCH="$STATE_DIR/trigger-rematch"
 
@@ -19,7 +20,19 @@ if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
   LOG_FILE="$FALLBACK_LOG"
 fi
 
+rotate_log() {
+  LOG_PATH="$1"
+  MAX_SIZE="${2:-262144}"
+  [ -f "$LOG_PATH" ] || return 0
+  LOG_SIZE="$(wc -c < "$LOG_PATH" 2>/dev/null | tr -d ' ')"
+  [ "${LOG_SIZE:-0}" -gt "$MAX_SIZE" ] || return 0
+  mv -f "$LOG_PATH" "$LOG_PATH.1" 2>/dev/null || true
+  : > "$LOG_PATH" 2>/dev/null || true
+  chmod 0600 "$LOG_PATH" 2>/dev/null || true
+}
+
 log_msg() {
+  rotate_log "$LOG_FILE"
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
 }
 
@@ -28,6 +41,20 @@ restore_system_prop_from_backup() {
   cp -af "$SYSTEM_PROP_BAK" "$PROP_FILE" 2>/dev/null || return 1
   chmod 0644 "$PROP_FILE" 2>/dev/null || true
   return 0
+}
+
+write_prop_lock_list() {
+  [ -s "$PROP_FILE" ] || return 1
+  : > "$PROP_LOCK_LIST" 2>/dev/null || return 1
+  while IFS='=' read -r PROP_KEY PROP_VALUE; do
+    PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
+    PROP_VALUE="$(printf '%s' "$PROP_VALUE" | tr -d '\r')"
+    case "$PROP_KEY" in
+      ""|\#*) continue ;;
+    esac
+    printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$PROP_LOCK_LIST" 2>/dev/null || true
+  done < "$PROP_FILE"
+  chmod 0600 "$PROP_LOCK_LIST" 2>/dev/null || true
 }
 
 write_service_state() {
@@ -81,10 +108,9 @@ run_trigger_rematch() {
   [ -f "$TRIGGER_REMATCH" ] || return 0
 
   VENDOR="$(sed -n 's/^vendor=//p' "$STATE_DIR/device.prop" 2>/dev/null | head -n 1)"
-  [ -n "$VENDOR" ] || VENDOR=oplus
-  OPTIONS_FILE="$MODDIR/webroot/data/options.json"
-  [ "$VENDOR" = "xiaomi" ] && OPTIONS_FILE="$MODDIR/webroot/data/options-xiaomi.json"
-  TEMPLATE_FILE="$MODDIR/props/$VENDOR.prop"
+  [ -n "$VENDOR" ] || VENDOR=generic
+  OPTIONS_FILE="$(options_file_for_vendor "$VENDOR")"
+  TEMPLATE_FILE="$(template_file_for_vendor "$VENDOR")"
   MODULE_VERSION="$(sed -n 's/^version=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
 
   log_msg "Trigger rematch detected: vendor=$VENDOR version=$MODULE_VERSION"
@@ -92,11 +118,30 @@ run_trigger_rematch() {
      sh "$MODDIR/scripts/match-props.sh" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$TEMPLATE_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$VENDOR" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
     cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
     chmod 0600 "$SYSTEM_PROP_BAK" 2>/dev/null || true
+    write_prop_lock_list || true
+    [ -f "$MODDIR/core/conflict-detect.sh" ] && sh "$MODDIR/core/conflict-detect.sh" "$MODDIR" 2>/dev/null || true
     log_msg "Trigger rematch completed"
   else
     log_msg "Trigger rematch failed; keeping current system.prop"
   fi
   rm -f "$TRIGGER_REMATCH" 2>/dev/null
+}
+
+options_file_for_vendor() {
+  case "$1" in
+    xiaomi|miui) printf '%s\n' "$MODDIR/webroot/data/options-xiaomi.json" ;;
+    samsung) printf '%s\n' "$MODDIR/webroot/data/options-samsung.json" ;;
+    pixel) printf '%s\n' "$MODDIR/webroot/data/options-pixel.json" ;;
+    meizu|redmagic|generic) printf '%s\n' "$MODDIR/webroot/data/options-generic.json" ;;
+    *) printf '%s\n' "$MODDIR/webroot/data/options.json" ;;
+  esac
+}
+
+template_file_for_vendor() {
+  TEMPLATE_FILE="$MODDIR/vendor/$1.prop"
+  [ -f "$TEMPLATE_FILE" ] || TEMPLATE_FILE="$MODDIR/props/$1.prop"
+  [ -f "$TEMPLATE_FILE" ] || TEMPLATE_FILE="$MODDIR/vendor/generic.prop"
+  printf '%s\n' "$TEMPLATE_FILE"
 }
 
 apply_prop() {
@@ -279,6 +324,14 @@ sleep 10
 log_msg "Boot completed, checking device..."
 run_trigger_rematch
 
+if [ -f "$MODDIR/core/health-check.sh" ]; then
+  sh "$MODDIR/core/health-check.sh" "$MODDIR" 2>/dev/null || true
+fi
+
+if [ -f "$MODDIR/core/prop-lock.sh" ]; then
+  sh "$MODDIR/core/prop-lock.sh" "$MODDIR" 2>/dev/null || true
+fi
+
 DEVICE_INFO="$(
   printf '%s %s %s %s %s %s %s %s' \
     "$(getprop ro.build.version.oplusrom)" \
@@ -299,10 +352,11 @@ case "$DEVICE_INFO" in
   *xiaomi*|*redmi*|*poco*|*miui*|*hyperos*)
     log_msg "Detected supported Xiaomi-family device: $DEVICE_INFO"
     ;;
+  *samsung*|*google*|*pixel*|*meizu*|*redmagic*|*nubia*)
+    log_msg "Detected supported multi-vendor device: $DEVICE_INFO"
+    ;;
   *)
-    log_msg "Unsupported device: $DEVICE_INFO. Runtime properties were not applied."
-    write_service_state skipped unsupported-device unsupported_device
-    exit 0
+    log_msg "Unknown device: $DEVICE_INFO. Applying generic runtime properties."
     ;;
 esac
 

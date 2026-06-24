@@ -306,6 +306,18 @@ button {
   border-radius: var(--radius-lg);
 }
 
+.health-section.health-ok {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.health-section.health-warn {
+  border-color: rgba(234, 179, 8, 0.35);
+}
+
+.health-section.health-error {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -787,6 +799,20 @@ select {
 .diagnostic-conclusion.applied {
   border-color: rgba(34, 197, 94, 0.3);
   background: rgba(34, 197, 94, 0.05);
+}
+
+.diagnostic-conflict-banner {
+  padding: var(--space-10);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diagnostic-conflict-banner.hide {
+  display: none;
 }
 
 .diagnostic-conclusion {

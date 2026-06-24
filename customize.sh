@@ -8,6 +8,7 @@ FINAL_INSTALL_STATE=/data/adb/dex2oat-lock-install.prop
 CONFIG_FILE="$STATE_DIR/config.json"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
+PROP_LOCK_LIST="$STATE_DIR/prop-lock.list"
 PROP_FILE="$MODPATH/system.prop"
 SYSTEM_PROP_BAK="$STATE_DIR/system.prop.bak"
 DEVICE_FILE="$STATE_DIR/device.prop"
@@ -33,9 +34,23 @@ if ! command -v set_perm >/dev/null 2>&1; then
   set_perm() { chown "$2:$3" "$1" 2>/dev/null; chmod "$4" "$1" 2>/dev/null; }
 fi
 
+rotate_log() {
+  LOG_PATH="$1"
+  MAX_SIZE="${2:-131072}"
+  [ -f "$LOG_PATH" ] || return 0
+  LOG_SIZE="$(wc -c < "$LOG_PATH" 2>/dev/null | tr -d ' ')"
+  [ "${LOG_SIZE:-0}" -gt "$MAX_SIZE" ] || return 0
+  mv -f "$LOG_PATH" "$LOG_PATH.1" 2>/dev/null || true
+  : > "$LOG_PATH" 2>/dev/null || true
+  chmod 0600 "$LOG_PATH" 2>/dev/null || true
+}
+
 log_install() {
   ui_print "$*"
-  [ "$INSTALL_STARTED" = "1" ] && printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$INSTALL_LOG"
+  if [ "$INSTALL_STARTED" = "1" ]; then
+    rotate_log "$INSTALL_LOG"
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$INSTALL_LOG"
+  fi
 }
 
 write_install_state() {
@@ -165,8 +180,72 @@ write_device_prop() {
     printf 'ro.build.version.release=%s\n' "$(getprop ro.build.version.release)"
     printf 'ro.build.version.sdk=%s\n' "$(getprop ro.build.version.sdk)"
     printf 'vendor=%s\n' "$DEVICE_VENDOR"
+    printf 'detected_vendor=%s\n' "$DEVICE_VENDOR"
+    printf 'detected_source=%s\n' "${DEVICE_DETECT_SOURCE:-unknown}"
+    printf 'detected_value=%s\n' "${DEVICE_DETECT_VALUE:-}"
     printf 'label=%s\n' "$DEVICE_LABEL"
   } > "$DEVICE_FILE" 2>/dev/null || fail_install "Failed to write device.prop"
+}
+
+map_vendor() {
+  DETECT_SOURCE="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$DETECT_SOURCE" in
+    *coloros*|*oplus*|*oppo*|*oneplus*|*realme*) DEVICE_VENDOR=oplus; DEVICE_LABEL="OPlus-family" ;;
+    *xiaomi*|*redmi*|*poco*|*miui*|*hyperos*) DEVICE_VENDOR=miui; DEVICE_LABEL="MIUI-family" ;;
+    *samsung*) DEVICE_VENDOR=samsung; DEVICE_LABEL="Samsung" ;;
+    *google*|*pixel*) DEVICE_VENDOR=pixel; DEVICE_LABEL="Pixel" ;;
+    *meizu*) DEVICE_VENDOR=meizu; DEVICE_LABEL="Meizu" ;;
+    *redmagic*|*nubia*) DEVICE_VENDOR=redmagic; DEVICE_LABEL="RedMagic" ;;
+    *) return 1 ;;
+  esac
+  return 0
+}
+
+detect_vendor() {
+  DEVICE_VENDOR=generic
+  DEVICE_LABEL="Generic"
+  DEVICE_DETECT_SOURCE=generic
+  DEVICE_DETECT_VALUE=""
+
+  DETECT_VALUE="$(getprop ro.product.manufacturer)"
+  if map_vendor "$DETECT_VALUE"; then
+    DEVICE_DETECT_SOURCE=ro.product.manufacturer
+    DEVICE_DETECT_VALUE="$DETECT_VALUE"
+  else
+    DETECT_VALUE="$(getprop ro.product.brand)"
+    if map_vendor "$DETECT_VALUE"; then
+      DEVICE_DETECT_SOURCE=ro.product.brand
+      DEVICE_DETECT_VALUE="$DETECT_VALUE"
+    else
+      DETECT_VALUE="$(getprop ro.product.system.manufacturer)"
+      if map_vendor "$DETECT_VALUE"; then
+        DEVICE_DETECT_SOURCE=ro.product.system.manufacturer
+        DEVICE_DETECT_VALUE="$DETECT_VALUE"
+      fi
+    fi
+  fi
+
+  VENDOR_PROP_TEMPLATE="$MODPATH/vendor/$DEVICE_VENDOR.prop"
+  if [ ! -f "$VENDOR_PROP_TEMPLATE" ]; then
+    if [ -f "$MODPATH/props/$DEVICE_VENDOR.prop" ]; then
+      VENDOR_PROP_TEMPLATE="$MODPATH/props/$DEVICE_VENDOR.prop"
+    else
+      DEVICE_VENDOR=generic
+      DEVICE_LABEL="Generic"
+      DEVICE_DETECT_SOURCE=template-fallback
+      VENDOR_PROP_TEMPLATE="$MODPATH/vendor/generic.prop"
+    fi
+  fi
+}
+
+options_file_for_vendor() {
+  case "$1" in
+    xiaomi|miui) printf '%s\n' "$MODPATH/webroot/data/options-xiaomi.json" ;;
+    samsung) printf '%s\n' "$MODPATH/webroot/data/options-samsung.json" ;;
+    pixel) printf '%s\n' "$MODPATH/webroot/data/options-pixel.json" ;;
+    meizu|redmagic|generic) printf '%s\n' "$MODPATH/webroot/data/options-generic.json" ;;
+    *) printf '%s\n' "$MODPATH/webroot/data/options.json" ;;
+  esac
 }
 
 write_config_source() {
@@ -223,8 +302,7 @@ use_vendor_template() {
 run_dex2oat_match() {
   CAPTURE_SCRIPT="$MODPATH/scripts/capture-props.sh"
   MATCH_SCRIPT="$MODPATH/scripts/match-props.sh"
-  OPTIONS_FILE="$MODPATH/webroot/data/options.json"
-  [ "$DEVICE_VENDOR" = "xiaomi" ] && OPTIONS_FILE="$MODPATH/webroot/data/options-xiaomi.json"
+  OPTIONS_FILE="$(options_file_for_vendor "$DEVICE_VENDOR")"
 
   [ -f "$CAPTURE_SCRIPT" ] || return 10
   [ -f "$MATCH_SCRIPT" ] || return 11
@@ -251,6 +329,18 @@ EOF
   [ -f "$CONFIG_FILE" ] || fail_install "Failed to create WebUI config"
 }
 
+write_prop_lock_list() {
+  : > "$PROP_LOCK_LIST" 2>/dev/null || return 0
+  while IFS='=' read -r PROP_KEY PROP_VALUE; do
+    PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
+    PROP_VALUE="$(printf '%s' "$PROP_VALUE" | tr -d '\r')"
+    case "$PROP_KEY" in
+      ""|\#*) continue ;;
+    esac
+    printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$PROP_LOCK_LIST" 2>/dev/null || true
+  done < "$PROP_FILE"
+}
+
 ui_print "- Installing Dex2oat Lock"
 
 [ -n "$MODPATH" ] || fail_install "MODPATH is not set"
@@ -264,16 +354,9 @@ STATE_CREATED=1
 INSTALL_STARTED=1
 touch "$INSTALL_LOG" || fail_install "Failed to create install.log"
 
-DEVICE_INFO="$(printf '%s %s %s %s %s %s %s %s' "$(getprop ro.build.version.oplusrom)" "$(getprop ro.oplus.version)" "$(getprop ro.product.brand)" "$(getprop ro.product.manufacturer)" "$(getprop ro.product.marketname)" "$(getprop ro.product.bootimage.brand)" "$(getprop ro.miui.ui.version.name)" "$(getprop ro.mi.os.version.name)" | tr '[:upper:]' '[:lower:]')"
-
-case "$DEVICE_INFO" in
-  *coloros*|*oplus*|*oppo*|*oneplus*|*realme*) DEVICE_VENDOR=oplus; DEVICE_LABEL="OPlus-family" ;;
-  *xiaomi*|*redmi*|*poco*|*miui*|*hyperos*) DEVICE_VENDOR=xiaomi; DEVICE_LABEL="Xiaomi-family" ;;
-  *) fail_install "Unsupported device" ;;
-esac
-
-VENDOR_PROP_TEMPLATE="$MODPATH/props/$DEVICE_VENDOR.prop"
-[ -f "$VENDOR_PROP_TEMPLATE" ] || fail_install "$DEVICE_VENDOR.prop not found"
+detect_vendor
+[ -f "$VENDOR_PROP_TEMPLATE" ] || VENDOR_PROP_TEMPLATE="$MODPATH/vendor/generic.prop"
+[ -f "$VENDOR_PROP_TEMPLATE" ] || fail_install "generic.prop not found"
 
 write_device_prop
 backup_original_props
@@ -304,11 +387,16 @@ if [ "$SKIP_CONFIG_GENERATION" != "1" ]; then
   fi
 fi
 
+write_prop_lock_list
 cp -af "$PROP_FILE" "$BACKUP_DIR/system.prop.factory" 2>/dev/null || true
 cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
 init_webui_config
 touch "$STATE_DIR/service.log" 2>/dev/null || true
 append_install_log
+
+if [ -f "$MODPATH/core/conflict-detect.sh" ]; then
+  sh "$MODPATH/core/conflict-detect.sh" "$MODPATH" 2>/dev/null || true
+fi
 
 chmod 0755 "$MODPATH" || fail_install "Failed to chmod module dir"
 set_perm "$MODPATH/service.sh" 0 0 0755 || fail_install "Failed to chmod service.sh"
@@ -317,10 +405,12 @@ set_perm "$MODPATH/uninstall.sh" 0 0 0755 || fail_install "Failed to chmod unins
 set_perm "$MODPATH/system.prop" 0 0 0644 || fail_install "Failed to chmod system.prop"
 set_perm "$MODPATH/module.prop" 0 0 0644 || fail_install "Failed to chmod module.prop"
 chmod_readable_tree "$MODPATH/props" || fail_install "Failed to chmod props"
+chmod_readable_tree "$MODPATH/vendor" || fail_install "Failed to chmod vendor"
 chmod_readable_tree "$MODPATH/scripts" || fail_install "Failed to chmod scripts"
+chmod_readable_tree "$MODPATH/core" || fail_install "Failed to chmod core"
 
 chmod 0700 "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" 2>/dev/null || true
-chmod 0600 "$CONFIG_FILE" "$CONFIG_SOURCE_FILE" "$DEVICE_FILE" "$ORIGINAL_PROPS" "$SYSTEM_PROP_BAK" "$INSTALL_LOG" "$CAPTURED_PROPS" "$MATCHED_PROPS" "$MATCH_REPORT" 2>/dev/null || true
+chmod 0600 "$CONFIG_FILE" "$CONFIG_SOURCE_FILE" "$DEVICE_FILE" "$ORIGINAL_PROPS" "$SYSTEM_PROP_BAK" "$INSTALL_LOG" "$CAPTURED_PROPS" "$MATCHED_PROPS" "$MATCH_REPORT" "$PROP_LOCK_LIST" 2>/dev/null || true
 
 log_install "- Installation completed: vendor=$DEVICE_VENDOR source=$INSTALL_SOURCE matched=$MATCHED_TOTAL version=$MODULE_VERSION"
 write_install_state ok installed

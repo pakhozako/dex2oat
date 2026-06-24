@@ -2,7 +2,7 @@
 
 ![:name](https://count.getloli.com/@dex2oat?name=dex2oat&theme=moebooru&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
 
-Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制 OPlus / Xiaomi 系设备在后台、安装、OTA 等场景下触发不必要的 dexopt 编译，减少发热、降低功耗、延长电池寿命。内置 WebUI，可在线切换三档方案，无需重新刷入。
+Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，抑制多厂商设备在后台、安装、OTA 等场景下触发不必要的 dexopt 编译，减少发热、降低功耗、延长电池寿命。内置 WebUI，可在线切换三档方案，无需重新刷入。
 
 ---
 
@@ -12,9 +12,11 @@ Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik
 |:--|:--|:--|
 | OPlus / ColorOS | OnePlus 13, ACE5 至尊版, OPPO/Realme 系列 | ✅ 完整支持 |
 | Xiaomi / MIUI / HyperOS | 小米 13, MIX4, Redmi / POCO 系列 | ✅ 独立配置 |
-| 其他 | — | ❌ 安装时自动拒绝 |
+| Samsung | Galaxy 系列 | ✅ 独立配置 |
+| Pixel | Google Pixel 系列 | ✅ 独立配置 |
+| Meizu / RedMagic / 其他 | 魅族、红魔、未识别设备 | ✅ Generic 兜底配置 |
 
-安装时自动识别厂商并加载对应配置，两套 profile 互不干扰，属性不会混用。
+安装时自动识别厂商并加载对应配置，未命中特定厂商时使用 Generic 兜底模板，属性不会混用。
 
 ---
 
@@ -22,11 +24,11 @@ Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik
 
 - **三档方案** — 安全 / 谨慎 / 危险，按需选择
 - **WebUI** — 可视化配置，展开查看完整属性说明
-- **厂商分离** — OPlus / Xiaomi 独立配置文件和属性模板
+- **厂商分离** — OPlus / Xiaomi / Samsung / Pixel 独立配置文件和属性模板，其他厂商使用 Generic 兜底
 - **安全回滚** — 安装时自动备份原始属性，卸载后完整还原
 - **诊断面板** — 内置属性生效验证与 apply.log 摘要分析
 - **云端更新** — 管理器自动检测新版本
-- **设备检测** — 未识别厂商直接拒绝安装
+- **设备检测** — 自动识别厂商并记录识别来源，未识别时回退 Generic
 
 ---
 
@@ -36,8 +38,9 @@ Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik
 
 压制后台、安装、OTA 等场景的额外编译触发：
 
-- **OPlus**（36 项）：pm.dexopt.* 全套策略 + ColorOS 私有触发 + OPlus MTK 编译服务 + runtime dexopt 开关 + iorap/启动缓存
-- **Xiaomi**（24 项）：pm.dexopt.* 全套策略 + MIUI dexfile preload + ART startup class preload + precache + iorap
+- **OPlus**：pm.dexopt.* 全套策略 + ColorOS 私有触发 + OPlus MTK 编译服务 + runtime dexopt 开关 + iorap/启动缓存
+- **Xiaomi / MIUI**：pm.dexopt.* 全套策略 + MIUI dexfile preload + ART startup class preload + precache + iorap
+- **Samsung / Pixel / Generic**：基于通用 dexopt / ART 属性的安全默认配置
 
 ### 谨慎档（默认关闭）
 
@@ -54,7 +57,7 @@ Magisk / KernelSU / APatch 模块，通过精细调控 `pm.dexopt.*` 与 `dalvik
 | 项目 | 要求 |
 |:--|:--|
 | Root 框架 | Magisk / KernelSU / APatch |
-| 系统 | OPlus (OPPO/OnePlus/Realme) 或 Xiaomi/Redmi/POCO |
+| 系统 | OPlus、Xiaomi/MIUI、Samsung、Pixel 或 Generic 兜底设备 |
 | Android 版本 | Android 12+ |
 
 ---
@@ -76,12 +79,22 @@ dex2oat/
 ├── props/
 │   ├── oplus.prop          # OPlus 默认安全配置模板
 │   └── xiaomi.prop         # Xiaomi 默认安全配置模板
+├── vendor/
+│   ├── samsung.prop        # Samsung 默认安全配置模板
+│   ├── pixel.prop          # Pixel 默认安全配置模板
+│   ├── miui.prop           # MIUI 默认安全配置模板
+│   ├── meizu.prop          # Meizu 默认安全配置模板
+│   ├── redmagic.prop       # RedMagic 默认安全配置模板
+│   └── generic.prop        # Generic 兜底配置模板
 ├── webroot/
 │   ├── css/app.css
 │   ├── data/
 │   │   ├── vendors.json    # 厂商元数据（id/label/options/detect）
-│   │   ├── options.json    # OPlus 77 项配置
-│   │   └── options-xiaomi.json  # Xiaomi 57 项配置
+│   │   ├── options.json    # OPlus 配置
+│   │   ├── options-xiaomi.json  # Xiaomi / MIUI 配置
+│   │   ├── options-samsung.json # Samsung 配置
+│   │   ├── options-pixel.json   # Pixel 配置
+│   │   └── options-generic.json # Generic 配置
 │   ├── js/
 │   │   ├── app.js bridge.js config.js utils.js ui.js system-info.js
 │   └── index.html
@@ -103,7 +116,7 @@ dex2oat/
 - 仅修改系统属性，不涉及任何系统文件，卸载后完全还原
 - 激进模式下关闭 JIT 可能影响性能敏感型应用，按需选用
 - iorap 相关属性仅适用于 Android 12，Android 13+ 已移除
-- OPlus 使用原 v2.5 策略（36 项），Xiaomi 自 v2.6 起独立配置（57 项）
+- v3.0 新增 Samsung、Pixel、MIUI、Meizu、RedMagic 与 Generic 兜底模板
 - 更新模块后建议重新保存一次配置，以同步新版 system.prop 模板
 
 ---

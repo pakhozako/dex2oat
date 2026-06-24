@@ -11,7 +11,7 @@ GETPROP=/system/bin/getprop
 [ -x "$GETPROP" ] || GETPROP=getprop
 
 if ! "$GETPROP" \
-  | grep -E '^\[(dalvik\.vm\.|vendor\.oplus\.dalvik\.|sys\.oplus\.dalvik_)' \
+  | grep -E '^\[(dalvik\.vm\.|pm\.dexopt\.|persist\.device_config\.runtime|persist\.device_config\.runtime_native|persist\.device_config\.runtime_native_boot|persist\.miui\.|persist\.oplus\.|persist\.sys\.|persist\.dalvik\.|system_perf_init\.|vendor\.oplus\.dalvik\.|oplus\.|sys\.oplus\.|sys\.heap\.|sys\.furtherHeapEnlarge\.|sys\.gcsupression\.)' \
   > "$TMP_FILE"; then
   rm -f "$TMP_FILE" 2>/dev/null
   exit 1

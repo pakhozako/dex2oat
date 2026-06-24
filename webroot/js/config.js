@@ -128,6 +128,16 @@ export function applySystemPropState(options, config, systemProp) {
   return next;
 }
 
+function managedProps(options) {
+  const props = new Set();
+  for (const category of options.categories) {
+    for (const item of category.items) {
+      if (item.prop) props.add(item.prop);
+    }
+  }
+  return props;
+}
+
 async function readServiceState() {
   return parseStateFile(await readText(`${STATE_DIR}/service-state.prop`));
 }
@@ -192,7 +202,7 @@ function buildRebootState(config, bootId, serviceState) {
       label: serviceStateProblem ? "需检查" : serviceSkipped ? "未应用" : "已生效",
       reason: serviceStateProblem
         ? (serviceReason || `服务已运行，但有 ${serviceProblemTotal} 项写入异常`)
-        : serviceSkipped ? (serviceReason || "设备不在 OPlus/Xiaomi 支持范围，运行时属性未应用")
+        : serviceSkipped ? (serviceReason || "设备未匹配到可应用的运行时属性")
           : serviceStatus === "settled" ? "服务已完成 settled" : "没有待应用配置",
       bootIdAvailable: Boolean(bootId),
       pendingBootId: "",
@@ -215,7 +225,7 @@ function buildRebootState(config, bootId, serviceState) {
   if (serviceStateProblem) {
     reason = serviceReason || `服务已运行，但有 ${serviceProblemTotal} 项写入异常`;
   } else if (serviceSkipped) {
-    reason = serviceReason || "设备不在 OPlus/Xiaomi 支持范围，运行时属性未应用";
+    reason = serviceReason || "设备未匹配到可应用的运行时属性";
   } else if (!bootId && serviceStatus !== "settled") {
     reason = "未读到 boot_id，且服务尚未 settled";
   } else if (serviceStatus === "settled" && !serviceSettledAt) {
@@ -272,9 +282,32 @@ function lineForItem(item, state, owners) {
   ].join("\n");
 }
 
-export function generateSystemProp(options, config) {
+function preservedUnmanagedLines(options, currentSystemProp) {
+  const managed = managedProps(options);
+  const lines = [];
+  for (const entry of parseKeyValueLines(currentSystemProp || "")) {
+    if (!managed.has(entry.prop) && shouldPreserveUnmanagedProp(entry.prop)) {
+      lines.push(`${entry.prop}=${entry.value}`);
+    }
+  }
+  return lines;
+}
+
+function shouldPreserveUnmanagedProp(prop) {
+  return !(
+    prop.startsWith("oplus.") ||
+    prop.startsWith("sys.oplus.") ||
+    prop.startsWith("persist.oplus.") ||
+    prop.startsWith("persist.sys.oplus.") ||
+    prop.startsWith("persist.miui.") ||
+    prop.startsWith("persist.sys.dexpreload.")
+  );
+}
+
+export function generateSystemProp(options, config, currentSystemProp = "") {
   const output = [];
   const owners = enabledOwnerByProp(options, config);
+  const preserved = preservedUnmanagedLines(options, currentSystemProp);
 
   for (const category of options.categories) {
     output.push("# ============================================================");
@@ -290,7 +323,22 @@ export function generateSystemProp(options, config) {
     output.push("");
   }
 
+  if (preserved.length) {
+    output.push("# ============================================================");
+    output.push("# Preserved unmanaged properties");
+    output.push("# ============================================================");
+    output.push("");
+    output.push(...preserved);
+    output.push("");
+  }
+
   return output.join("\n").trim() + "\n";
+}
+
+function buildPropLockList(systemProp) {
+  return parseKeyValueLines(systemProp)
+    .map((entry) => `${entry.prop}=${entry.value}`)
+    .join("\n") + "\n";
 }
 
 export function countEnabled(config) {
@@ -311,13 +359,18 @@ export async function saveConfig(options, config) {
   nextConfig.pendingBootId = bootId;
   nextConfig.pendingSavedAt = Math.floor(Date.now() / 1000);
 
-  const systemProp = generateSystemProp(options, nextConfig);
+  const currentSystemProp = await readText(`${MODULE_DIR}/system.prop`);
+  const systemProp = generateSystemProp(options, nextConfig, currentSystemProp);
   const configJson = JSON.stringify(nextConfig, null, 2) + "\n";
+  const propLockList = buildPropLockList(systemProp);
 
   ensureOk(await exec(`mkdir -p ${shellQuote(STATE_DIR + '/backup')}`), "create backup directory");
   ensureOk(await exec(`[ -f ${shellQuote(MODULE_DIR + '/system.prop')} ] && cp -af ${shellQuote(MODULE_DIR + '/system.prop')} ${shellQuote(STATE_DIR + '/backup/system.prop.bak')}`), "backup system.prop");
   ensureOk(await writeBase64(`${MODULE_DIR}/system.prop`, systemProp), "write system.prop");
+  ensureOk(await writeBase64(`${STATE_DIR}/system.prop.bak`, systemProp), "write system.prop backup");
+  ensureOk(await writeBase64(`${STATE_DIR}/prop-lock.list`, propLockList), "write prop-lock.list");
   ensureOk(await writeBase64(`${STATE_DIR}/config.json`, configJson), "write WebUI config");
+  await exec(`chmod 0600 ${shellQuote(STATE_DIR + '/system.prop.bak')} ${shellQuote(STATE_DIR + '/prop-lock.list')} 2>/dev/null || true`);
 
   nextConfig.rebootState = buildRebootState(nextConfig, bootId, {});
   return nextConfig;
