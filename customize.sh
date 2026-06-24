@@ -9,6 +9,7 @@ CONFIG_FILE="$STATE_DIR/config.json"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 PROP_FILE="$MODPATH/system.prop"
+SYSTEM_PROP_BAK="$STATE_DIR/system.prop.bak"
 DEVICE_FILE="$STATE_DIR/device.prop"
 CAPTURED_PROPS="$STATE_DIR/captured-props.txt"
 MATCHED_PROPS="$STATE_DIR/matched-props.txt"
@@ -48,7 +49,7 @@ write_install_state() {
     printf 'source=%s\n' "${INSTALL_SOURCE:-unknown}"
     printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
     printf 'version=%s\n' "${MODULE_VERSION:-unknown}"
-    printf 'updated_at=%s\n' "$(date '+%s')"
+    printf 'updated_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
   } > "$FINAL_INSTALL_STATE" 2>/dev/null || true
   chmod 0600 "$FINAL_INSTALL_STATE" 2>/dev/null || true
 }
@@ -82,6 +83,20 @@ chooseport() {
   done
 }
 
+chooseport_once() {
+  DELAY="${1:-10}"
+  EVENT_FILE="${TMPDIR:-/dev}/dex2oat-events"
+  : > "$EVENT_FILE" 2>/dev/null || true
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$DELAY" /system/bin/getevent -lqc 1 > "$EVENT_FILE" 2>&1
+  else
+    /system/bin/getevent -lqc 1 > "$EVENT_FILE" 2>&1
+  fi
+  grep -q 'KEY_VOLUMEUP *DOWN' "$EVENT_FILE" 2>/dev/null && return 0
+  grep -q 'KEY_VOLUMEDOWN *DOWN' "$EVENT_FILE" 2>/dev/null && return 1
+  return 2
+}
+
 show_prompt() {
   ui_print " "
   ui_print "║  $1"
@@ -91,6 +106,19 @@ show_prompt() {
   ui_print "╚══════════════════════════════════════"
   chooseport
   return $?
+}
+
+show_prompt_timeout_no() {
+  ui_print " "
+  ui_print "║  $1"
+  ui_print "║"
+  ui_print "║  音量上键: 是"
+  ui_print "║  音量下键: 否"
+  ui_print "║  无响应: 默认否"
+  ui_print "╚══════════════════════════════════════"
+  chooseport_once 10
+  [ "$?" = "0" ] && return 0
+  return 1
 }
 
 chmod_readable_tree() {
@@ -139,7 +167,7 @@ write_config_source() {
     printf 'version=%s\n' "$MODULE_VERSION"
     printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
     [ -n "$SOURCE_REASON" ] && printf 'reason=%s\n' "$SOURCE_REASON"
-    printf 'updated_at=%s\n' "$(date '+%s')"
+    printf 'updated_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
   } > "$CONFIG_SOURCE_FILE" 2>/dev/null || true
   chmod 0600 "$CONFIG_SOURCE_FILE" 2>/dev/null || true
 }
@@ -192,7 +220,7 @@ run_dex2oat_match() {
   chmod 0755 "$CAPTURE_SCRIPT" "$MATCH_SCRIPT" 2>/dev/null || true
 
   sh "$CAPTURE_SCRIPT" "$CAPTURED_PROPS" "$CAPTURE_EXPORT" || return 12
-  sh "$MATCH_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$VENDOR_PROP_TEMPLATE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$DEVICE_VENDOR" "$MODULE_VERSION" || return $?
+  sh "$MATCH_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$VENDOR_PROP_TEMPLATE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$DEVICE_VENDOR" "$MODULE_VERSION" "$ORIGINAL_PROPS" || return $?
 
   MATCHED_TOTAL="$(sed -n 's/^matched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)"
   [ -n "$MATCHED_TOTAL" ] || MATCHED_TOTAL=0
@@ -243,7 +271,7 @@ BACKUP_READY=1
 EXISTING_SOURCE="$(sed -n 's/^source=//p' "$CONFIG_SOURCE_FILE" 2>/dev/null | head -n 1)"
 SKIP_CONFIG_GENERATION=0
 if [ "$EXISTING_SOURCE" = "webui-custom" ] && [ -s "$PROP_FILE" ]; then
-  if ! show_prompt "检测到 WebUI 自定义配置，是否覆盖并重新匹配？"; then
+  if ! show_prompt_timeout_no "检测到 WebUI 自定义配置，是否覆盖并重新匹配？"; then
     INSTALL_SOURCE=webui-custom
     MATCHED_TOTAL="$(sed -n 's/^matched_total=//p' "$CONFIG_SOURCE_FILE" 2>/dev/null | head -n 1)"
     [ -n "$MATCHED_TOTAL" ] || MATCHED_TOTAL=0
@@ -266,6 +294,7 @@ if [ "$SKIP_CONFIG_GENERATION" != "1" ]; then
 fi
 
 cp -af "$PROP_FILE" "$BACKUP_DIR/system.prop.factory" 2>/dev/null || true
+cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
 init_webui_config
 touch "$STATE_DIR/service.log" 2>/dev/null || true
 append_install_log
@@ -280,7 +309,7 @@ chmod_readable_tree "$MODPATH/props" || fail_install "Failed to chmod props"
 chmod_readable_tree "$MODPATH/scripts" || fail_install "Failed to chmod scripts"
 
 chmod 0700 "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" 2>/dev/null || true
-chmod 0600 "$CONFIG_FILE" "$CONFIG_SOURCE_FILE" "$DEVICE_FILE" "$ORIGINAL_PROPS" "$INSTALL_LOG" "$CAPTURED_PROPS" "$MATCHED_PROPS" "$MATCH_REPORT" 2>/dev/null || true
+chmod 0600 "$CONFIG_FILE" "$CONFIG_SOURCE_FILE" "$DEVICE_FILE" "$ORIGINAL_PROPS" "$SYSTEM_PROP_BAK" "$INSTALL_LOG" "$CAPTURED_PROPS" "$MATCHED_PROPS" "$MATCH_REPORT" 2>/dev/null || true
 
 log_install "- Installation completed: vendor=$DEVICE_VENDOR source=$INSTALL_SOURCE matched=$MATCHED_TOTAL version=$MODULE_VERSION"
 write_install_state ok installed

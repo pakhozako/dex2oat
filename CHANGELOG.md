@@ -9,7 +9,7 @@
 - 匹配失败、抓取失败或用户拒绝时自动回退厂商模板，不中断安装
 
 ### Diagnostics
-- 新增 `/data/adb/dex2oat-lock/config-source.prop`，记录配置来源：模板、ds 自动匹配或 WebUI 自定义
+- 新增 `/data/adb/dex2oat-lock/config-source.prop`，记录配置来源：模板、dex2oat 属性抓取匹配或 WebUI 自定义
 - 新增 `/data/adb/dex2oat-lock/captured-props.txt` 与 `match-report.txt`，便于反馈设备适配情况
 - WebUI 首页显示配置来源，诊断输出包含抓取结果和匹配报告
 

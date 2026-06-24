@@ -28,6 +28,8 @@ cleanup_state_files() {
   rm -f "$STATE_DIR/device.prop" 2>/dev/null
   rm -f "$STATE_DIR/original-props.conf" 2>/dev/null
   rm -f "$STATE_DIR/matched-props.txt" 2>/dev/null
+  rm -f "$STATE_DIR/system.prop.bak" 2>/dev/null
+  rm -f "$STATE_DIR/trigger-rematch" 2>/dev/null
   rm -f "$STATE_DIR/captured-keys.txt" 2>/dev/null
   rm -f "$STATE_DIR/captured-values.prop" 2>/dev/null
   rm -f "$STATE_DIR/options-props.txt" 2>/dev/null
@@ -41,7 +43,7 @@ cleanup_state_files() {
 write_uninstall_state() {
   UNINSTALL_STATUS="$1"
   UNINSTALL_REASON="$2"
-  NOW="$(date '+%s')"
+  NOW="$(date '+%Y-%m-%d %H:%M:%S')"
 
   {
     printf 'status=%s\n' "$UNINSTALL_STATUS"

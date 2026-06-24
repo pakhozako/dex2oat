@@ -8,6 +8,12 @@ SERVICE_STATE="$STATE_DIR/service-state.prop"
 FALLBACK_LOG=/data/adb/dex2oat-lock-service.log
 PROP_FILE="$MODDIR/system.prop"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
+SYSTEM_PROP_BAK="$STATE_DIR/system.prop.bak"
+CAPTURED_PROPS="$STATE_DIR/captured-props.txt"
+MATCHED_PROPS="$STATE_DIR/matched-props.txt"
+MATCH_REPORT="$STATE_DIR/match-report.txt"
+CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
+TRIGGER_REMATCH="$STATE_DIR/trigger-rematch"
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
   LOG_FILE="$FALLBACK_LOG"
@@ -17,21 +23,9 @@ log_msg() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
 }
 
-restore_system_prop_from_original() {
-  [ -s "$ORIGINAL_PROPS" ] || return 1
-  TMP_PROP="$PROP_FILE.tmp"
-  {
-    printf '# Restored by Dex2oat Lock service\n'
-    printf '# source=original-props.conf\n\n'
-    while IFS= read -r PROP_LINE || [ -n "$PROP_LINE" ]; do
-      case "$PROP_LINE" in
-        ""|@unset:*) continue ;;
-        *=*) printf '%s\n' "$PROP_LINE" ;;
-      esac
-    done < "$ORIGINAL_PROPS"
-  } > "$TMP_PROP" 2>/dev/null || return 1
-  [ -s "$TMP_PROP" ] || { rm -f "$TMP_PROP" 2>/dev/null; return 1; }
-  mv -f "$TMP_PROP" "$PROP_FILE" 2>/dev/null || return 1
+restore_system_prop_from_backup() {
+  [ -s "$SYSTEM_PROP_BAK" ] || return 1
+  cp -af "$SYSTEM_PROP_BAK" "$PROP_FILE" 2>/dev/null || return 1
   chmod 0644 "$PROP_FILE" 2>/dev/null || true
   return 0
 }
@@ -41,7 +35,6 @@ write_service_state() {
   STATE_PHASE="$2"
   STATE_REASON="$3"
   BOOT_ID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
-  NOW="$(date '+%s')"
   STATE_HEALTH="ok"
 
   case "$STATE_STATUS" in
@@ -77,11 +70,33 @@ write_service_state() {
     printf 'matched_total=%s\n' "${TOTAL_MATCHED_COUNT:-0}"
     printf 'mismatch_total=%s\n' "${TOTAL_MISMATCH_COUNT:-0}"
     printf 'failed_total=%s\n' "${TOTAL_FAILED_COUNT:-0}"
-    printf 'updated_at=%s\n' "$NOW"
-    [ "$STATE_STATUS" = "settled" ] && printf 'settled_at=%s\n' "$NOW"
+    printf 'updated_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+    [ "$STATE_STATUS" = "settled" ] && printf 'settled_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     [ -n "$BOOT_ID" ] && printf 'boot_id=%s\n' "$BOOT_ID"
   } > "$SERVICE_STATE" 2>/dev/null || true
   chmod 0600 "$SERVICE_STATE" 2>/dev/null || true
+}
+
+run_trigger_rematch() {
+  [ -f "$TRIGGER_REMATCH" ] || return 0
+
+  VENDOR="$(sed -n 's/^vendor=//p' "$STATE_DIR/device.prop" 2>/dev/null | head -n 1)"
+  [ -n "$VENDOR" ] || VENDOR=oplus
+  OPTIONS_FILE="$MODDIR/webroot/data/options.json"
+  [ "$VENDOR" = "xiaomi" ] && OPTIONS_FILE="$MODDIR/webroot/data/options-xiaomi.json"
+  TEMPLATE_FILE="$MODDIR/props/$VENDOR.prop"
+  MODULE_VERSION="$(sed -n 's/^version=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
+
+  log_msg "Trigger rematch detected: vendor=$VENDOR version=$MODULE_VERSION"
+  if sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "/storage/emulated/0/Download/dex2oat-captured-props.txt" && \
+     sh "$MODDIR/scripts/match-props.sh" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$TEMPLATE_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$VENDOR" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
+    cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
+    chmod 0600 "$SYSTEM_PROP_BAK" 2>/dev/null || true
+    log_msg "Trigger rematch completed"
+  else
+    log_msg "Trigger rematch failed; keeping current system.prop"
+  fi
+  rm -f "$TRIGGER_REMATCH" 2>/dev/null
 }
 
 apply_prop() {
@@ -262,6 +277,7 @@ fi
 
 sleep 10
 log_msg "Boot completed, checking device..."
+run_trigger_rematch
 
 DEVICE_INFO="$(
   printf '%s %s %s %s %s %s %s %s' \
@@ -290,11 +306,11 @@ case "$DEVICE_INFO" in
     ;;
 esac
 
-# 检查配置文件是否存在且非空，丢失时从 original-props.conf 生成恢复文件
+# 检查配置文件是否存在且非空，丢失时从 system.prop.bak 恢复
 if [ ! -s "$PROP_FILE" ]; then
-  log_msg "Warning: system.prop missing or empty at $PROP_FILE, trying restore from original-props.conf"
-  if restore_system_prop_from_original; then
-    log_msg "Restored system.prop from $ORIGINAL_PROPS"
+  log_msg "Warning: system.prop missing or empty at $PROP_FILE, trying restore from system.prop.bak"
+  if restore_system_prop_from_backup; then
+    log_msg "Restored system.prop from $SYSTEM_PROP_BAK"
   else
     log_msg "Error: system.prop restore failed"
     TOTAL_FAILED_COUNT=$((TOTAL_FAILED_COUNT + 1))

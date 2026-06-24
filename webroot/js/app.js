@@ -379,7 +379,8 @@ async function saveCurrentConfig() {
   };
   try {
     state.config = await saveConfig(state.options, nextConfig);
-    await writeBase64(`${STATE_DIR}/config-source.prop`, `source=webui-custom\nvendor=${state.device?.vendor || "unknown"}\nupdated_at=${Math.floor(Date.now() / 1000)}\nversion=${state.configSource?.version || state.meta.version}\n`);
+    const preservedVersion = state.configSource?.version || state.meta.version;
+    await writeBase64(`${STATE_DIR}/config-source.prop`, `source=webui-custom\nvendor=${state.device?.vendor || "unknown"}\nupdated_at=${formatTimestamp(new Date())}\nversion=${preservedVersion}\n`);
     state.configSource = await loadConfigSource();
     renderPage();
     setStatus("已保存，重启后生效", "warn");
@@ -394,21 +395,35 @@ async function showSystemProp() {
 }
 
 async function rerunDex2oatMatch() {
-  const ok = showConfirm("重新抓取并匹配会覆盖当前 system.prop，确定继续吗？");
+  const ok = showConfirm("重新抓取匹配将在后台触发 service 执行，完成后需要重启生效。确定继续吗？");
   if (!ok) return;
 
-  setStatus("正在重新抓取并匹配...");
-  const vendor = state.device?.vendor || "oplus";
-  const optionsFile = vendor === "xiaomi" ? "options-xiaomi.json" : "options.json";
-  const command = [
-    `sh ${shellQuote(`${MODULE_DIR}/scripts/capture-props.sh`)} ${shellQuote(`${STATE_DIR}/captured-props.txt`)} ${shellQuote("/storage/emulated/0/Download/dex2oat-captured-props.txt")}`,
-    `sh ${shellQuote(`${MODULE_DIR}/scripts/match-props.sh`)} ${shellQuote(`${STATE_DIR}/captured-props.txt`)} ${shellQuote(`${MODULE_DIR}/webroot/data/${optionsFile}`)} ${shellQuote(`${MODULE_DIR}/props/${vendor}.prop`)} ${shellQuote(`${MODULE_DIR}/system.prop`)} ${shellQuote(`${STATE_DIR}/matched-props.txt`)} ${shellQuote(`${STATE_DIR}/match-report.txt`)} ${shellQuote(`${STATE_DIR}/config-source.prop`)} ${shellQuote(vendor)} ${shellQuote(state.meta.version)}`
-  ].join(" && ");
+  setStatus("已写入触发文件，等待 service 处理...");
+  await writeBase64(`${STATE_DIR}/trigger-rematch`, `requested_at=${formatTimestamp(new Date())}\n`);
+  await exec(`sh ${shellQuote(`${MODULE_DIR}/service.sh`)} >/dev/null 2>&1 &`);
 
-  const result = await exec(command);
+  let completed = false;
+  for (let i = 0; i < 45; i += 1) {
+    await delay(2000);
+    const trigger = await readText(`${STATE_DIR}/trigger-rematch`);
+    if (!trigger) {
+      completed = true;
+      break;
+    }
+  }
+
   state.configSource = await loadConfigSource();
   renderPage();
-  setStatus(result.code === 0 ? "重新匹配完成，重启后生效" : `重新匹配失败：${resultMessage(result)}`, result.code === 0 ? "warn" : "warn");
+  setStatus(completed ? "重新匹配完成，重启后生效" : "重新匹配仍在后台执行，请稍后查看诊断", "warn");
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatTimestamp(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 async function renderHistory() {
@@ -443,7 +458,7 @@ function buildStaticDiagnosticShell() {
     "cat /data/adb/modules/dex2oat-lock/system.prop 2>/dev/null",
     "echo '--- config source ---'",
     "cat /data/adb/dex2oat-lock/config-source.prop 2>/dev/null",
-    "echo '--- ds match report ---'",
+    "echo '--- dex2oat match report ---'",
     "cat /data/adb/dex2oat-lock/match-report.txt 2>/dev/null",
     "echo '--- captured props ---'",
     "cat /data/adb/dex2oat-lock/captured-props.txt 2>/dev/null",
@@ -668,19 +683,67 @@ async function showDiagnosticsDialog(content) {
   const rebootState = parseDiagnosticRebootState(content);
   const uninstallState = parseDiagnosticSection(content, "--- uninstall state ---");
   const desiredProps = parseActiveSystemProp(await readGeneratedSystemProp());
+  const originalPropsContent = await readText(`${STATE_DIR}/original-props.conf`);
+  const currentSystemProp = await readGeneratedSystemProp();
   const diagnosticState = buildDiagnosticState(content, applyLog, desiredProps);
-  showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState), {
+  showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp), {
+    copyLabel: "复制全部诊断信息",
     savePath: `${STATE_DIR}/logs/webui-diagnostic.txt`
   });
 }
 
-function createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState) {
+function createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp) {
   const section = createElement("section", "diagnostic-stack");
   section.append(createLifecycleStateSummary(installState, uninstallState));
   section.append(createRebootStateSummary(rebootState, applyLog.passSummaries));
+  section.append(createPropCompareSection(originalPropsContent, currentSystemProp));
   section.append(createFinalPropSummary(diagnosticState));
   section.append(createApplyLogSummary(applyLog, diagnosticState, rebootState));
   return section;
+}
+
+function createPropCompareSection(originalContent, systemContent) {
+  const original = parseOriginalProps(originalContent || "");
+  const current = parseActiveSystemProp(systemContent || "");
+  const keys = [...new Set([...Object.keys(original), ...Object.keys(current)])].sort();
+  const changed = keys.filter((key) => (original[key] || "<unset>") !== (current[key] || "<unset>"));
+  const details = createElement("details", "diagnostic-summary prop-compare");
+  details.open = false;
+  const summary = createElement("summary", "diagnostic-summary-head");
+  summary.append(createElement("strong", "", "属性上下对比"));
+  summary.append(createElement("span", "", `${changed.length} 项差异，可展开查看 original-props.conf 与当前 system.prop`));
+  details.append(summary);
+
+  const originalBlock = createElement("pre", "prop-compare-block", originalContent || "original-props.conf 暂无内容");
+  const currentBlock = createElement("pre", "prop-compare-block", systemContent || "system.prop 暂无内容");
+  details.append(createElement("strong", "", "original-props.conf（安装前原始值）"));
+  details.append(originalBlock);
+  details.append(createElement("strong", "", "当前 system.prop（模块生成值）"));
+  details.append(currentBlock);
+
+  const list = createElement("div", "diagnostic-problems");
+  for (const key of changed.slice(0, 120)) {
+    const item = createElement("div", "diagnostic-problem mismatch");
+    item.append(createElement("strong", "", key));
+    item.append(createElement("span", "", `${original[key] || "<unset>"} -> ${current[key] || "<unset>"}`));
+    list.append(item);
+  }
+  details.append(list);
+  return details;
+}
+
+function parseOriginalProps(content) {
+  const props = {};
+  for (const line of content.split(/\r?\n/)) {
+    if (!line || line.startsWith("#")) continue;
+    if (line.startsWith("@unset:")) {
+      props[line.slice(7)] = "<unset>";
+    } else {
+      const index = line.indexOf("=");
+      if (index > 0) props[line.slice(0, index)] = line.slice(index + 1);
+    }
+  }
+  return props;
 }
 
 function createLifecycleStateSummary(installState, uninstallState) {
@@ -920,7 +983,7 @@ function showDialog(title, content, beforeContent, options = {}) {
         <h2>${title}</h2>
         <div class="dialog-actions">
           ${saveButton}
-          <button class="text-button" data-action="copy">复制</button>
+          <button class="text-button" data-action="copy">${options.copyLabel || "复制"}</button>
           <button class="text-button" data-action="close">关闭</button>
         </div>
       </div>

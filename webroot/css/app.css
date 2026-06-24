@@ -823,6 +823,16 @@ select {
   gap: var(--space-6);
 }
 
+.prop-compare-block {
+  max-height: 180px;
+  margin: var(--space-6) 0;
+  padding: var(--space-8);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: auto;
+  font-size: 10px;
+}
+
 .diagnostic-problem {
   display: grid;
   gap: var(--space-3);

@@ -9,6 +9,7 @@ REPORT_FILE="$6"
 SOURCE_FILE="$7"
 VENDOR_ID="$8"
 MODULE_VERSION="$9"
+ORIGINAL_PROPS="${10}"
 
 [ -s "$CAPTURED_FILE" ] || exit 1
 [ -f "$OPTIONS_FILE" ] || exit 1
@@ -133,11 +134,25 @@ done < "$KEYS_FILE"
   printf 'template_fallback_total=%s\n' "${TEMPLATE_FALLBACK_TOTAL:-0}"
   printf 'skipped_invalid_total=%s\n' "${SKIPPED_INVALID_TOTAL:-0}"
   printf 'generated_system_prop=%s\n' "$OUTPUT_FILE"
+  printf '[diff]\n'
+  while IFS='=' read -r DIFF_KEY DIFF_VALUE || [ -n "$DIFF_KEY" ]; do
+    [ -z "$DIFF_KEY" ] && continue
+    ORIGINAL_LINE=""
+    [ -n "$ORIGINAL_PROPS" ] && [ -f "$ORIGINAL_PROPS" ] && ORIGINAL_LINE="$(grep -F -m 1 "$DIFF_KEY=" "$ORIGINAL_PROPS" 2>/dev/null)"
+    if [ -n "$ORIGINAL_LINE" ]; then
+      ORIGINAL_VALUE="${ORIGINAL_LINE#*=}"
+    elif [ -n "$ORIGINAL_PROPS" ] && [ -f "$ORIGINAL_PROPS" ] && grep -F -x -q "@unset:$DIFF_KEY" "$ORIGINAL_PROPS" 2>/dev/null; then
+      ORIGINAL_VALUE="<unset>"
+    else
+      ORIGINAL_VALUE="<unknown>"
+    fi
+    printf '%s: %s -> %s\n' "$DIFF_KEY" "$ORIGINAL_VALUE" "$DIFF_VALUE"
+  done < "$TMP_MATCHED"
 } > "$TMP_REPORT" || exit 1
 
 {
   printf 'source=dex2oat-match\n'
-  printf 'updated_at=%s\n' "$(date '+%s')"
+  printf 'updated_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
   printf 'version=%s\n' "${MODULE_VERSION:-unknown}"
   printf 'vendor=%s\n' "${VENDOR_ID:-unknown}"
   printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
