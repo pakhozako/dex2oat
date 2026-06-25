@@ -19,9 +19,15 @@ hash_file() {
   TARGET="$1"
   [ -s "$TARGET" ] || { printf 'missing'; return 0; }
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$TARGET" 2>/dev/null | awk '{print $1}'
+    case "$TARGET" in
+      */module.prop) sed '/^description=/d' "$TARGET" 2>/dev/null | sha256sum 2>/dev/null | awk '{print $1}' ;;
+      *) sha256sum "$TARGET" 2>/dev/null | awk '{print $1}' ;;
+    esac
   elif command -v md5sum >/dev/null 2>&1; then
-    md5sum "$TARGET" 2>/dev/null | awk '{print $1}'
+    case "$TARGET" in
+      */module.prop) sed '/^description=/d' "$TARGET" 2>/dev/null | md5sum 2>/dev/null | awk '{print $1}' ;;
+      *) md5sum "$TARGET" 2>/dev/null | awk '{print $1}' ;;
+    esac
   else
     wc -c < "$TARGET" 2>/dev/null | tr -d ' '
   fi
@@ -57,9 +63,14 @@ check_runtime_file() {
   LABEL="$1"
   TARGET="$2"
   KIND="$3"
+  REQUIRED="${4:-required}"
   if [ ! -s "$TARGET" ]; then
-    printf '%s missing path=%s\n' "$LABEL" "$TARGET" >> "$TMP_REPORT"
-    RUNTIME_MISSING_TOTAL=$((RUNTIME_MISSING_TOTAL + 1))
+    if [ "$REQUIRED" = "optional" ]; then
+      printf '%s optional-missing path=%s\n' "$LABEL" "$TARGET" >> "$TMP_REPORT"
+    else
+      printf '%s missing path=%s\n' "$LABEL" "$TARGET" >> "$TMP_REPORT"
+      RUNTIME_MISSING_TOTAL=$((RUNTIME_MISSING_TOTAL + 1))
+    fi
     return 0
   fi
 
@@ -139,23 +150,33 @@ fi
   printf '[runtime]\n'
 } >> "$TMP_REPORT" 2>/dev/null || STATUS=error
 check_runtime_file system.prop "$MODDIR/system.prop" prop
-check_runtime_file state.prop "$STATE_FILE" state
-check_runtime_file config.json "$STATE_DIR/config.json" json
+check_runtime_file state.prop "$STATE_FILE" state optional
+if [ -s "$STATE_DIR/config.json" ]; then
+  check_runtime_file config.json "$STATE_DIR/config.json" json
+else
+  printf 'config.json optional-missing path=%s\n' "$STATE_DIR/config.json" >> "$TMP_REPORT"
+fi
 
 if [ "$STATUS" = "error" ]; then
   REASON=check-error
 elif [ "$BASELINE_CREATED" = "failed" ]; then
   STATUS=error
   REASON=baseline-create-failed
-elif [ "$MISSING_TOTAL" -gt 0 ] 2>/dev/null || [ "$RUNTIME_MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
+elif [ "$MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
   STATUS=missing
   REASON=missing-files
+elif [ "$RUNTIME_MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
+  STATUS=warning
+  REASON=runtime-evidence-not-ready
 elif [ "$CHANGED_TOTAL" -gt 0 ] 2>/dev/null; then
   STATUS=changed
   REASON=hash-mismatch
-elif [ "$BASELINE_CREATED" = "yes" ] || [ "$RUNTIME_WARNING_TOTAL" -gt 0 ] 2>/dev/null; then
+elif [ "$RUNTIME_WARNING_TOTAL" -gt 0 ] 2>/dev/null; then
   STATUS=warning
   REASON=runtime-structure-warning
+elif [ "$BASELINE_CREATED" = "yes" ]; then
+  STATUS=ok
+  REASON=baseline-created
 fi
 
 {

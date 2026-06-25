@@ -18,6 +18,7 @@ ORIGINAL_PROPS="$8"
 STATE_DIR="${REPORT_FILE%/*}"
 VALUES_FILE="$STATE_DIR/captured-values.prop"
 RULES_FILE="$STATE_DIR/rule-props.tsv"
+NORMALIZED_OPTIONS_FILE="$STATE_DIR/options-normalized.json"
 TMP_OUTPUT="$OUTPUT_FILE.tmp"
 TMP_MATCHED="$MATCHED_FILE.tmp"
 TMP_REPORT="$REPORT_FILE.tmp"
@@ -33,6 +34,11 @@ if [ -s "$CAPTURED_FILE" ]; then
     -e 's/^\([^=#][^=]*\)=\(.*\)$/\1=\2/p' \
     "$CAPTURED_FILE" > "$VALUES_FILE" || exit 1
 fi
+
+sed 's/},{/}\
+{/g; s/,"/\
+"/g; s/{"/{\
+"/g' "$OPTIONS_FILE" > "$NORMALIZED_OPTIONS_FILE" 2>/dev/null || cp "$OPTIONS_FILE" "$NORMALIZED_OPTIONS_FILE"
 
 awk '
   /"id"[[:space:]]*:/ {
@@ -55,7 +61,7 @@ awk '
     }
     id=""; label=""; prop=""; enabled="false"; value=""
   }
-' "$OPTIONS_FILE" > "$RULES_FILE" || exit 1
+' "$NORMALIZED_OPTIONS_FILE" > "$RULES_FILE" || exit 1
 
 [ -s "$RULES_FILE" ] || exit 1
 
@@ -91,7 +97,7 @@ while IFS='|' read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RULE_DEFAULT || 
   fi
   printf '%s\n' "$RULE_PROP" >> "$SEEN_PROPS"
 
-  CAPTURED_LINE="$(grep -F -m 1 "$RULE_PROP=" "$VALUES_FILE" 2>/dev/null)"
+  CAPTURED_LINE="$(awk -v key="$RULE_PROP" 'index($0, key "=") == 1 { print; exit }' "$VALUES_FILE" 2>/dev/null)"
   CAPTURED_VALUE="${CAPTURED_LINE#*=}"
   [ "$CAPTURED_LINE" = "$CAPTURED_VALUE" ] && CAPTURED_VALUE=""
   FINAL_VALUE="$RULE_DEFAULT"
@@ -203,6 +209,6 @@ mv -f "$TMP_OUTPUT" "$OUTPUT_FILE" || exit 1
 mv -f "$TMP_MATCHED" "$MATCHED_FILE" || exit 1
 mv -f "$TMP_REPORT" "$REPORT_FILE" || exit 1
 mv -f "$TMP_SOURCE" "$SOURCE_FILE" || exit 1
-chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$VALUES_FILE" "$RULES_FILE" "$SEEN_PROPS" 2>/dev/null || true
+chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$VALUES_FILE" "$RULES_FILE" "$NORMALIZED_OPTIONS_FILE" "$SEEN_PROPS" 2>/dev/null || true
 
 exit 0

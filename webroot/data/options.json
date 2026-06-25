@@ -1,1 +1,2963 @@
-{"schemaVersion":32,"rulesVersion":"v3.2-final","schema":{"itemFields":["key","title","desc","risk","group","default"],"matchFields":["when","allOf","anyOf","noneOf","source","reason"],"propFields":["key","value","action"],"resultStatuses":["ok","partial","fallback","warning","error"]},"debug":{"captureSlots":6,"report":["matchedRules","generatedProps","unmatchedKeys","statusReason"]},"categories":[{"id":"safe","title":"安全","tone":"safe","description":"日常推荐配置，优先降低后台编译、缓存预读和厂商私有触发项带来的负载，适合长期启用。","items":[{"id":"pm_bg_dexopt","label":"跳过后台 dexopt","description":"作用：控制系统空闲时触发的后台 dexopt 维护任务。可选值：skip 表示跳过后台重编译；speed-profile 按运行画像做性能编译；verify 仅做字节码校验。场景：希望减少待机发热、后台 I/O 和无感重编译时建议使用 skip；如果更看重后台逐步优化应用启动速度，可改为 speed-profile。","prop":"pm.dexopt.bg-dexopt","defaultEnabled":true,"defaultValue":"skip","values":["skip","speed-profile","verify"]},{"id":"pm_boot_after_ota","label":"OTA 后编译策略","description":"作用：定义系统 OTA 更新后首次启动阶段的包编译策略。可选值：verify 仅校验；speed-profile 基于 profile 编译热点路径；speed 编译更多代码以提升运行速度；everything 尽可能全量 AOT。场景：日常推荐 speed-profile，兼顾 OTA 后恢复速度和后续性能；低存储或怕发热可选 verify；只在愿意接受更长更新后维护时间时使用 speed/everything。","prop":"pm.dexopt.boot-after-ota","defaultEnabled":true,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"]},{"id":"pm_mainline","label":"Mainline 更新后编译策略","description":"作用：控制 ART/Mainline 模块更新后的 dexopt 行为。可选值：verify、speed-profile、speed、everything，编译强度依次升高。场景：Mainline 更新频率较高，默认 verify 可减少更新后的后台负载；遇到运行时组件更新后应用启动异常或性能波动，可临时改为 speed-profile。","prop":"pm.dexopt.boot-after-mainline-update","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_install","label":"安装时编译策略","description":"作用：控制普通安装路径下新安装或更新应用的 dexopt 策略。可选值：verify 最快但优化最少；speed-profile 以 profile 为准进行平衡优化；speed 更偏性能；everything 编译最彻底但安装最慢。场景：日常安装推荐 speed-profile；频繁安装测试包可选 verify；大型游戏或长期使用应用可在可接受安装耗时的情况下选择 speed。","prop":"pm.dexopt.install","defaultEnabled":true,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"]},{"id":"pm_install_bulk","label":"批量安装编译策略","description":"作用：控制批量安装多应用时的编译策略，例如恢复备份、应用商店批量更新。可选值：verify、speed-profile、speed、everything。场景：批量安装对耗时和温度更敏感，推荐 speed-profile；大量恢复应用且希望尽快完成安装时可用 verify；不建议在批量场景使用 everything。","prop":"pm.dexopt.install-bulk","defaultEnabled":true,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"]},{"id":"pm_install_bulk_downgraded","label":"批量安装降级包策略","description":"作用：控制批量安装降级 APK 时的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：降级包更容易出现 oat/art 产物不匹配，默认 verify 可减少无效编译；如果确认降级包稳定且希望保留运行性能，可改为 speed-profile。","prop":"pm.dexopt.install-bulk-downgraded","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_install_bulk_secondary","label":"批量安装 secondary dex","description":"作用：控制批量安装时 secondary dex 的处理策略，secondary dex 常见于插件化、动态加载或多 dex 应用。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可减少批量安装负载；如果常用大型插件化应用并希望安装后立即优化，可选择 speed-profile。","prop":"pm.dexopt.install-bulk-secondary","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_install_bulk_secondary_downgraded","label":"批量降级 secondary dex","description":"作用：控制批量安装降级包时 secondary dex 的编译策略。可选值：verify、speed-profile、speed、everything。场景：降级和 secondary dex 叠加时兼容性风险更高，推荐 verify；仅在明确需要性能优化且确认应用兼容时使用 speed-profile 或更高档位。","prop":"pm.dexopt.install-bulk-secondary-downgraded","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_install_fast","label":"快速安装路径策略","description":"作用：控制 fast install 路径使用的 dexopt 策略，这类路径通常强调安装完成速度。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可最大化安装速度；如果安装后首次启动性能更重要，可切到 speed-profile。","prop":"pm.dexopt.install-fast","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_post_boot","label":"开机后编译策略","description":"作用：控制系统启动完成后的 post-boot dexopt 维护策略。可选值：verify、speed-profile、speed、everything。场景：推荐 verify，减少开机后温度和 I/O 峰值；如果设备性能充足且希望系统在开机后自动补齐优化，可选择 speed-profile。","prop":"pm.dexopt.post-boot","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_first_boot","label":"首次开机编译策略","description":"作用：控制首次启动、恢复出厂或系统初始化后的编译策略。可选值：verify、speed-profile、speed、everything。场景：首次启动阶段任务密集，默认 verify 可缩短进入系统时间；刷机后愿意等待完整优化时可选择 speed-profile 或 speed。","prop":"pm.dexopt.first-boot","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_shared","label":"共享库编译策略","description":"作用：控制共享库和被多应用依赖组件的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：共享库影响范围更大，默认 speed 可提升依赖应用的公共路径性能；低端设备或存储紧张时可降为 speed-profile。","prop":"pm.dexopt.shared","defaultEnabled":true,"defaultValue":"speed","values":["verify","speed-profile","speed","everything"]},{"id":"pm_inactive","label":"闲置 App 编译策略","description":"作用：控制长期未使用应用被维护任务触发时的编译策略。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可避免为低频应用浪费编译时间和存储；如果某些应用偶尔使用但启动体验重要，可改为 speed-profile。","prop":"pm.dexopt.inactive","defaultEnabled":true,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"pm_ab_ota","label":"A/B OTA 编译策略","description":"作用：控制 A/B 分区 OTA 场景下的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：A/B OTA 可在后台准备更新产物，speed-profile 通常能平衡后台耗时与更新后性能；低温控余量设备可降为 verify。","prop":"pm.dexopt.ab-ota","defaultEnabled":true,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"]},{"id":"pm_cmdline","label":"手动触发编译策略","description":"作用：控制命令行或工具手动触发 dexopt 时的默认策略。可选值：verify、speed-profile、speed、everything。场景：常配合 adb shell cmd package compile 使用，默认 speed-profile 适合手动维护；需要强制性能优化时再手动切换 speed/everything。","prop":"pm.dexopt.cmdline","defaultEnabled":true,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"]},{"id":"pm_first_use","label":"First-use dexopt policy","description":"Adds pm.dexopt.first-use from Xiaomi capture evidence. speed-profile is conservative and avoids heavier first-use compilation.","prop":"pm.dexopt.first-use","defaultEnabled":true,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["pm.dexopt.first-use"],"reason":"Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile."},"propOutput":{"key":"pm.dexopt.first-use","value":"speed-profile","action":"enable"},"explain":{"title":"First-use dexopt policy","reason":"Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile.","confidence":"medium"}},{"id":"pm_dexopt_baseline","label":"Baseline dexopt policy","description":"Adds pm.dexopt.baseline from real capture evidence. Kept disabled by default because only one log exposes it.","prop":"pm.dexopt.baseline","defaultEnabled":false,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["pm.dexopt.baseline"],"reason":"Observed in one v3.2 capture log as speed-profile."},"propOutput":{"key":"pm.dexopt.baseline","value":"speed-profile","action":"keep"},"explain":{"title":"Baseline dexopt policy","reason":"Observed in one v3.2 capture log as speed-profile.","confidence":"low"}},{"id":"pm_install_create_dm","label":"Install create-dm policy","description":"Adds pm.dexopt.install-create-dm for ROMs that expose dex metadata creation policy. Disabled by default; captured value is inherited.","prop":"pm.dexopt.install-create-dm","defaultEnabled":false,"defaultValue":"speed-profile","values":["verify","speed-profile","speed","everything"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["pm.dexopt.install-create-dm"],"reason":"Observed in one Xiaomi v3.2 capture log as speed-profile."},"propOutput":{"key":"pm.dexopt.install-create-dm","value":"speed-profile","action":"keep"},"explain":{"title":"Install create-dm policy","reason":"Observed in one Xiaomi v3.2 capture log as speed-profile.","confidence":"low"}},{"id":"pm_downgrade_days","label":"闲置降级阈值","description":"作用：设置应用闲置多少天后允许系统降低其编译优化等级。可选值：15、90、365、9999，数值越大越不容易降级。场景：推荐 9999，用于避免系统频繁回收或降级编译产物；存储空间紧张且愿意牺牲低频应用性能时可选择较小天数。","prop":"pm.dexopt.downgrade_after_inactive_days","defaultEnabled":true,"defaultValue":"9999","values":["15","90","365","9999"]},{"id":"mini_debug","label":"关闭 dex2oat 调试符号","description":"作用：控制 dex2oat 是否生成 mini debug info。可选值：false 表示不生成，减少编译产物体积；true 表示保留调试信息，便于底层诊断。场景：普通用户推荐 false；只有在分析 ART 崩溃、native 堆栈或开发调试时才考虑 true。","prop":"dalvik.vm.dex2oat-minidebuginfo","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"mini_debug_vm","label":"关闭 VM 调试符号","description":"作用：控制 Dalvik/ART VM 层面的 mini debug info。可选值：false 关闭，true 开启。场景：日常使用推荐 false，以减少产物和日志负担；开发者定位运行时异常时可临时开启。","prop":"dalvik.vm.minidebuginfo","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"oplus_bgdex2oat","label":"ColorOS 后台编译开关","description":"作用：控制 OPlus/ColorOS 私有后台 dex2oat 触发开关。可选值：false 关闭私有后台编译；true 允许系统按厂商策略执行。场景：推荐 false，减少系统在后台自行触发编译；如果遇到厂商应用更新后性能异常，可临时恢复 true。","prop":"persist.sys.oplus.bgdex2oat_enabled","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"compile_cache_miss","label":"ColorOS 编译缓存 miss 触发","description":"作用：控制 ColorOS 编译缓存 miss 后是否触发额外重编译。可选值：0 表示关闭该触发；1 表示启用厂商逻辑。场景：推荐 0，避免缓存未命中导致频繁后台编译；仅在确认厂商缓存机制对当前 ROM 有正向收益时使用 1。","prop":"persist.sys.feature.compile.re.cache.miss","defaultEnabled":true,"defaultValue":"0","values":["0","1"]},{"id":"compile_cache_fmap","label":"ColorOS 编译缓存 fmap","description":"作用：控制 ColorOS 编译缓存 fmap size 相关私有特性。可选值：0 关闭；1 启用。场景：默认 0 更保守，可降低未知 ROM 私有逻辑带来的副作用；除非已验证当前机型启用后有收益，否则不建议打开。","prop":"persist.sys.feature.compile.re.fmap.size","defaultEnabled":true,"defaultValue":"0","values":["0","1"]},{"id":"startup_cache","label":"禁用启动镜像缓存","description":"作用：控制 runtime_native 的 app image startup cache。可选值：false 禁用；true 启用。场景：禁用可减少启动缓存写入和缓存失效后的维护负担；如果追求应用冷启动缓存收益且设备存储压力不大，可尝试 true。","prop":"persist.device_config.runtime_native.use_app_image_startup_cache","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"iorap_readahead","label":"禁用 iorap 预读","description":"作用：控制 iorap readahead 预读机制。可选值：false 禁用；true 启用。场景：Android 12 以后 iorap 在不同 ROM 上差异较大，推荐 false 以减少启动轨迹学习和预读负担；如果当前系统仍依赖 iorap 优化冷启动，可测试 true。","prop":"persist.device_config.runtime_native_boot.iorap_readahead_enable","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"iorap_perfetto","label":"禁用 iorap 追踪","description":"作用：控制 iorap perfetto trace 采集。可选值：false 禁用追踪；true 启用追踪。场景：推荐 false，避免为启动预测持续采样；只有在调试启动预读行为或厂商 ROM 明确依赖该链路时才开启。","prop":"persist.device_config.runtime_native_boot.iorap_perfetto_enable","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"opex_merge","label":"ColorOS opex merge 触发","description":"作用：控制 OPlus opex merge 私有触发项。可选值：false 关闭；true 启用。场景：该项属于厂商私有行为，跨版本含义可能变化，推荐 false；仅在确认 ROM 需要 opex merge 维护时开启。","prop":"oplus.opex.merge","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"opex_modulemerge","label":"ColorOS opex modulemerge","description":"作用：控制 OPlus opex modulemerge 私有触发项。可选值：false 关闭；true 启用。场景：推荐 false，减少无法预期的厂商后台维护任务；如果系统模块更新后出现厂商组件优化异常，可临时测试 true。","prop":"oplus.opex.modulemerge","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"ocompiler","label":"OPlus 编译器服务","description":"控制 OPlus 私有编译器服务（ocompiler），MTK 平台常见。false 关闭，减少厂商独立触发编译。","prop":"persist.oplus.ocompiler","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"zygote_c","label":"ZygoteC","description":"控制 OPlus ZygoteC 特性（MTK）。false 关闭，减少额外编译链路。","prop":"persist.oplus.zygote_c.enable","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"zygote_ocomp","label":"Zygote ocomp","description":"控制 OPlus Zygote ocomp 优化（MTK）。false 关闭，减少 zygote 阶段编译。","prop":"persist.oplus.zygote_ocomp","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"runtime_dexopt","label":"禁用运行时 dexopt","description":"控制设备配置文件命名空间的 dexopt 开关。false 关闭，阻止 runtime 层触发重编译。","prop":"persist.device_config.runtime.dexopt.enabled","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"runtime_bg_dexopt","label":"禁用运行时后台 dexopt","description":"控制设备配置文件命名空间的后台 dexopt。false 关闭，减少空闲维护编译。","prop":"persist.device_config.runtime.bg_dexopt.enabled","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"runtime_profile_merge","label":"禁用运行时 profile merge","description":"控制设备配置文件命名空间的 profile 合并。false 关闭，减少合并触发 I/O。","prop":"persist.device_config.runtime.profile_merge","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"xiaomi_app_dexfile_preload","label":"Xiaomi app dexfile preload","description":"Controls Xiaomi/MIUI/HyperOS app dexfile preload. Default false reduces ROM preload overhead; non-Xiaomi devices only write it when captured or manually enabled.","prop":"persist.sys.app_dexfile_preload.enable","defaultEnabled":true,"defaultValue":"false","values":["false","true"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.app_dexfile_preload.enable"],"reason":"Observed in both Xiaomi logs with true/false variance."},"propOutput":{"key":"persist.sys.app_dexfile_preload.enable","value":"false","action":"enable"},"explain":{"title":"Xiaomi app dexfile preload","reason":"Observed in both Xiaomi logs with true/false variance.","confidence":"medium"}},{"id":"xiaomi_art_startup_preload","label":"Xiaomi ART startup preload","description":"Controls Xiaomi ART startup class preload. Default false keeps the low-load rule line while avoiding vendor template branching.","prop":"persist.sys.art_startup_class_preload.enable","defaultEnabled":true,"defaultValue":"false","values":["false","true"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.art_startup_class_preload.enable"],"reason":"Observed in Xiaomi v3.2 capture evidence."},"propOutput":{"key":"persist.sys.art_startup_class_preload.enable","value":"false","action":"enable"},"explain":{"title":"Xiaomi ART startup preload","reason":"Observed in Xiaomi v3.2 capture evidence.","confidence":"medium"}},{"id":"xiaomi_precache","label":"Xiaomi precache switch","description":"Controls Xiaomi/MIUI/HyperOS precache. Default false is conservative; captured values can be inherited automatically.","prop":"persist.sys.precache.enable","defaultEnabled":true,"defaultValue":"false","values":["false","true"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.precache.enable"],"reason":"Observed in both Xiaomi logs with true/false variance."},"propOutput":{"key":"persist.sys.precache.enable","value":"false","action":"enable"},"explain":{"title":"Xiaomi precache switch","reason":"Observed in both Xiaomi logs with true/false variance.","confidence":"medium"}},{"id":"xiaomi_precache_appstrs1","label":"Xiaomi precache app list 1","description":"Retains Xiaomi precache appstrs1 evidence. Default-disabled because app package lists are ROM/user specific.","prop":"persist.sys.precache.appstrs1","defaultEnabled":false,"defaultValue":"com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker","values":["com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.precache.appstrs1"],"reason":"Observed in one Xiaomi log."},"propOutput":{"key":"persist.sys.precache.appstrs1","value":"com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker","action":"keep"},"explain":{"title":"Xiaomi precache app list 1","reason":"Observed in one Xiaomi log.","confidence":"low"}},{"id":"xiaomi_precache_appstrs2","label":"Xiaomi precache app list 2","description":"Retains Xiaomi precache appstrs2 evidence. Default-disabled because app package lists are ROM/user specific.","prop":"persist.sys.precache.appstrs2","defaultEnabled":false,"defaultValue":"com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili","values":["com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.precache.appstrs2"],"reason":"Observed in one Xiaomi log."},"propOutput":{"key":"persist.sys.precache.appstrs2","value":"com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili","action":"keep"},"explain":{"title":"Xiaomi precache app list 2","reason":"Observed in one Xiaomi log.","confidence":"low"}},{"id":"xiaomi_precache_appstrs3","label":"Xiaomi precache app list 3","description":"Retains Xiaomi precache appstrs3 evidence. Default-disabled because app package lists are ROM/user specific.","prop":"persist.sys.precache.appstrs3","defaultEnabled":false,"defaultValue":"com.miui.home,com.android.systemui","values":["com.miui.home,com.android.systemui"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.precache.appstrs3"],"reason":"Observed in one Xiaomi log."},"propOutput":{"key":"persist.sys.precache.appstrs3","value":"com.miui.home,com.android.systemui","action":"keep"},"explain":{"title":"Xiaomi precache app list 3","reason":"Observed in one Xiaomi log.","confidence":"low"}},{"id":"xiaomi_precache_appstrs4","label":"Xiaomi precache app list 4","description":"Retains Xiaomi precache appstrs4 evidence. Default-disabled because app package lists are ROM/user specific.","prop":"persist.sys.precache.appstrs4","defaultEnabled":false,"defaultValue":"com.android.settings","values":["com.android.settings"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.precache.appstrs4"],"reason":"Observed in one Xiaomi log."},"propOutput":{"key":"persist.sys.precache.appstrs4","value":"com.android.settings","action":"keep"},"explain":{"title":"Xiaomi precache app list 4","reason":"Observed in one Xiaomi log.","confidence":"low"}},{"id":"xiaomi_precache_number","label":"Xiaomi precache app count","description":"Retains Xiaomi precache.number evidence. Default-disabled and tied to the retained app list evidence.","prop":"persist.sys.precache.number","defaultEnabled":false,"defaultValue":"4","values":["0","4"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.sys.precache.number"],"reason":"Observed in one Xiaomi log as 4."},"propOutput":{"key":"persist.sys.precache.number","value":"4","action":"keep"},"explain":{"title":"Xiaomi precache app count","reason":"Observed in one Xiaomi log as 4.","confidence":"low"}},{"id":"disable_pr_dexopt","label":"禁用 PR dexopt","description":"禁用 Package Reference dexopt profile 链路。false 关闭，减少 profile 维护开销。","prop":"dalvik.vm.enable_pr_dexopt","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"disable_ota_pr","label":"禁用 OTA 异步 PR","description":"禁用 OTA 后异步 pr_dexopt。false 关闭，减少 OTA 后台负载。","prop":"dalvik.vm.pr_dexopt_async_for_ota","defaultEnabled":true,"defaultValue":"false","values":["false","true"]},{"id":"bgdexopt_new_classes","label":"bg-dexopt 新类阈值","description":"后台 dexopt 因新增类触发的比例阈值。0 最小触发，10/20 允许一定增量编译。","prop":"dalvik.vm.bgdexopt.new-classes-percent","defaultEnabled":true,"defaultValue":"0","values":["0","10","20"]},{"id":"bgdexopt_new_methods","label":"bg-dexopt 新方法阈值","description":"后台 dexopt 因新增方法触发的比例阈值。0 最小触发，10/20 允许一定增量编译。","prop":"dalvik.vm.bgdexopt.new-methods-percent","defaultEnabled":true,"defaultValue":"0","values":["0","10","20"]}]},{"id":"caution","title":"谨慎","tone":"caution","description":"进阶配置，涉及全局 dex2oat filter、线程调度、JIT、profile 和厂商私有优化。建议逐项了解后再启用。","items":[{"id":"dex2oat_filter","label":"默认 dex2oat 编译过滤器","description":"设置全局 dex2oat-filter 默认强度。speed-profile 平衡体验，speed/everything 增加编译量，verify 最轻量。","prop":"dalvik.vm.dex2oat-filter","defaultEnabled":false,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"very_large","label":"超大 APK 编译策略","description":"控制 very-large APK 的编译策略。everything 全量 AOT 但安装慢、发热高；speed-profile 平衡；verify 轻量。","prop":"dalvik.vm.dex2oat-very-large","defaultEnabled":false,"defaultValue":"verify","values":["verify","speed-profile","speed","everything"]},{"id":"resolve_startup","label":"启动字符串预解析","description":"控制 dex2oat 是否预解析启动路径字符串。false 减少编译工作，true 可能改善冷启动。","prop":"dalvik.vm.dex2oat-resolve-startup-strings","defaultEnabled":false,"defaultValue":"false","values":["false","true"]},{"id":"oplus_tempcontrol","label":"温控编译触发","description":"控制 OPlus 温控与编译联动。false 关闭，避免温控额外触发编译。","prop":"oplus.dex.tempcontrol","defaultEnabled":false,"defaultValue":"false","values":["false","true"]},{"id":"dalvik_sync","label":"dalvik 同步任务","description":"配置 OPlus dalvik 周期同步参数。关闭可减少后台维护负载。","prop":"sys.oplus.dalvik_sync_config","defaultEnabled":false,"defaultValue":"0,0,0,0,0","values":["0,0,0,0,0","1,1,1,1,1"]},{"id":"disable_secondary_auto","label":"禁用 secondary 自动编译","description":"禁用 secondary dex 自动编译链路。false 关闭自动维护。","prop":"dalvik.vm.dexopt.secondary","defaultEnabled":false,"defaultValue":"false","values":["false","true"]},{"id":"disable_thermal_cutoff","label":"dexopt 温控截断","description":"控制 dexopt 温控截断策略。0 系统默认，修改可能增加持续编译发热。","prop":"dalvik.vm.dexopt.thermal-cutoff","defaultEnabled":false,"defaultValue":"0","values":["0","1","2"]},{"id":"boot_after_ota_concurrency","label":"OTA dexopt concurrency","description":"Controls pm.dexopt.boot-after-ota.concurrency. One log exposes 4; disabled by default to avoid cross-ROM assumptions.","prop":"pm.dexopt.boot-after-ota.concurrency","defaultEnabled":false,"defaultValue":"4","values":["1","2","4","6","8"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["pm.dexopt.boot-after-ota.concurrency"],"reason":"Observed in one v3.2 capture log as 4."},"propOutput":{"key":"pm.dexopt.boot-after-ota.concurrency","value":"4","action":"keep"},"explain":{"title":"OTA dexopt concurrency","reason":"Observed in one v3.2 capture log as 4.","confidence":"low"}},{"id":"disable_artfile_madvise","label":"ART 文件预读缓存","description":"控制 ART madvise 预读缓存大小。0 关闭，极大值增加不确定性。","prop":"dalvik.vm.madvise.artfile.size","defaultEnabled":false,"defaultValue":"0","values":["0","2147483647","4294967295"]},{"id":"jit_max_zero","label":"JIT 代码缓存上限","description":"JIT code cache 最大值。0 极限压制，64m 宽松上限。","prop":"dalvik.vm.jitmaxsize","defaultEnabled":false,"defaultValue":"0","values":["0","64m"]},{"id":"profile_save_max","label":"profile 保存间隔","description":"ART profile 最小保存间隔（毫秒）。30000 约30秒，2147483647 压制频繁保存。","prop":"dalvik.vm.ps-min-save-period-ms","defaultEnabled":false,"defaultValue":"2147483647","values":["30000","2147483647"]},{"id":"perf_init_bg_threads_zero","label":"perf_init 后台线程数","description":"system_perf_init 阶段后台 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。","prop":"system_perf_init.bg-dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4"]},{"id":"perf_init_boot_threads_zero","label":"perf_init 开机线程数","description":"system_perf_init 阶段 boot dex2oat 线程数。0 不分配，1/2/4 允许对应并发。","prop":"system_perf_init.boot-dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4"]},{"id":"perf_init_threads_zero","label":"perf_init 编译线程数","description":"system_perf_init 阶段通用 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。","prop":"system_perf_init.dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4"]},{"id":"background_dex2oat_threads_zero","label":"后台 dex2oat 线程数","description":"dalvik.vm 后台 dex2oat 线程数。0 压制，1/2/4 允许对应并发。","prop":"dalvik.vm.background-dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4","5","8"]},{"id":"persist_dex2oat_threads_zero","label":"持久 dex2oat 线程数","description":"persist 持久编译线程数。0 压制并发，1/2/4/8 允许对应线程。","prop":"persist.dalvik.vm.dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4","8"]},{"id":"dex2oat_threads","label":"dex2oat thread count","description":"General dalvik.vm.dex2oat-threads. Six logs show 4 or 6; the generator inherits captured values and only writes default 4 when manually enabled.","prop":"dalvik.vm.dex2oat-threads","defaultEnabled":false,"defaultValue":"4","values":["0","1","2","4","5","6","8"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.dex2oat-threads"],"reason":"Observed in all six logs with values 4 or 6."},"propOutput":{"key":"dalvik.vm.dex2oat-threads","value":"4","action":"keep"},"explain":{"title":"dex2oat thread count","reason":"Observed in all six logs with values 4 or 6.","confidence":"high"}},{"id":"default_dex2oat_cpu_set","label":"Default dex2oat CPU set","description":"Adds dalvik.vm.default-dex2oat-cpu-set for ROMs that expose a default compiler CPU affinity.","prop":"dalvik.vm.default-dex2oat-cpu-set","defaultEnabled":false,"defaultValue":"3,4,5,6,7","values":["","0,1,2,3,4,5","3,4,5,6,7","4,5,6,7","0,1,2,3,4,5,6,7"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.default-dex2oat-cpu-set"],"reason":"Observed in one v3.2 capture log as 3,4,5,6,7."},"propOutput":{"key":"dalvik.vm.default-dex2oat-cpu-set","value":"3,4,5,6,7","action":"keep"},"explain":{"title":"Default dex2oat CPU set","reason":"Observed in one v3.2 capture log as 3,4,5,6,7.","confidence":"low"}},{"id":"dex2oat_max_image_block","label":"dex2oat max image block","description":"General dalvik.vm.dex2oat-max-image-block-size. Six logs show 524288; keep disabled by default unless captured or manually enabled.","prop":"dalvik.vm.dex2oat-max-image-block-size","defaultEnabled":false,"defaultValue":"524288","values":["262144","524288","1048576"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.dex2oat-max-image-block-size"],"reason":"Observed in all six logs as 524288."},"propOutput":{"key":"dalvik.vm.dex2oat-max-image-block-size","value":"524288","action":"keep"},"explain":{"title":"dex2oat max image block","reason":"Observed in all six logs as 524288.","confidence":"high"}},{"id":"dex2oat64_enabled","label":"dex2oat64 enabled","description":"General dex2oat64 switch. Six logs show true; kept as captured evidence, not a forced write for unsupported devices.","prop":"dalvik.vm.dex2oat64.enabled","defaultEnabled":false,"defaultValue":"true","values":["false","true"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.dex2oat64.enabled"],"reason":"Observed in all six logs as true."},"propOutput":{"key":"dalvik.vm.dex2oat64.enabled","value":"true","action":"keep"},"explain":{"title":"dex2oat64 enabled","reason":"Observed in all six logs as true.","confidence":"high"}},{"id":"image_dex2oat_xms","label":"image dex2oat Xms","description":"Image dex2oat minimum heap. Six logs show 64m; captured values are inherited and default 64m is available for manual use.","prop":"dalvik.vm.image-dex2oat-Xms","defaultEnabled":false,"defaultValue":"64m","values":["32m","64m","128m"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.image-dex2oat-Xms"],"reason":"Observed in all six logs as 64m."},"propOutput":{"key":"dalvik.vm.image-dex2oat-Xms","value":"64m","action":"keep"},"explain":{"title":"image dex2oat Xms","reason":"Observed in all six logs as 64m.","confidence":"high"}},{"id":"image_dex2oat_xmx","label":"image dex2oat Xmx","description":"Image dex2oat maximum heap. Six logs show 64m; captured values are inherited and default 64m is available for manual use.","prop":"dalvik.vm.image-dex2oat-Xmx","defaultEnabled":false,"defaultValue":"64m","values":["64m","128m","256m"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.image-dex2oat-Xmx"],"reason":"Observed in all six logs as 64m."},"propOutput":{"key":"dalvik.vm.image-dex2oat-Xmx","value":"64m","action":"keep"},"explain":{"title":"image dex2oat Xmx","reason":"Observed in all six logs as 64m.","confidence":"high"}},{"id":"app_image_format","label":"ART app image format","description":"ART app image format. Five logs show lz4; kept disabled by default to avoid forcing unsupported ROMs.","prop":"dalvik.vm.appimageformat","defaultEnabled":false,"defaultValue":"lz4","values":["lz4","uncompressed"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.appimageformat"],"reason":"Observed in five logs as lz4."},"propOutput":{"key":"dalvik.vm.appimageformat","value":"lz4","action":"keep"},"explain":{"title":"ART app image format","reason":"Observed in five logs as lz4.","confidence":"medium"}},{"id":"usap_pool_enabled","label":"USAP pool enabled","description":"USAP pool enabled from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.","prop":"dalvik.vm.usap_pool_enabled","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.usap_pool_enabled"],"reason":"Observed in five logs as false."},"propOutput":{"key":"dalvik.vm.usap_pool_enabled","value":"false","action":"keep"},"explain":{"title":"USAP pool enabled","reason":"Observed in five logs as false.","confidence":"medium"}},{"id":"usap_pool_refill_delay","label":"USAP refill delay","description":"USAP refill delay from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.","prop":"dalvik.vm.usap_pool_refill_delay_ms","defaultEnabled":false,"defaultValue":"3000","values":["1000","3000","5000"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.usap_pool_refill_delay_ms"],"reason":"Observed in five logs as 3000."},"propOutput":{"key":"dalvik.vm.usap_pool_refill_delay_ms","value":"3000","action":"keep"},"explain":{"title":"USAP refill delay","reason":"Observed in five logs as 3000.","confidence":"medium"}},{"id":"usap_pool_size_max","label":"USAP pool max size","description":"USAP pool max size from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.","prop":"dalvik.vm.usap_pool_size_max","defaultEnabled":false,"defaultValue":"3","values":["1","2","3","4","6"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.usap_pool_size_max"],"reason":"Observed in five logs as 3."},"propOutput":{"key":"dalvik.vm.usap_pool_size_max","value":"3","action":"keep"},"explain":{"title":"USAP pool max size","reason":"Observed in five logs as 3.","confidence":"medium"}},{"id":"usap_pool_size_min","label":"USAP pool min size","description":"USAP pool min size from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.","prop":"dalvik.vm.usap_pool_size_min","defaultEnabled":false,"defaultValue":"1","values":["0","1","2","3"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.usap_pool_size_min"],"reason":"Observed in five logs as 1."},"propOutput":{"key":"dalvik.vm.usap_pool_size_min","value":"1","action":"keep"},"explain":{"title":"USAP pool min size","reason":"Observed in five logs as 1.","confidence":"medium"}},{"id":"usap_refill_threshold","label":"USAP refill threshold","description":"USAP refill threshold from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.","prop":"dalvik.vm.usap_refill_threshold","defaultEnabled":false,"defaultValue":"1","values":["1","2","3"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.usap_refill_threshold"],"reason":"Observed in five logs as 1."},"propOutput":{"key":"dalvik.vm.usap_refill_threshold","value":"1","action":"keep"},"explain":{"title":"USAP refill threshold","reason":"Observed in five logs as 1.","confidence":"medium"}},{"id":"runtime_native_usap_pool","label":"runtime_native USAP pool","description":"Device_config runtime_native USAP pool switch. One log exposes true; disabled by default because support is ROM-specific.","prop":"persist.device_config.runtime_native.usap_pool_enabled","defaultEnabled":false,"defaultValue":"true","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.usap_pool_enabled"],"reason":"Observed in one v3.2 capture log as true."},"propOutput":{"key":"persist.device_config.runtime_native.usap_pool_enabled","value":"true","action":"keep"},"explain":{"title":"runtime_native USAP pool","reason":"Observed in one v3.2 capture log as true.","confidence":"low"}},{"id":"dex2oat_cpu_set","label":"dex2oat CPU 亲和性","description":"绑定 dex2oat 到指定 CPU 核心集。留空使用默认，可指定如 4-7 限制到大核。","prop":"dalvik.vm.dex2oat-cpu-set","defaultEnabled":false,"defaultValue":"","values":["","4,5,6,7","0,1,2,3,4,5,6,7","0,1,2,3,4,5","3,4,5,6,7"]},{"id":"boot_dex2oat_cpu_set","label":"开机 dex2oat CPU 亲和性","description":"绑定开机阶段 dex2oat 到指定 CPU 核心集。留空默认，限制可减少开机阶段发热。","prop":"dalvik.vm.boot-dex2oat-cpu-set","defaultEnabled":false,"defaultValue":"","values":["","4,5,6,7","0,1,2,3,4,5,6,7","0,1,2,3,4,5","3,4,5,6,7"]},{"id":"bg_dex2oat_cpu_set","label":"后台 dex2oat CPU 亲和性","description":"绑定后台 dex2oat 到指定 CPU 核心集。留空默认，限制可减少后台编译发热。","prop":"dalvik.vm.background-dex2oat-cpu-set","defaultEnabled":false,"defaultValue":"","values":["","4,5,6,7","0,1,2,3,4,5,6,7","0,1,2,3,4,5","3,4,5,6,7"]},{"id":"image_dex2oat_cpu_set","label":"镜像 dex2oat CPU 亲和性","description":"绑定镜像编译阶段 dex2oat 到指定 CPU 核心集。留空默认。","prop":"dalvik.vm.image-dex2oat-cpu-set","defaultEnabled":false,"defaultValue":"","values":["","4,5,6,7","0,1,2,3,4,5,6,7","0,1,2,3,4,5","3,4,5,6,7"]},{"id":"bg_dex2oat_threads","label":"后台 dex2oat 线程数（短名）","description":"另一组后台 dex2oat 线程控制属性（dalvik.vm.bg-dex2oat-threads），与 background-dex2oat-threads 独立。0 压制，1/2/4 允许并发。","prop":"dalvik.vm.bg-dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4","5","8"]},{"id":"image_dex2oat_threads","label":"镜像 dex2oat 线程数","description":"镜像编译阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。","prop":"dalvik.vm.image-dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4","5","6"]},{"id":"boot_dex2oat_threads","label":"开机 dex2oat 线程数","description":"开机阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。","prop":"dalvik.vm.boot-dex2oat-threads","defaultEnabled":false,"defaultValue":"0","values":["0","1","2","4","5","6"]},{"id":"mtk_aggressive_cpu","label":"MTK 激进 CPU 亲和性","description":"MTK 平台 dex2oat 激进调度 CPU 核心集。默认 0,1,2,3,4 绑定所有性能核。","prop":"ro.vendor.dex2oat-aggressive-cpu-set","defaultEnabled":false,"defaultValue":"0,1,2,3,4","values":["0,1,2,3,4",""]},{"id":"mtk_aggressive_threads","label":"MTK 激进线程数","description":"MTK 平台 dex2oat 激进调度线程数。默认 5，设为 0 可压制。","prop":"ro.vendor.dex2oat-aggressive-threads","defaultEnabled":false,"defaultValue":"0","values":["0","5"]},{"id":"dex2oat_xms","label":"dex2oat 最小堆","description":"dex2oat 进程最小堆大小。64m 默认，减小可节省内存但增加 GC。","prop":"dalvik.vm.dex2oat-Xms","defaultEnabled":false,"defaultValue":"64m","values":["32m","64m","128m"],"propOutput":{"key":"dalvik.vm.dex2oat-Xms","value":"64m","action":"keep"},"match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.dex2oat-Xms"],"reason":"Covered by v3.2 capture evidence."},"explain":{"title":"dex2oat 最小堆","reason":"Covered by v3.2 capture evidence.","confidence":"medium"}},{"id":"dex2oat_xmx","label":"dex2oat 最大堆","description":"dex2oat 进程最大堆大小。512m 默认，减小可预防 OOM。","prop":"dalvik.vm.dex2oat-Xmx","defaultEnabled":false,"defaultValue":"512m","values":["256m","512m","1024m"],"propOutput":{"key":"dalvik.vm.dex2oat-Xmx","value":"512m","action":"keep"},"match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.dex2oat-Xmx"],"reason":"Covered by v3.2 capture evidence."},"explain":{"title":"dex2oat 最大堆","reason":"Covered by v3.2 capture evidence.","confidence":"medium"}},{"id":"odex_madvise","label":"odex 预读缓存","description":"odex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。","prop":"dalvik.vm.madvise.odexfile.size","defaultEnabled":false,"defaultValue":"0","values":["0","104857600","2147483647"]},{"id":"vdex_madvise","label":"vdex 预读缓存","description":"vdex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。","prop":"dalvik.vm.madvise.vdexfile.size","defaultEnabled":false,"defaultValue":"0","values":["0","104857600","2147483647"]},{"id":"profile_first_save","label":"profile 首次保存延迟","description":"应用首次 profile 保存的最小延迟时间（毫秒）。5000 约5秒，10000 约10秒。","prop":"dalvik.vm.ps-min-first-save-ms","defaultEnabled":false,"defaultValue":"2147483647","values":["5000","10000","2147483647","8000"]},{"id":"use_jit_profiles","label":"JIT profile usage","description":"Controls dalvik.vm.usejitprofiles. One log exposes true; disabled by default because forcing profile behavior can affect app warmup.","prop":"dalvik.vm.usejitprofiles","defaultEnabled":false,"defaultValue":"true","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.usejitprofiles"],"reason":"Observed in one v3.2 capture log as true."},"propOutput":{"key":"dalvik.vm.usejitprofiles","value":"true","action":"keep"},"explain":{"title":"JIT profile usage","reason":"Observed in one v3.2 capture log as true.","confidence":"low"}},{"id":"generational_gc","label":"Generational GC flag","description":"runtime_native_boot.use_generational_gc capture rule. Empty captured values are evidence only and do not become errors.","prop":"persist.device_config.runtime_native_boot.use_generational_gc","defaultEnabled":false,"defaultValue":"true","values":["false","true"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native_boot.use_generational_gc"],"reason":"Observed in four logs as true or empty device_config evidence."},"propOutput":{"key":"persist.device_config.runtime_native_boot.use_generational_gc","value":"true","action":"keep"},"explain":{"title":"Generational GC flag","reason":"Observed in four logs as true or empty device_config evidence.","confidence":"medium"}},{"id":"uffd_gc_flag","label":"UFFD GC disable flag","description":"runtime_native_boot.force_disable_uffd_gc capture rule. false is the conservative value from logs.","prop":"persist.device_config.runtime_native_boot.force_disable_uffd_gc","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native_boot.force_disable_uffd_gc"],"reason":"Observed in four logs as false or empty device_config evidence."},"propOutput":{"key":"persist.device_config.runtime_native_boot.force_disable_uffd_gc","value":"false","action":"keep"},"explain":{"title":"UFFD GC disable flag","reason":"Observed in four logs as false or empty device_config evidence.","confidence":"medium"}},{"id":"lock_profiling_flag","label":"Lock profiling disable flag","description":"runtime_native_boot.disable_lock_profiling capture rule. false is the conservative value from logs.","prop":"persist.device_config.runtime_native_boot.disable_lock_profiling","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":320,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native_boot.disable_lock_profiling"],"reason":"Observed in four logs as false or empty device_config evidence."},"propOutput":{"key":"persist.device_config.runtime_native_boot.disable_lock_profiling","value":"false","action":"keep"},"explain":{"title":"Lock profiling disable flag","reason":"Observed in four logs as false or empty device_config evidence.","confidence":"medium"}},{"id":"runtime_profman_enabled","label":"runtime profman enabled","description":"runtime profman enabled from device_config runtime evidence. Disabled by default; captured value is inherited when present.","prop":"persist.device_config.runtime.profman.enabled","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime.profman.enabled"],"reason":"Observed in one v3.2 capture log as false."},"propOutput":{"key":"persist.device_config.runtime.profman.enabled","value":"false","action":"keep"},"explain":{"title":"runtime profman enabled","reason":"Observed in one v3.2 capture log as false.","confidence":"low"}},{"id":"runtime_secondary_dex","label":"runtime secondary dex","description":"runtime secondary dex from device_config runtime evidence. Disabled by default; captured value is inherited when present.","prop":"persist.device_config.runtime.secondary_dex","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime.secondary_dex"],"reason":"Observed in one v3.2 capture log as false."},"propOutput":{"key":"persist.device_config.runtime.secondary_dex","value":"false","action":"keep"},"explain":{"title":"runtime secondary dex","reason":"Observed in one v3.2 capture log as false.","confidence":"low"}},{"id":"runtime_dex_reconcile","label":"runtime dex reconcile","description":"runtime dex reconcile from device_config runtime evidence. Disabled by default; captured value is inherited when present.","prop":"persist.device_config.runtime.dex_reconcile","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime.dex_reconcile"],"reason":"Observed in one v3.2 capture log as false."},"propOutput":{"key":"persist.device_config.runtime.dex_reconcile","value":"false","action":"keep"},"explain":{"title":"runtime dex reconcile","reason":"Observed in one v3.2 capture log as false.","confidence":"low"}},{"id":"runtime_dynamic_code_opt","label":"runtime dynamic code opt","description":"runtime dynamic code opt from device_config runtime evidence. Disabled by default; captured value is inherited when present.","prop":"persist.device_config.runtime.dynamic_code_opt","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime.dynamic_code_opt"],"reason":"Observed in one v3.2 capture log as false."},"propOutput":{"key":"persist.device_config.runtime.dynamic_code_opt","value":"false","action":"keep"},"explain":{"title":"runtime dynamic code opt","reason":"Observed in one v3.2 capture log as false.","confidence":"low"}},{"id":"enable_uffd_gc_2","label":"UFFD GC v2 flag","description":"UFFD GC v2 flag from device_config runtime evidence. Disabled by default; captured value is inherited when present.","prop":"persist.device_config.runtime_native_boot.enable_uffd_gc_2","defaultEnabled":false,"defaultValue":"false","values":["false","true"],"priority":330,"fallback":"keep-disabled-unless-captured-or-enabled","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native_boot.enable_uffd_gc_2"],"reason":"Observed in one v3.2 capture log as false."},"propOutput":{"key":"persist.device_config.runtime_native_boot.enable_uffd_gc_2","value":"false","action":"keep"},"explain":{"title":"UFFD GC v2 flag","reason":"Observed in one v3.2 capture log as false.","confidence":"low"}},{"id":"iorap_blacklisted_packages","label":"iorap blacklisted packages","description":"Retains empty iorap blacklist evidence from device_config runtime_native_boot.","prop":"persist.device_config.runtime_native_boot.iorap_blacklisted_packages","defaultEnabled":false,"defaultValue":"","values":[""],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native_boot.iorap_blacklisted_packages"],"reason":"Observed in four logs as an empty value."},"propOutput":{"key":"persist.device_config.runtime_native_boot.iorap_blacklisted_packages","value":"","action":"keep"},"explain":{"title":"iorap blacklisted packages","reason":"Observed in four logs as an empty value.","confidence":"medium"}},{"id":"iorapd_options","label":"iorapd options","description":"Retains empty iorapd options evidence from device_config runtime_native_boot.","prop":"persist.device_config.runtime_native_boot.iorapd_options","defaultEnabled":false,"defaultValue":"","values":[""],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native_boot.iorapd_options"],"reason":"Observed in four logs as an empty value."},"propOutput":{"key":"persist.device_config.runtime_native_boot.iorapd_options","value":"","action":"keep"},"explain":{"title":"iorapd options","reason":"Observed in four logs as an empty value.","confidence":"medium"}},{"id":"thread_suspend_timeout","label":"Thread suspend timeout","description":"Retains dalvik.vm.thread-suspend-timeout-ms. Default-disabled because it affects runtime suspension behavior.","prop":"dalvik.vm.thread-suspend-timeout-ms","defaultEnabled":false,"defaultValue":"30000","values":["30000"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.thread-suspend-timeout-ms"],"reason":"Observed in three logs as 30000."},"propOutput":{"key":"dalvik.vm.thread-suspend-timeout-ms","value":"30000","action":"keep"},"explain":{"title":"Thread suspend timeout","reason":"Observed in three logs as 30000.","confidence":"medium"}},{"id":"extra_opts_xss","label":"ART extra opts","description":"Retains dalvik.vm.extra-opts from capture evidence. Default-disabled because VM extra opts are broad runtime flags.","prop":"dalvik.vm.extra-opts","defaultEnabled":false,"defaultValue":"-Xss3M","values":["-Xss3M"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.extra-opts"],"reason":"Observed in two logs as -Xss3M."},"propOutput":{"key":"dalvik.vm.extra-opts","value":"-Xss3M","action":"keep"},"explain":{"title":"ART extra opts","reason":"Observed in two logs as -Xss3M.","confidence":"low"}},{"id":"finalizer_timeout","label":"Finalizer timeout","description":"Retains dalvik.vm.finalizer-timeout-ms from one log. Default-disabled because it can affect runtime behavior globally.","prop":"dalvik.vm.finalizer-timeout-ms","defaultEnabled":false,"defaultValue":"40000","values":["40000"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.finalizer-timeout-ms"],"reason":"Observed in one log as 40000."},"propOutput":{"key":"dalvik.vm.finalizer-timeout-ms","value":"40000","action":"keep"},"explain":{"title":"Finalizer timeout","reason":"Observed in one log as 40000.","confidence":"low"}},{"id":"mtk_stack_trace_file","label":"MTK stack trace file","description":"Retains dalvik.vm.mtk-stack-trace-file evidence. Default-disabled and diagnostic-only for MTK-style ROMs.","prop":"dalvik.vm.mtk-stack-trace-file","defaultEnabled":false,"defaultValue":"/data/anr/mtk_traces.txt","values":["/data/anr/mtk_traces.txt"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.mtk-stack-trace-file"],"reason":"Observed in one log as /data/anr/mtk_traces.txt."},"propOutput":{"key":"dalvik.vm.mtk-stack-trace-file","value":"/data/anr/mtk_traces.txt","action":"keep"},"explain":{"title":"MTK stack trace file","reason":"Observed in one log as /data/anr/mtk_traces.txt.","confidence":"low"}},{"id":"systemui_compiler_filter","label":"SystemUI compiler filter","description":"Retains dalvik.vm.systemuicompilerfilter. Default-disabled because SystemUI compiler policy is ROM-sensitive.","prop":"dalvik.vm.systemuicompilerfilter","defaultEnabled":false,"defaultValue":"speed","values":["verify","speed-profile","speed","everything"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.systemuicompilerfilter"],"reason":"Observed in one log as speed."},"propOutput":{"key":"dalvik.vm.systemuicompilerfilter","value":"speed","action":"keep"},"explain":{"title":"SystemUI compiler filter","reason":"Observed in one log as speed.","confidence":"low"}},{"id":"runtime_metrics_reporting_mods","label":"Runtime metrics reporting mods","description":"Retains runtime_native metrics reporting-mods evidence. Default-disabled because it is reporting policy, not tuning.","prop":"persist.device_config.runtime_native.metrics.reporting-mods","defaultEnabled":false,"defaultValue":"2","values":["","2"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.metrics.reporting-mods"],"reason":"Observed in four logs as empty or 2."},"propOutput":{"key":"persist.device_config.runtime_native.metrics.reporting-mods","value":"2","action":"keep"},"explain":{"title":"Runtime metrics reporting mods","reason":"Observed in four logs as empty or 2.","confidence":"medium"}},{"id":"runtime_metrics_reporting_mods_server","label":"Runtime metrics reporting mods server","description":"Retains runtime_native metrics reporting-mods-server evidence.","prop":"persist.device_config.runtime_native.metrics.reporting-mods-server","defaultEnabled":false,"defaultValue":"2","values":["","2"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.metrics.reporting-mods-server"],"reason":"Observed in four logs as empty or 2."},"propOutput":{"key":"persist.device_config.runtime_native.metrics.reporting-mods-server","value":"2","action":"keep"},"explain":{"title":"Runtime metrics reporting mods server","reason":"Observed in four logs as empty or 2.","confidence":"medium"}},{"id":"runtime_metrics_reporting_num_mods","label":"Runtime metrics reporting num mods","description":"Retains runtime_native metrics reporting-num-mods evidence.","prop":"persist.device_config.runtime_native.metrics.reporting-num-mods","defaultEnabled":false,"defaultValue":"100","values":["","100"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.metrics.reporting-num-mods"],"reason":"Observed in four logs as empty or 100."},"propOutput":{"key":"persist.device_config.runtime_native.metrics.reporting-num-mods","value":"100","action":"keep"},"explain":{"title":"Runtime metrics reporting num mods","reason":"Observed in four logs as empty or 100.","confidence":"medium"}},{"id":"runtime_metrics_reporting_num_mods_server","label":"Runtime metrics reporting num mods server","description":"Retains runtime_native metrics reporting-num-mods-server evidence.","prop":"persist.device_config.runtime_native.metrics.reporting-num-mods-server","defaultEnabled":false,"defaultValue":"100","values":["","100"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.metrics.reporting-num-mods-server"],"reason":"Observed in four logs as empty or 100."},"propOutput":{"key":"persist.device_config.runtime_native.metrics.reporting-num-mods-server","value":"100","action":"keep"},"explain":{"title":"Runtime metrics reporting num mods server","reason":"Observed in four logs as empty or 100.","confidence":"medium"}},{"id":"runtime_metrics_reporting_spec","label":"Runtime metrics reporting spec","description":"Retains runtime_native metrics reporting-spec evidence.","prop":"persist.device_config.runtime_native.metrics.reporting-spec","defaultEnabled":false,"defaultValue":"1,5,30,60,600","values":["","1,5,30,60,600"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.metrics.reporting-spec"],"reason":"Observed in four logs as empty or 1,5,30,60,600."},"propOutput":{"key":"persist.device_config.runtime_native.metrics.reporting-spec","value":"1,5,30,60,600","action":"keep"},"explain":{"title":"Runtime metrics reporting spec","reason":"Observed in four logs as empty or 1,5,30,60,600.","confidence":"medium"}},{"id":"runtime_metrics_reporting_spec_server","label":"Runtime metrics reporting spec server","description":"Retains runtime_native metrics reporting-spec-server evidence.","prop":"persist.device_config.runtime_native.metrics.reporting-spec-server","defaultEnabled":false,"defaultValue":"1,10,60,3600,*","values":["","1,10,60,3600,*"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.metrics.reporting-spec-server"],"reason":"Observed in four logs as empty or 1,10,60,3600,*."},"propOutput":{"key":"persist.device_config.runtime_native.metrics.reporting-spec-server","value":"1,10,60,3600,*","action":"keep"},"explain":{"title":"Runtime metrics reporting spec server","reason":"Observed in four logs as empty or 1,10,60,3600,*.","confidence":"medium"}},{"id":"runtime_metrics_write_statsd","label":"Runtime metrics write statsd","description":"Retains runtime_native metrics write-to-statsd evidence.","prop":"persist.device_config.runtime_native.metrics.write-to-statsd","defaultEnabled":false,"defaultValue":"true","values":["","false","true"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["persist.device_config.runtime_native.metrics.write-to-statsd"],"reason":"Observed in four logs as empty or true."},"propOutput":{"key":"persist.device_config.runtime_native.metrics.write-to-statsd","value":"true","action":"keep"},"explain":{"title":"Runtime metrics write statsd","reason":"Observed in four logs as empty or true.","confidence":"medium"}}]},{"id":"aggressive","title":"危险","tone":"aggressive","description":"全量 AOT 性能配置。将所有 dexopt 策略设为 everything，最大化运行时性能。适合愿意接受安装耗时、发热和存储占用以换取极致性能的用户。","items":[{"id":"force_install_everything","label":"安装时全量 AOT","description":"将安装编译策略设为 everything，安装时全量 AOT 编译，追求运行性能。","prop":"pm.dexopt.install","defaultEnabled":true,"defaultValue":"everything","values":["verify","speed-profile","speed","everything"]},{"id":"force_ota_everything","label":"OTA 后全量 AOT","description":"将 OTA 后编译策略设为 everything，更新后全量 AOT，提升更新后性能。","prop":"pm.dexopt.boot-after-ota","defaultEnabled":true,"defaultValue":"everything","values":["verify","speed-profile","speed","everything"]},{"id":"force_cmdline_everything","label":"手动编译全量 AOT","description":"将命令行手动触发 dexopt 策略设为 everything。","prop":"pm.dexopt.cmdline","defaultEnabled":true,"defaultValue":"everything","values":["verify","speed-profile","speed","everything"]},{"id":"priv_apps_oob","label":"特权 App 全量 AOT","description":"将特权应用离线编译策略设为 everything。","prop":"pm.dexopt.priv-apps-oob","defaultEnabled":true,"defaultValue":"everything","values":["verify","speed-profile","speed","everything"]},{"id":"secondary_everything","label":"secondary dex 全量 AOT","description":"将 secondary dex 编译策略设为 everything，插件化应用全量编译。","prop":"pm.dexopt.secondary","defaultEnabled":true,"defaultValue":"everything","values":["verify","speed-profile","speed","everything"]},{"id":"global_everything","label":"全局 dex2oat filter AOT","description":"将全局 dex2oat-filter 设为 everything，兜底全量 AOT。","prop":"dalvik.vm.dex2oat-filter","defaultEnabled":true,"defaultValue":"everything","values":["verify","speed-profile","speed","everything"]},{"id":"priv_apps_oob_list","label":"特权 App OOB 列表","description":"指定参与 priv-apps-oob 的特权应用列表。ALL 表示全部。","prop":"pm.dexopt.priv-apps-oob-list","defaultEnabled":true,"defaultValue":"ALL","values":["ALL"]},{"id":"disable_art_service","label":"禁用 ART Service","description":"禁用 ART Service 调度器，可能阻断系统正常 dexopt 维护和 OTA 后优化。","prop":"dalvik.vm.useartservice","defaultEnabled":false,"defaultValue":"false","values":["false","true"]},{"id":"disable_jit","label":"禁用 JIT","description":"禁用 ART JIT 即时编译。可减少运行时编译，但降低热点代码性能。","prop":"dalvik.vm.usejit","defaultEnabled":false,"defaultValue":"false","values":["false","true"]},{"id":"heapgrowthlimit","label":"ART heap growth limit","description":"Retains dalvik.vm.heapgrowthlimit from capture logs. This is broad ART runtime evidence, so it is default-disabled and primarily preserved for diagnostics.","prop":"dalvik.vm.heapgrowthlimit","defaultEnabled":false,"defaultValue":"256m","values":["256m","384m"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.heapgrowthlimit"],"reason":"Observed in all six logs with values 256m or 384m."},"propOutput":{"key":"dalvik.vm.heapgrowthlimit","value":"256m","action":"keep"},"explain":{"title":"ART heap growth limit","reason":"Observed in all six logs with values 256m or 384m.","confidence":"high"}},{"id":"heapmaxfree","label":"ART heap max free","description":"Retains dalvik.vm.heapmaxfree from capture logs. Default-disabled to avoid forcing runtime heap policy across ROMs.","prop":"dalvik.vm.heapmaxfree","defaultEnabled":false,"defaultValue":"8m","values":["8m","16m","32m"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.heapmaxfree"],"reason":"Observed in all six logs with values 8m, 16m or 32m."},"propOutput":{"key":"dalvik.vm.heapmaxfree","value":"8m","action":"keep"},"explain":{"title":"ART heap max free","reason":"Observed in all six logs with values 8m, 16m or 32m.","confidence":"high"}},{"id":"heapminfree","label":"ART heap min free","description":"Retains dalvik.vm.heapminfree from capture logs. Default-disabled because heap tuning can affect every app process.","prop":"dalvik.vm.heapminfree","defaultEnabled":false,"defaultValue":"2m","values":["512k","2m","4m","8m"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.heapminfree"],"reason":"Observed in all six logs with values 512k, 2m, 4m or 8m."},"propOutput":{"key":"dalvik.vm.heapminfree","value":"2m","action":"keep"},"explain":{"title":"ART heap min free","reason":"Observed in all six logs with values 512k, 2m, 4m or 8m.","confidence":"high"}},{"id":"heapsize","label":"ART heap size","description":"Retains dalvik.vm.heapsize from capture logs. Default-disabled and treated as high-impact runtime evidence.","prop":"dalvik.vm.heapsize","defaultEnabled":false,"defaultValue":"512m","values":["512m","768m"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.heapsize"],"reason":"Observed in all six logs with values 512m or 768m."},"propOutput":{"key":"dalvik.vm.heapsize","value":"512m","action":"keep"},"explain":{"title":"ART heap size","reason":"Observed in all six logs with values 512m or 768m.","confidence":"high"}},{"id":"heapstartsize","label":"ART heap start size","description":"Retains dalvik.vm.heapstartsize from capture logs. Default-disabled to avoid broad runtime side effects.","prop":"dalvik.vm.heapstartsize","defaultEnabled":false,"defaultValue":"16m","values":["8m","16m","32m"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.heapstartsize"],"reason":"Observed in all six logs with values 8m, 16m or 32m."},"propOutput":{"key":"dalvik.vm.heapstartsize","value":"16m","action":"keep"},"explain":{"title":"ART heap start size","reason":"Observed in all six logs with values 8m, 16m or 32m.","confidence":"high"}},{"id":"heaptargetutilization","label":"ART heap target utilization","description":"Retains dalvik.vm.heaptargetutilization from capture logs. Default-disabled because GC behavior is device-sensitive.","prop":"dalvik.vm.heaptargetutilization","defaultEnabled":false,"defaultValue":"0.5","values":["0.5","0.8"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.heaptargetutilization"],"reason":"Observed in all six logs with values 0.5 or 0.8."},"propOutput":{"key":"dalvik.vm.heaptargetutilization","value":"0.5","action":"keep"},"explain":{"title":"ART heap target utilization","reason":"Observed in all six logs with values 0.5 or 0.8.","confidence":"high"}},{"id":"isa_arm64_features","label":"arm64 ISA features","description":"Retains dalvik.vm.isa.arm64.features. This describes CPU capability evidence and is default-disabled.","prop":"dalvik.vm.isa.arm64.features","defaultEnabled":false,"defaultValue":"default","values":["default"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.isa.arm64.features"],"reason":"Observed in all six logs as default."},"propOutput":{"key":"dalvik.vm.isa.arm64.features","value":"default","action":"keep"},"explain":{"title":"arm64 ISA features","reason":"Observed in all six logs as default.","confidence":"high"}},{"id":"isa_arm64_variant","label":"arm64 ISA variant","description":"Retains dalvik.vm.isa.arm64.variant. This is ABI/CPU evidence and must not be generalized across devices.","prop":"dalvik.vm.isa.arm64.variant","defaultEnabled":false,"defaultValue":"cortex-a55","values":["default","oryon","kryo300","cortex-a55"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.isa.arm64.variant"],"reason":"Observed in all six logs with oryon, kryo300 or cortex-a55."},"propOutput":{"key":"dalvik.vm.isa.arm64.variant","value":"cortex-a55","action":"keep"},"explain":{"title":"arm64 ISA variant","reason":"Observed in all six logs with oryon, kryo300 or cortex-a55.","confidence":"high"}},{"id":"isa_arm_features","label":"arm ISA features","description":"Retains dalvik.vm.isa.arm.features for devices exposing 32-bit ARM runtime evidence.","prop":"dalvik.vm.isa.arm.features","defaultEnabled":false,"defaultValue":"default","values":["default"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.isa.arm.features"],"reason":"Observed in three logs as default."},"propOutput":{"key":"dalvik.vm.isa.arm.features","value":"default","action":"keep"},"explain":{"title":"arm ISA features","reason":"Observed in three logs as default.","confidence":"medium"}},{"id":"isa_arm_variant","label":"arm ISA variant","description":"Retains dalvik.vm.isa.arm.variant. Default-disabled because CPU variant values are device-specific.","prop":"dalvik.vm.isa.arm.variant","defaultEnabled":false,"defaultValue":"cortex-a55","values":["default","cortex-a75","cortex-a55"],"priority":340,"fallback":"retain-as-captured-evidence","match":{"source":"six-device-capture-logs","anyOf":["dalvik.vm.isa.arm.variant"],"reason":"Observed in three logs with cortex-a75 or cortex-a55."},"propOutput":{"key":"dalvik.vm.isa.arm.variant","value":"cortex-a55","action":"keep"},"explain":{"title":"arm ISA variant","reason":"Observed in three logs with cortex-a75 or cortex-a55.","confidence":"medium"}}]}],"evidenceLogs":[{"id":"oneplus-1","family":"OnePlus/OPlus","propCount":802,"sourceFile":"oneplus-capture-1.txt","role":"common-art-dexopt-evidence"},{"id":"oneplus-2","family":"OnePlus/OPlus","propCount":737,"sourceFile":"oneplus-capture-2.txt","role":"common-art-dexopt-evidence"},{"id":"oneplus-3","family":"OnePlus/OPlus","propCount":712,"sourceFile":"oneplus-capture-3.txt","role":"common-art-dexopt-evidence"},{"id":"xiaomi-1","family":"Xiaomi/MIUI-HyperOS","propCount":324,"sourceFile":"xiaomi-capture-1.txt","role":"xiaomi-preload-evidence"},{"id":"xiaomi-2","family":"Xiaomi/MIUI-HyperOS","propCount":275,"sourceFile":"xiaomi-capture-2.txt","role":"xiaomi-preload-evidence"},{"id":"motorola-1","family":"Motorola/AOSP-like","propCount":333,"sourceFile":"motorola-capture-1.txt","role":"aosp-baseline-evidence"}],"matchPolicy":{"ok":"Captured ART/dexopt evidence generated a usable system.prop; safe defaults may fill non-captured managed rules.","partial":"Captured evidence exists but too few managed rules matched, so conservative defaults filled gaps.","fallback":"No reliable capture evidence or no managed hit; safe defaults generated system.prop.","warning":"Rules generated output but duplicate or diagnostic-only evidence needs attention.","error":"Generation failed or a blocking input/output file is missing."},"logEvidenceVersion":"six-device-2026-06-25","retainedEvidencePolicy":{"policy":"All remaining relevant keys from the six capture logs are retained as rules. High-impact runtime, heap, ISA, metrics and app-list keys are default-disabled and are only written when captured or manually enabled.","reason":"The user requested the remaining 29 keys be kept; retaining them preserves diagnostics and device evidence without forcing one ROM default onto every device."}}
+{
+  "schemaVersion": 32,
+  "rulesVersion": "v3.3-final",
+  "schema": {
+    "itemFields": [
+      "key",
+      "title",
+      "desc",
+      "risk",
+      "group",
+      "default"
+    ],
+    "matchFields": [
+      "when",
+      "allOf",
+      "anyOf",
+      "noneOf",
+      "source",
+      "reason"
+    ],
+    "propFields": [
+      "key",
+      "value",
+      "action"
+    ],
+    "resultStatuses": [
+      "ok",
+      "partial",
+      "fallback",
+      "warning",
+      "error"
+    ]
+  },
+  "debug": {
+    "captureSlots": 6,
+    "report": [
+      "matchedRules",
+      "generatedProps",
+      "unmatchedKeys",
+      "statusReason"
+    ]
+  },
+  "categories": [
+    {
+      "id": "safe",
+      "title": "安全",
+      "tone": "safe",
+      "description": "日常推荐配置，优先降低后台编译、缓存预读和厂商私有触发项带来的负载，适合长期启用。",
+      "items": [
+        {
+          "id": "pm_bg_dexopt",
+          "label": "跳过后台 dexopt",
+          "description": "作用：控制系统空闲时触发的后台 dexopt 维护任务。可选值：skip 表示跳过后台重编译；speed-profile 按运行画像做性能编译；verify 仅做字节码校验。场景：希望减少待机发热、后台 I/O 和无感重编译时建议使用 skip；如果更看重后台逐步优化应用启动速度，可改为 speed-profile。",
+          "prop": "pm.dexopt.bg-dexopt",
+          "defaultEnabled": true,
+          "defaultValue": "skip",
+          "values": [
+            "skip",
+            "speed-profile",
+            "verify"
+          ]
+        },
+        {
+          "id": "pm_boot_after_ota",
+          "label": "OTA 后编译策略",
+          "description": "作用：定义系统 OTA 更新后首次启动阶段的包编译策略。可选值：verify 仅校验；speed-profile 基于 profile 编译热点路径；speed 编译更多代码以提升运行速度；everything 尽可能全量 AOT。场景：日常推荐 speed-profile，兼顾 OTA 后恢复速度和后续性能；低存储或怕发热可选 verify；只在愿意接受更长更新后维护时间时使用 speed/everything。",
+          "prop": "pm.dexopt.boot-after-ota",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_mainline",
+          "label": "Mainline 更新后编译策略",
+          "description": "作用：控制 ART/Mainline 模块更新后的 dexopt 行为。可选值：verify、speed-profile、speed、everything，编译强度依次升高。场景：Mainline 更新频率较高，默认 verify 可减少更新后的后台负载；遇到运行时组件更新后应用启动异常或性能波动，可临时改为 speed-profile。",
+          "prop": "pm.dexopt.boot-after-mainline-update",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_install",
+          "label": "安装时编译策略",
+          "description": "作用：控制普通安装路径下新安装或更新应用的 dexopt 策略。可选值：verify 最快但优化最少；speed-profile 以 profile 为准进行平衡优化；speed 更偏性能；everything 编译最彻底但安装最慢。场景：日常安装推荐 speed-profile；频繁安装测试包可选 verify；大型游戏或长期使用应用可在可接受安装耗时的情况下选择 speed。",
+          "prop": "pm.dexopt.install",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_install_bulk",
+          "label": "批量安装编译策略",
+          "description": "作用：控制批量安装多应用时的编译策略，例如恢复备份、应用商店批量更新。可选值：verify、speed-profile、speed、everything。场景：批量安装对耗时和温度更敏感，推荐 speed-profile；大量恢复应用且希望尽快完成安装时可用 verify；不建议在批量场景使用 everything。",
+          "prop": "pm.dexopt.install-bulk",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_install_bulk_downgraded",
+          "label": "批量安装降级包策略",
+          "description": "作用：控制批量安装降级 APK 时的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：降级包更容易出现 oat/art 产物不匹配，默认 verify 可减少无效编译；如果确认降级包稳定且希望保留运行性能，可改为 speed-profile。",
+          "prop": "pm.dexopt.install-bulk-downgraded",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_install_bulk_secondary",
+          "label": "批量安装 secondary dex",
+          "description": "作用：控制批量安装时 secondary dex 的处理策略，secondary dex 常见于插件化、动态加载或多 dex 应用。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可减少批量安装负载；如果常用大型插件化应用并希望安装后立即优化，可选择 speed-profile。",
+          "prop": "pm.dexopt.install-bulk-secondary",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_install_bulk_secondary_downgraded",
+          "label": "批量降级 secondary dex",
+          "description": "作用：控制批量安装降级包时 secondary dex 的编译策略。可选值：verify、speed-profile、speed、everything。场景：降级和 secondary dex 叠加时兼容性风险更高，推荐 verify；仅在明确需要性能优化且确认应用兼容时使用 speed-profile 或更高档位。",
+          "prop": "pm.dexopt.install-bulk-secondary-downgraded",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_install_fast",
+          "label": "快速安装路径策略",
+          "description": "作用：控制 fast install 路径使用的 dexopt 策略，这类路径通常强调安装完成速度。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可最大化安装速度；如果安装后首次启动性能更重要，可切到 speed-profile。",
+          "prop": "pm.dexopt.install-fast",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_post_boot",
+          "label": "开机后编译策略",
+          "description": "作用：控制系统启动完成后的 post-boot dexopt 维护策略。可选值：verify、speed-profile、speed、everything。场景：推荐 verify，减少开机后温度和 I/O 峰值；如果设备性能充足且希望系统在开机后自动补齐优化，可选择 speed-profile。",
+          "prop": "pm.dexopt.post-boot",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_first_boot",
+          "label": "首次开机编译策略",
+          "description": "作用：控制首次启动、恢复出厂或系统初始化后的编译策略。可选值：verify、speed-profile、speed、everything。场景：首次启动阶段任务密集，默认 verify 可缩短进入系统时间；刷机后愿意等待完整优化时可选择 speed-profile 或 speed。",
+          "prop": "pm.dexopt.first-boot",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_shared",
+          "label": "共享库编译策略",
+          "description": "作用：控制共享库和被多应用依赖组件的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：共享库影响范围更大，默认 speed 可提升依赖应用的公共路径性能；低端设备或存储紧张时可降为 speed-profile。",
+          "prop": "pm.dexopt.shared",
+          "defaultEnabled": true,
+          "defaultValue": "speed",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_inactive",
+          "label": "闲置 App 编译策略",
+          "description": "作用：控制长期未使用应用被维护任务触发时的编译策略。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可避免为低频应用浪费编译时间和存储；如果某些应用偶尔使用但启动体验重要，可改为 speed-profile。",
+          "prop": "pm.dexopt.inactive",
+          "defaultEnabled": true,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_ab_ota",
+          "label": "A/B OTA 编译策略",
+          "description": "作用：控制 A/B 分区 OTA 场景下的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：A/B OTA 可在后台准备更新产物，speed-profile 通常能平衡后台耗时与更新后性能；低温控余量设备可降为 verify。",
+          "prop": "pm.dexopt.ab-ota",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_cmdline",
+          "label": "手动触发编译策略",
+          "description": "作用：控制命令行或工具手动触发 dexopt 时的默认策略。可选值：verify、speed-profile、speed、everything。场景：常配合 adb shell cmd package compile 使用，默认 speed-profile 适合手动维护；需要强制性能优化时再手动切换 speed/everything。",
+          "prop": "pm.dexopt.cmdline",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "pm_first_use",
+          "label": "First-use dexopt policy",
+          "description": "Adds pm.dexopt.first-use from Xiaomi capture evidence. speed-profile is conservative and avoids heavier first-use compilation.",
+          "prop": "pm.dexopt.first-use",
+          "defaultEnabled": true,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "pm.dexopt.first-use"
+            ],
+            "reason": "Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile."
+          },
+          "propOutput": {
+            "key": "pm.dexopt.first-use",
+            "value": "speed-profile",
+            "action": "enable"
+          },
+          "explain": {
+            "title": "First-use dexopt policy",
+            "reason": "Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "pm_dexopt_baseline",
+          "label": "Baseline dexopt policy",
+          "description": "Adds pm.dexopt.baseline from real capture evidence. Kept disabled by default because only one log exposes it.",
+          "prop": "pm.dexopt.baseline",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "pm.dexopt.baseline"
+            ],
+            "reason": "Observed in one v3.2 capture log as speed-profile."
+          },
+          "propOutput": {
+            "key": "pm.dexopt.baseline",
+            "value": "speed-profile",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Baseline dexopt policy",
+            "reason": "Observed in one v3.2 capture log as speed-profile.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "pm_install_create_dm",
+          "label": "Install create-dm policy",
+          "description": "Adds pm.dexopt.install-create-dm for ROMs that expose dex metadata creation policy. Disabled by default; captured value is inherited.",
+          "prop": "pm.dexopt.install-create-dm",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "pm.dexopt.install-create-dm"
+            ],
+            "reason": "Observed in one Xiaomi v3.2 capture log as speed-profile."
+          },
+          "propOutput": {
+            "key": "pm.dexopt.install-create-dm",
+            "value": "speed-profile",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Install create-dm policy",
+            "reason": "Observed in one Xiaomi v3.2 capture log as speed-profile.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "pm_downgrade_days",
+          "label": "闲置降级阈值",
+          "description": "作用：设置应用闲置多少天后允许系统降低其编译优化等级。可选值：15、90、365、9999，数值越大越不容易降级。场景：推荐 9999，用于避免系统频繁回收或降级编译产物；存储空间紧张且愿意牺牲低频应用性能时可选择较小天数。",
+          "prop": "pm.dexopt.downgrade_after_inactive_days",
+          "defaultEnabled": true,
+          "defaultValue": "9999",
+          "values": [
+            "15",
+            "90",
+            "365",
+            "9999"
+          ]
+        },
+        {
+          "id": "mini_debug",
+          "label": "关闭 dex2oat 调试符号",
+          "description": "作用：控制 dex2oat 是否生成 mini debug info。可选值：false 表示不生成，减少编译产物体积；true 表示保留调试信息，便于底层诊断。场景：普通用户推荐 false；只有在分析 ART 崩溃、native 堆栈或开发调试时才考虑 true。",
+          "prop": "dalvik.vm.dex2oat-minidebuginfo",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "mini_debug_vm",
+          "label": "关闭 VM 调试符号",
+          "description": "作用：控制 Dalvik/ART VM 层面的 mini debug info。可选值：false 关闭，true 开启。场景：日常使用推荐 false，以减少产物和日志负担；开发者定位运行时异常时可临时开启。",
+          "prop": "dalvik.vm.minidebuginfo",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "oplus_bgdex2oat",
+          "label": "ColorOS 后台编译开关",
+          "description": "作用：控制 OPlus/ColorOS 私有后台 dex2oat 触发开关。可选值：false 关闭私有后台编译；true 允许系统按厂商策略执行。场景：推荐 false，减少系统在后台自行触发编译；如果遇到厂商应用更新后性能异常，可临时恢复 true。",
+          "prop": "persist.sys.oplus.bgdex2oat_enabled",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "compile_cache_miss",
+          "label": "ColorOS 编译缓存 miss 触发",
+          "description": "作用：控制 ColorOS 编译缓存 miss 后是否触发额外重编译。可选值：0 表示关闭该触发；1 表示启用厂商逻辑。场景：推荐 0，避免缓存未命中导致频繁后台编译；仅在确认厂商缓存机制对当前 ROM 有正向收益时使用 1。",
+          "prop": "persist.sys.feature.compile.re.cache.miss",
+          "defaultEnabled": true,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "id": "compile_cache_fmap",
+          "label": "ColorOS 编译缓存 fmap",
+          "description": "作用：控制 ColorOS 编译缓存 fmap size 相关私有特性。可选值：0 关闭；1 启用。场景：默认 0 更保守，可降低未知 ROM 私有逻辑带来的副作用；除非已验证当前机型启用后有收益，否则不建议打开。",
+          "prop": "persist.sys.feature.compile.re.fmap.size",
+          "defaultEnabled": true,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1"
+          ]
+        },
+        {
+          "id": "startup_cache",
+          "label": "禁用启动镜像缓存",
+          "description": "作用：控制 runtime_native 的 app image startup cache。可选值：false 禁用；true 启用。场景：禁用可减少启动缓存写入和缓存失效后的维护负担；如果追求应用冷启动缓存收益且设备存储压力不大，可尝试 true。",
+          "prop": "persist.device_config.runtime_native.use_app_image_startup_cache",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "iorap_readahead",
+          "label": "禁用 iorap 预读",
+          "description": "作用：控制 iorap readahead 预读机制。可选值：false 禁用；true 启用。场景：Android 12 以后 iorap 在不同 ROM 上差异较大，推荐 false 以减少启动轨迹学习和预读负担；如果当前系统仍依赖 iorap 优化冷启动，可测试 true。",
+          "prop": "persist.device_config.runtime_native_boot.iorap_readahead_enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "iorap_perfetto",
+          "label": "禁用 iorap 追踪",
+          "description": "作用：控制 iorap perfetto trace 采集。可选值：false 禁用追踪；true 启用追踪。场景：推荐 false，避免为启动预测持续采样；只有在调试启动预读行为或厂商 ROM 明确依赖该链路时才开启。",
+          "prop": "persist.device_config.runtime_native_boot.iorap_perfetto_enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "opex_merge",
+          "label": "ColorOS opex merge 触发",
+          "description": "作用：控制 OPlus opex merge 私有触发项。可选值：false 关闭；true 启用。场景：该项属于厂商私有行为，跨版本含义可能变化，推荐 false；仅在确认 ROM 需要 opex merge 维护时开启。",
+          "prop": "oplus.opex.merge",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "opex_modulemerge",
+          "label": "ColorOS opex modulemerge",
+          "description": "作用：控制 OPlus opex modulemerge 私有触发项。可选值：false 关闭；true 启用。场景：推荐 false，减少无法预期的厂商后台维护任务；如果系统模块更新后出现厂商组件优化异常，可临时测试 true。",
+          "prop": "oplus.opex.modulemerge",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "ocompiler",
+          "label": "OPlus 编译器服务",
+          "description": "控制 OPlus 私有编译器服务（ocompiler），MTK 平台常见。false 关闭，减少厂商独立触发编译。",
+          "prop": "persist.oplus.ocompiler",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "zygote_c",
+          "label": "ZygoteC",
+          "description": "控制 OPlus ZygoteC 特性（MTK）。false 关闭，减少额外编译链路。",
+          "prop": "persist.oplus.zygote_c.enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "zygote_ocomp",
+          "label": "Zygote ocomp",
+          "description": "控制 OPlus Zygote ocomp 优化（MTK）。false 关闭，减少 zygote 阶段编译。",
+          "prop": "persist.oplus.zygote_ocomp",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "runtime_dexopt",
+          "label": "禁用运行时 dexopt",
+          "description": "控制设备配置文件命名空间的 dexopt 开关。false 关闭，阻止 runtime 层触发重编译。",
+          "prop": "persist.device_config.runtime.dexopt.enabled",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "runtime_bg_dexopt",
+          "label": "禁用运行时后台 dexopt",
+          "description": "控制设备配置文件命名空间的后台 dexopt。false 关闭，减少空闲维护编译。",
+          "prop": "persist.device_config.runtime.bg_dexopt.enabled",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "runtime_profile_merge",
+          "label": "禁用运行时 profile merge",
+          "description": "控制设备配置文件命名空间的 profile 合并。false 关闭，减少合并触发 I/O。",
+          "prop": "persist.device_config.runtime.profile_merge",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "xiaomi_app_dexfile_preload",
+          "label": "Xiaomi app dexfile preload",
+          "description": "Controls Xiaomi/MIUI/HyperOS app dexfile preload. Default false reduces ROM preload overhead; non-Xiaomi devices only write it when captured or manually enabled.",
+          "prop": "persist.sys.app_dexfile_preload.enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.app_dexfile_preload.enable"
+            ],
+            "reason": "Observed in both Xiaomi logs with true/false variance."
+          },
+          "propOutput": {
+            "key": "persist.sys.app_dexfile_preload.enable",
+            "value": "false",
+            "action": "enable"
+          },
+          "explain": {
+            "title": "Xiaomi app dexfile preload",
+            "reason": "Observed in both Xiaomi logs with true/false variance.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "xiaomi_art_startup_preload",
+          "label": "Xiaomi ART startup preload",
+          "description": "Controls Xiaomi ART startup class preload. Default false keeps the low-load rule line while avoiding vendor template branching.",
+          "prop": "persist.sys.art_startup_class_preload.enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.art_startup_class_preload.enable"
+            ],
+            "reason": "Observed in Xiaomi v3.2 capture evidence."
+          },
+          "propOutput": {
+            "key": "persist.sys.art_startup_class_preload.enable",
+            "value": "false",
+            "action": "enable"
+          },
+          "explain": {
+            "title": "Xiaomi ART startup preload",
+            "reason": "Observed in Xiaomi v3.2 capture evidence.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "xiaomi_precache",
+          "label": "Xiaomi precache switch",
+          "description": "Controls Xiaomi/MIUI/HyperOS precache. Default false is conservative; captured values can be inherited automatically.",
+          "prop": "persist.sys.precache.enable",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.precache.enable"
+            ],
+            "reason": "Observed in both Xiaomi logs with true/false variance."
+          },
+          "propOutput": {
+            "key": "persist.sys.precache.enable",
+            "value": "false",
+            "action": "enable"
+          },
+          "explain": {
+            "title": "Xiaomi precache switch",
+            "reason": "Observed in both Xiaomi logs with true/false variance.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "xiaomi_precache_appstrs1",
+          "label": "Xiaomi precache app list 1",
+          "description": "Retains Xiaomi precache appstrs1 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "prop": "persist.sys.precache.appstrs1",
+          "defaultEnabled": false,
+          "defaultValue": "com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker",
+          "values": [
+            "com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.precache.appstrs1"
+            ],
+            "reason": "Observed in one Xiaomi log."
+          },
+          "propOutput": {
+            "key": "persist.sys.precache.appstrs1",
+            "value": "com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Xiaomi precache app list 1",
+            "reason": "Observed in one Xiaomi log.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "xiaomi_precache_appstrs2",
+          "label": "Xiaomi precache app list 2",
+          "description": "Retains Xiaomi precache appstrs2 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "prop": "persist.sys.precache.appstrs2",
+          "defaultEnabled": false,
+          "defaultValue": "com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili",
+          "values": [
+            "com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.precache.appstrs2"
+            ],
+            "reason": "Observed in one Xiaomi log."
+          },
+          "propOutput": {
+            "key": "persist.sys.precache.appstrs2",
+            "value": "com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Xiaomi precache app list 2",
+            "reason": "Observed in one Xiaomi log.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "xiaomi_precache_appstrs3",
+          "label": "Xiaomi precache app list 3",
+          "description": "Retains Xiaomi precache appstrs3 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "prop": "persist.sys.precache.appstrs3",
+          "defaultEnabled": false,
+          "defaultValue": "com.miui.home,com.android.systemui",
+          "values": [
+            "com.miui.home,com.android.systemui"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.precache.appstrs3"
+            ],
+            "reason": "Observed in one Xiaomi log."
+          },
+          "propOutput": {
+            "key": "persist.sys.precache.appstrs3",
+            "value": "com.miui.home,com.android.systemui",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Xiaomi precache app list 3",
+            "reason": "Observed in one Xiaomi log.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "xiaomi_precache_appstrs4",
+          "label": "Xiaomi precache app list 4",
+          "description": "Retains Xiaomi precache appstrs4 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "prop": "persist.sys.precache.appstrs4",
+          "defaultEnabled": false,
+          "defaultValue": "com.android.settings",
+          "values": [
+            "com.android.settings"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.precache.appstrs4"
+            ],
+            "reason": "Observed in one Xiaomi log."
+          },
+          "propOutput": {
+            "key": "persist.sys.precache.appstrs4",
+            "value": "com.android.settings",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Xiaomi precache app list 4",
+            "reason": "Observed in one Xiaomi log.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "xiaomi_precache_number",
+          "label": "Xiaomi precache app count",
+          "description": "Retains Xiaomi precache.number evidence. Default-disabled and tied to the retained app list evidence.",
+          "prop": "persist.sys.precache.number",
+          "defaultEnabled": false,
+          "defaultValue": "4",
+          "values": [
+            "0",
+            "4"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.sys.precache.number"
+            ],
+            "reason": "Observed in one Xiaomi log as 4."
+          },
+          "propOutput": {
+            "key": "persist.sys.precache.number",
+            "value": "4",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Xiaomi precache app count",
+            "reason": "Observed in one Xiaomi log as 4.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "disable_pr_dexopt",
+          "label": "禁用 PR dexopt",
+          "description": "禁用 Package Reference dexopt profile 链路。false 关闭，减少 profile 维护开销。",
+          "prop": "dalvik.vm.enable_pr_dexopt",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "disable_ota_pr",
+          "label": "禁用 OTA 异步 PR",
+          "description": "禁用 OTA 后异步 pr_dexopt。false 关闭，减少 OTA 后台负载。",
+          "prop": "dalvik.vm.pr_dexopt_async_for_ota",
+          "defaultEnabled": true,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "bgdexopt_new_classes",
+          "label": "bg-dexopt 新类阈值",
+          "description": "后台 dexopt 因新增类触发的比例阈值。0 最小触发，10/20 允许一定增量编译。",
+          "prop": "dalvik.vm.bgdexopt.new-classes-percent",
+          "defaultEnabled": true,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "10",
+            "20"
+          ]
+        },
+        {
+          "id": "bgdexopt_new_methods",
+          "label": "bg-dexopt 新方法阈值",
+          "description": "后台 dexopt 因新增方法触发的比例阈值。0 最小触发，10/20 允许一定增量编译。",
+          "prop": "dalvik.vm.bgdexopt.new-methods-percent",
+          "defaultEnabled": true,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "10",
+            "20"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caution",
+      "title": "谨慎",
+      "tone": "caution",
+      "description": "进阶配置，涉及全局 dex2oat filter、线程调度、JIT、profile 和厂商私有优化。建议逐项了解后再启用。",
+      "items": [
+        {
+          "id": "dex2oat_filter",
+          "label": "默认 dex2oat 编译过滤器",
+          "description": "设置全局 dex2oat-filter 默认强度。speed-profile 平衡体验，speed/everything 增加编译量，verify 最轻量。",
+          "prop": "dalvik.vm.dex2oat-filter",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "very_large",
+          "label": "超大 APK 编译策略",
+          "description": "控制 very-large APK 的编译策略。everything 全量 AOT 但安装慢、发热高；speed-profile 平衡；verify 轻量。",
+          "prop": "dalvik.vm.dex2oat-very-large",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "resolve_startup",
+          "label": "启动字符串预解析",
+          "description": "控制 dex2oat 是否预解析启动路径字符串。false 减少编译工作，true 可能改善冷启动。",
+          "prop": "dalvik.vm.dex2oat-resolve-startup-strings",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "oplus_tempcontrol",
+          "label": "温控编译触发",
+          "description": "控制 OPlus 温控与编译联动。false 关闭，避免温控额外触发编译。",
+          "prop": "oplus.dex.tempcontrol",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "dalvik_sync",
+          "label": "dalvik 同步任务",
+          "description": "配置 OPlus dalvik 周期同步参数。关闭可减少后台维护负载。",
+          "prop": "sys.oplus.dalvik_sync_config",
+          "defaultEnabled": false,
+          "defaultValue": "0,0,0,0,0",
+          "values": [
+            "0,0,0,0,0",
+            "1,1,1,1,1"
+          ]
+        },
+        {
+          "id": "disable_secondary_auto",
+          "label": "禁用 secondary 自动编译",
+          "description": "禁用 secondary dex 自动编译链路。false 关闭自动维护。",
+          "prop": "dalvik.vm.dexopt.secondary",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "disable_thermal_cutoff",
+          "label": "dexopt 温控截断",
+          "description": "控制 dexopt 温控截断策略。0 系统默认，修改可能增加持续编译发热。",
+          "prop": "dalvik.vm.dexopt.thermal-cutoff",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2"
+          ]
+        },
+        {
+          "id": "boot_after_ota_concurrency",
+          "label": "OTA dexopt concurrency",
+          "description": "Controls pm.dexopt.boot-after-ota.concurrency. One log exposes 4; disabled by default to avoid cross-ROM assumptions.",
+          "prop": "pm.dexopt.boot-after-ota.concurrency",
+          "defaultEnabled": false,
+          "defaultValue": "4",
+          "values": [
+            "1",
+            "2",
+            "4",
+            "6",
+            "8"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "pm.dexopt.boot-after-ota.concurrency"
+            ],
+            "reason": "Observed in one v3.2 capture log as 4."
+          },
+          "propOutput": {
+            "key": "pm.dexopt.boot-after-ota.concurrency",
+            "value": "4",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "OTA dexopt concurrency",
+            "reason": "Observed in one v3.2 capture log as 4.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "disable_artfile_madvise",
+          "label": "ART 文件预读缓存",
+          "description": "控制 ART madvise 预读缓存大小。0 关闭，极大值增加不确定性。",
+          "prop": "dalvik.vm.madvise.artfile.size",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "2147483647",
+            "4294967295"
+          ]
+        },
+        {
+          "id": "jit_max_zero",
+          "label": "JIT 代码缓存上限",
+          "description": "JIT code cache 最大值。0 极限压制，64m 宽松上限。",
+          "prop": "dalvik.vm.jitmaxsize",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "64m"
+          ]
+        },
+        {
+          "id": "profile_save_max",
+          "label": "profile 保存间隔",
+          "description": "ART profile 最小保存间隔（毫秒）。30000 约30秒，2147483647 压制频繁保存。",
+          "prop": "dalvik.vm.ps-min-save-period-ms",
+          "defaultEnabled": false,
+          "defaultValue": "2147483647",
+          "values": [
+            "30000",
+            "2147483647"
+          ]
+        },
+        {
+          "id": "perf_init_bg_threads_zero",
+          "label": "perf_init 后台线程数",
+          "description": "system_perf_init 阶段后台 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
+          "prop": "system_perf_init.bg-dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4"
+          ]
+        },
+        {
+          "id": "perf_init_boot_threads_zero",
+          "label": "perf_init 开机线程数",
+          "description": "system_perf_init 阶段 boot dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
+          "prop": "system_perf_init.boot-dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4"
+          ]
+        },
+        {
+          "id": "perf_init_threads_zero",
+          "label": "perf_init 编译线程数",
+          "description": "system_perf_init 阶段通用 dex2oat 线程数。0 不分配，1/2/4 允许对应并发。",
+          "prop": "system_perf_init.dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4"
+          ]
+        },
+        {
+          "id": "background_dex2oat_threads_zero",
+          "label": "后台 dex2oat 线程数",
+          "description": "dalvik.vm 后台 dex2oat 线程数。0 压制，1/2/4 允许对应并发。",
+          "prop": "dalvik.vm.background-dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4",
+            "5",
+            "8"
+          ]
+        },
+        {
+          "id": "persist_dex2oat_threads_zero",
+          "label": "持久 dex2oat 线程数",
+          "description": "persist 持久编译线程数。0 压制并发，1/2/4/8 允许对应线程。",
+          "prop": "persist.dalvik.vm.dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4",
+            "8"
+          ]
+        },
+        {
+          "id": "dex2oat_threads",
+          "label": "dex2oat thread count",
+          "description": "General dalvik.vm.dex2oat-threads. Six logs show 4 or 6; the generator inherits captured values and only writes default 4 when manually enabled.",
+          "prop": "dalvik.vm.dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "4",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4",
+            "5",
+            "6",
+            "8"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.dex2oat-threads"
+            ],
+            "reason": "Observed in all six logs with values 4 or 6."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.dex2oat-threads",
+            "value": "4",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "dex2oat thread count",
+            "reason": "Observed in all six logs with values 4 or 6.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "default_dex2oat_cpu_set",
+          "label": "Default dex2oat CPU set",
+          "description": "Adds dalvik.vm.default-dex2oat-cpu-set for ROMs that expose a default compiler CPU affinity.",
+          "prop": "dalvik.vm.default-dex2oat-cpu-set",
+          "defaultEnabled": false,
+          "defaultValue": "3,4,5,6,7",
+          "values": [
+            "",
+            "0,1,2,3,4,5",
+            "3,4,5,6,7",
+            "4,5,6,7",
+            "0,1,2,3,4,5,6,7"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.default-dex2oat-cpu-set"
+            ],
+            "reason": "Observed in one v3.2 capture log as 3,4,5,6,7."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.default-dex2oat-cpu-set",
+            "value": "3,4,5,6,7",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Default dex2oat CPU set",
+            "reason": "Observed in one v3.2 capture log as 3,4,5,6,7.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "dex2oat_max_image_block",
+          "label": "dex2oat max image block",
+          "description": "General dalvik.vm.dex2oat-max-image-block-size. Six logs show 524288; keep disabled by default unless captured or manually enabled.",
+          "prop": "dalvik.vm.dex2oat-max-image-block-size",
+          "defaultEnabled": false,
+          "defaultValue": "524288",
+          "values": [
+            "262144",
+            "524288",
+            "1048576"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.dex2oat-max-image-block-size"
+            ],
+            "reason": "Observed in all six logs as 524288."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.dex2oat-max-image-block-size",
+            "value": "524288",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "dex2oat max image block",
+            "reason": "Observed in all six logs as 524288.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "dex2oat64_enabled",
+          "label": "dex2oat64 enabled",
+          "description": "General dex2oat64 switch. Six logs show true; kept as captured evidence, not a forced write for unsupported devices.",
+          "prop": "dalvik.vm.dex2oat64.enabled",
+          "defaultEnabled": false,
+          "defaultValue": "true",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.dex2oat64.enabled"
+            ],
+            "reason": "Observed in all six logs as true."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.dex2oat64.enabled",
+            "value": "true",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "dex2oat64 enabled",
+            "reason": "Observed in all six logs as true.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "image_dex2oat_xms",
+          "label": "image dex2oat Xms",
+          "description": "Image dex2oat minimum heap. Six logs show 64m; captured values are inherited and default 64m is available for manual use.",
+          "prop": "dalvik.vm.image-dex2oat-Xms",
+          "defaultEnabled": false,
+          "defaultValue": "64m",
+          "values": [
+            "32m",
+            "64m",
+            "128m"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.image-dex2oat-Xms"
+            ],
+            "reason": "Observed in all six logs as 64m."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.image-dex2oat-Xms",
+            "value": "64m",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "image dex2oat Xms",
+            "reason": "Observed in all six logs as 64m.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "image_dex2oat_xmx",
+          "label": "image dex2oat Xmx",
+          "description": "Image dex2oat maximum heap. Six logs show 64m; captured values are inherited and default 64m is available for manual use.",
+          "prop": "dalvik.vm.image-dex2oat-Xmx",
+          "defaultEnabled": false,
+          "defaultValue": "64m",
+          "values": [
+            "64m",
+            "128m",
+            "256m"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.image-dex2oat-Xmx"
+            ],
+            "reason": "Observed in all six logs as 64m."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.image-dex2oat-Xmx",
+            "value": "64m",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "image dex2oat Xmx",
+            "reason": "Observed in all six logs as 64m.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "app_image_format",
+          "label": "ART app image format",
+          "description": "ART app image format. Five logs show lz4; kept disabled by default to avoid forcing unsupported ROMs.",
+          "prop": "dalvik.vm.appimageformat",
+          "defaultEnabled": false,
+          "defaultValue": "lz4",
+          "values": [
+            "lz4",
+            "uncompressed"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.appimageformat"
+            ],
+            "reason": "Observed in five logs as lz4."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.appimageformat",
+            "value": "lz4",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART app image format",
+            "reason": "Observed in five logs as lz4.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "usap_pool_enabled",
+          "label": "USAP pool enabled",
+          "description": "USAP pool enabled from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "prop": "dalvik.vm.usap_pool_enabled",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.usap_pool_enabled"
+            ],
+            "reason": "Observed in five logs as false."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.usap_pool_enabled",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "USAP pool enabled",
+            "reason": "Observed in five logs as false.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "usap_pool_refill_delay",
+          "label": "USAP refill delay",
+          "description": "USAP refill delay from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "prop": "dalvik.vm.usap_pool_refill_delay_ms",
+          "defaultEnabled": false,
+          "defaultValue": "3000",
+          "values": [
+            "1000",
+            "3000",
+            "5000"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.usap_pool_refill_delay_ms"
+            ],
+            "reason": "Observed in five logs as 3000."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.usap_pool_refill_delay_ms",
+            "value": "3000",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "USAP refill delay",
+            "reason": "Observed in five logs as 3000.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "usap_pool_size_max",
+          "label": "USAP pool max size",
+          "description": "USAP pool max size from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "prop": "dalvik.vm.usap_pool_size_max",
+          "defaultEnabled": false,
+          "defaultValue": "3",
+          "values": [
+            "1",
+            "2",
+            "3",
+            "4",
+            "6"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.usap_pool_size_max"
+            ],
+            "reason": "Observed in five logs as 3."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.usap_pool_size_max",
+            "value": "3",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "USAP pool max size",
+            "reason": "Observed in five logs as 3.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "usap_pool_size_min",
+          "label": "USAP pool min size",
+          "description": "USAP pool min size from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "prop": "dalvik.vm.usap_pool_size_min",
+          "defaultEnabled": false,
+          "defaultValue": "1",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.usap_pool_size_min"
+            ],
+            "reason": "Observed in five logs as 1."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.usap_pool_size_min",
+            "value": "1",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "USAP pool min size",
+            "reason": "Observed in five logs as 1.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "usap_refill_threshold",
+          "label": "USAP refill threshold",
+          "description": "USAP refill threshold from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "prop": "dalvik.vm.usap_refill_threshold",
+          "defaultEnabled": false,
+          "defaultValue": "1",
+          "values": [
+            "1",
+            "2",
+            "3"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.usap_refill_threshold"
+            ],
+            "reason": "Observed in five logs as 1."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.usap_refill_threshold",
+            "value": "1",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "USAP refill threshold",
+            "reason": "Observed in five logs as 1.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_native_usap_pool",
+          "label": "runtime_native USAP pool",
+          "description": "Device_config runtime_native USAP pool switch. One log exposes true; disabled by default because support is ROM-specific.",
+          "prop": "persist.device_config.runtime_native.usap_pool_enabled",
+          "defaultEnabled": false,
+          "defaultValue": "true",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.usap_pool_enabled"
+            ],
+            "reason": "Observed in one v3.2 capture log as true."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.usap_pool_enabled",
+            "value": "true",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "runtime_native USAP pool",
+            "reason": "Observed in one v3.2 capture log as true.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "dex2oat_cpu_set",
+          "label": "dex2oat CPU 亲和性",
+          "description": "绑定 dex2oat 到指定 CPU 核心集。留空使用默认，可指定如 4-7 限制到大核。",
+          "prop": "dalvik.vm.dex2oat-cpu-set",
+          "defaultEnabled": false,
+          "defaultValue": "",
+          "values": [
+            "",
+            "4,5,6,7",
+            "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5",
+            "3,4,5,6,7"
+          ]
+        },
+        {
+          "id": "boot_dex2oat_cpu_set",
+          "label": "开机 dex2oat CPU 亲和性",
+          "description": "绑定开机阶段 dex2oat 到指定 CPU 核心集。留空默认，限制可减少开机阶段发热。",
+          "prop": "dalvik.vm.boot-dex2oat-cpu-set",
+          "defaultEnabled": false,
+          "defaultValue": "",
+          "values": [
+            "",
+            "4,5,6,7",
+            "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5",
+            "3,4,5,6,7"
+          ]
+        },
+        {
+          "id": "bg_dex2oat_cpu_set",
+          "label": "后台 dex2oat CPU 亲和性",
+          "description": "绑定后台 dex2oat 到指定 CPU 核心集。留空默认，限制可减少后台编译发热。",
+          "prop": "dalvik.vm.background-dex2oat-cpu-set",
+          "defaultEnabled": false,
+          "defaultValue": "",
+          "values": [
+            "",
+            "4,5,6,7",
+            "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5",
+            "3,4,5,6,7"
+          ]
+        },
+        {
+          "id": "image_dex2oat_cpu_set",
+          "label": "镜像 dex2oat CPU 亲和性",
+          "description": "绑定镜像编译阶段 dex2oat 到指定 CPU 核心集。留空默认。",
+          "prop": "dalvik.vm.image-dex2oat-cpu-set",
+          "defaultEnabled": false,
+          "defaultValue": "",
+          "values": [
+            "",
+            "4,5,6,7",
+            "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5",
+            "3,4,5,6,7"
+          ]
+        },
+        {
+          "id": "bg_dex2oat_threads",
+          "label": "后台 dex2oat 线程数（短名）",
+          "description": "另一组后台 dex2oat 线程控制属性（dalvik.vm.bg-dex2oat-threads），与 background-dex2oat-threads 独立。0 压制，1/2/4 允许并发。",
+          "prop": "dalvik.vm.bg-dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4",
+            "5",
+            "8"
+          ]
+        },
+        {
+          "id": "image_dex2oat_threads",
+          "label": "镜像 dex2oat 线程数",
+          "description": "镜像编译阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。",
+          "prop": "dalvik.vm.image-dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4",
+            "5",
+            "6"
+          ]
+        },
+        {
+          "id": "boot_dex2oat_threads",
+          "label": "开机 dex2oat 线程数",
+          "description": "开机阶段 dex2oat 线程数。0 压制，1/2/4/5 允许并发。",
+          "prop": "dalvik.vm.boot-dex2oat-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "1",
+            "2",
+            "4",
+            "5",
+            "6"
+          ]
+        },
+        {
+          "id": "mtk_aggressive_cpu",
+          "label": "MTK 激进 CPU 亲和性",
+          "description": "MTK 平台 dex2oat 激进调度 CPU 核心集。默认 0,1,2,3,4 绑定所有性能核。",
+          "prop": "ro.vendor.dex2oat-aggressive-cpu-set",
+          "defaultEnabled": false,
+          "defaultValue": "0,1,2,3,4",
+          "values": [
+            "0,1,2,3,4",
+            ""
+          ]
+        },
+        {
+          "id": "mtk_aggressive_threads",
+          "label": "MTK 激进线程数",
+          "description": "MTK 平台 dex2oat 激进调度线程数。默认 5，设为 0 可压制。",
+          "prop": "ro.vendor.dex2oat-aggressive-threads",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "5"
+          ]
+        },
+        {
+          "id": "dex2oat_xms",
+          "label": "dex2oat 最小堆",
+          "description": "dex2oat 进程最小堆大小。64m 默认，减小可节省内存但增加 GC。",
+          "prop": "dalvik.vm.dex2oat-Xms",
+          "defaultEnabled": false,
+          "defaultValue": "64m",
+          "values": [
+            "32m",
+            "64m",
+            "128m"
+          ],
+          "propOutput": {
+            "key": "dalvik.vm.dex2oat-Xms",
+            "value": "64m",
+            "action": "keep"
+          },
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.dex2oat-Xms"
+            ],
+            "reason": "Covered by v3.2 capture evidence."
+          },
+          "explain": {
+            "title": "dex2oat 最小堆",
+            "reason": "Covered by v3.2 capture evidence.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "dex2oat_xmx",
+          "label": "dex2oat 最大堆",
+          "description": "dex2oat 进程最大堆大小。512m 默认，减小可预防 OOM。",
+          "prop": "dalvik.vm.dex2oat-Xmx",
+          "defaultEnabled": false,
+          "defaultValue": "512m",
+          "values": [
+            "256m",
+            "512m",
+            "1024m"
+          ],
+          "propOutput": {
+            "key": "dalvik.vm.dex2oat-Xmx",
+            "value": "512m",
+            "action": "keep"
+          },
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.dex2oat-Xmx"
+            ],
+            "reason": "Covered by v3.2 capture evidence."
+          },
+          "explain": {
+            "title": "dex2oat 最大堆",
+            "reason": "Covered by v3.2 capture evidence.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "odex_madvise",
+          "label": "odex 预读缓存",
+          "description": "odex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。",
+          "prop": "dalvik.vm.madvise.odexfile.size",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "104857600",
+            "2147483647"
+          ]
+        },
+        {
+          "id": "vdex_madvise",
+          "label": "vdex 预读缓存",
+          "description": "vdex 文件 madvise 预读阈值。0 关闭缓存，104857600 默认，2147483647 极限。",
+          "prop": "dalvik.vm.madvise.vdexfile.size",
+          "defaultEnabled": false,
+          "defaultValue": "0",
+          "values": [
+            "0",
+            "104857600",
+            "2147483647"
+          ]
+        },
+        {
+          "id": "profile_first_save",
+          "label": "profile 首次保存延迟",
+          "description": "应用首次 profile 保存的最小延迟时间（毫秒）。5000 约5秒，10000 约10秒。",
+          "prop": "dalvik.vm.ps-min-first-save-ms",
+          "defaultEnabled": false,
+          "defaultValue": "2147483647",
+          "values": [
+            "5000",
+            "10000",
+            "2147483647",
+            "8000"
+          ]
+        },
+        {
+          "id": "use_jit_profiles",
+          "label": "JIT profile usage",
+          "description": "Controls dalvik.vm.usejitprofiles. One log exposes true; disabled by default because forcing profile behavior can affect app warmup.",
+          "prop": "dalvik.vm.usejitprofiles",
+          "defaultEnabled": false,
+          "defaultValue": "true",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.usejitprofiles"
+            ],
+            "reason": "Observed in one v3.2 capture log as true."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.usejitprofiles",
+            "value": "true",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "JIT profile usage",
+            "reason": "Observed in one v3.2 capture log as true.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "generational_gc",
+          "label": "Generational GC flag",
+          "description": "runtime_native_boot.use_generational_gc capture rule. Empty captured values are evidence only and do not become errors.",
+          "prop": "persist.device_config.runtime_native_boot.use_generational_gc",
+          "defaultEnabled": false,
+          "defaultValue": "true",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native_boot.use_generational_gc"
+            ],
+            "reason": "Observed in four logs as true or empty device_config evidence."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native_boot.use_generational_gc",
+            "value": "true",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Generational GC flag",
+            "reason": "Observed in four logs as true or empty device_config evidence.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "uffd_gc_flag",
+          "label": "UFFD GC disable flag",
+          "description": "runtime_native_boot.force_disable_uffd_gc capture rule. false is the conservative value from logs.",
+          "prop": "persist.device_config.runtime_native_boot.force_disable_uffd_gc",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native_boot.force_disable_uffd_gc"
+            ],
+            "reason": "Observed in four logs as false or empty device_config evidence."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native_boot.force_disable_uffd_gc",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "UFFD GC disable flag",
+            "reason": "Observed in four logs as false or empty device_config evidence.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "lock_profiling_flag",
+          "label": "Lock profiling disable flag",
+          "description": "runtime_native_boot.disable_lock_profiling capture rule. false is the conservative value from logs.",
+          "prop": "persist.device_config.runtime_native_boot.disable_lock_profiling",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native_boot.disable_lock_profiling"
+            ],
+            "reason": "Observed in four logs as false or empty device_config evidence."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native_boot.disable_lock_profiling",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Lock profiling disable flag",
+            "reason": "Observed in four logs as false or empty device_config evidence.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_profman_enabled",
+          "label": "runtime profman enabled",
+          "description": "runtime profman enabled from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "prop": "persist.device_config.runtime.profman.enabled",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime.profman.enabled"
+            ],
+            "reason": "Observed in one v3.2 capture log as false."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime.profman.enabled",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "runtime profman enabled",
+            "reason": "Observed in one v3.2 capture log as false.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "runtime_secondary_dex",
+          "label": "runtime secondary dex",
+          "description": "runtime secondary dex from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "prop": "persist.device_config.runtime.secondary_dex",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime.secondary_dex"
+            ],
+            "reason": "Observed in one v3.2 capture log as false."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime.secondary_dex",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "runtime secondary dex",
+            "reason": "Observed in one v3.2 capture log as false.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "runtime_dex_reconcile",
+          "label": "runtime dex reconcile",
+          "description": "runtime dex reconcile from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "prop": "persist.device_config.runtime.dex_reconcile",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime.dex_reconcile"
+            ],
+            "reason": "Observed in one v3.2 capture log as false."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime.dex_reconcile",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "runtime dex reconcile",
+            "reason": "Observed in one v3.2 capture log as false.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "runtime_dynamic_code_opt",
+          "label": "runtime dynamic code opt",
+          "description": "runtime dynamic code opt from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "prop": "persist.device_config.runtime.dynamic_code_opt",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime.dynamic_code_opt"
+            ],
+            "reason": "Observed in one v3.2 capture log as false."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime.dynamic_code_opt",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "runtime dynamic code opt",
+            "reason": "Observed in one v3.2 capture log as false.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "enable_uffd_gc_2",
+          "label": "UFFD GC v2 flag",
+          "description": "UFFD GC v2 flag from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "prop": "persist.device_config.runtime_native_boot.enable_uffd_gc_2",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native_boot.enable_uffd_gc_2"
+            ],
+            "reason": "Observed in one v3.2 capture log as false."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native_boot.enable_uffd_gc_2",
+            "value": "false",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "UFFD GC v2 flag",
+            "reason": "Observed in one v3.2 capture log as false.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "iorap_blacklisted_packages",
+          "label": "iorap blacklisted packages",
+          "description": "Retains empty iorap blacklist evidence from device_config runtime_native_boot.",
+          "prop": "persist.device_config.runtime_native_boot.iorap_blacklisted_packages",
+          "defaultEnabled": false,
+          "defaultValue": "",
+          "values": [
+            ""
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native_boot.iorap_blacklisted_packages"
+            ],
+            "reason": "Observed in four logs as an empty value."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native_boot.iorap_blacklisted_packages",
+            "value": "",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "iorap blacklisted packages",
+            "reason": "Observed in four logs as an empty value.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "iorapd_options",
+          "label": "iorapd options",
+          "description": "Retains empty iorapd options evidence from device_config runtime_native_boot.",
+          "prop": "persist.device_config.runtime_native_boot.iorapd_options",
+          "defaultEnabled": false,
+          "defaultValue": "",
+          "values": [
+            ""
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native_boot.iorapd_options"
+            ],
+            "reason": "Observed in four logs as an empty value."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native_boot.iorapd_options",
+            "value": "",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "iorapd options",
+            "reason": "Observed in four logs as an empty value.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "thread_suspend_timeout",
+          "label": "Thread suspend timeout",
+          "description": "Retains dalvik.vm.thread-suspend-timeout-ms. Default-disabled because it affects runtime suspension behavior.",
+          "prop": "dalvik.vm.thread-suspend-timeout-ms",
+          "defaultEnabled": false,
+          "defaultValue": "30000",
+          "values": [
+            "30000"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.thread-suspend-timeout-ms"
+            ],
+            "reason": "Observed in three logs as 30000."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.thread-suspend-timeout-ms",
+            "value": "30000",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Thread suspend timeout",
+            "reason": "Observed in three logs as 30000.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "extra_opts_xss",
+          "label": "ART extra opts",
+          "description": "Retains dalvik.vm.extra-opts from capture evidence. Default-disabled because VM extra opts are broad runtime flags.",
+          "prop": "dalvik.vm.extra-opts",
+          "defaultEnabled": false,
+          "defaultValue": "-Xss3M",
+          "values": [
+            "-Xss3M"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.extra-opts"
+            ],
+            "reason": "Observed in two logs as -Xss3M."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.extra-opts",
+            "value": "-Xss3M",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART extra opts",
+            "reason": "Observed in two logs as -Xss3M.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "finalizer_timeout",
+          "label": "Finalizer timeout",
+          "description": "Retains dalvik.vm.finalizer-timeout-ms from one log. Default-disabled because it can affect runtime behavior globally.",
+          "prop": "dalvik.vm.finalizer-timeout-ms",
+          "defaultEnabled": false,
+          "defaultValue": "40000",
+          "values": [
+            "40000"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.finalizer-timeout-ms"
+            ],
+            "reason": "Observed in one log as 40000."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.finalizer-timeout-ms",
+            "value": "40000",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Finalizer timeout",
+            "reason": "Observed in one log as 40000.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "mtk_stack_trace_file",
+          "label": "MTK stack trace file",
+          "description": "Retains dalvik.vm.mtk-stack-trace-file evidence. Default-disabled and diagnostic-only for MTK-style ROMs.",
+          "prop": "dalvik.vm.mtk-stack-trace-file",
+          "defaultEnabled": false,
+          "defaultValue": "/data/anr/mtk_traces.txt",
+          "values": [
+            "/data/anr/mtk_traces.txt"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.mtk-stack-trace-file"
+            ],
+            "reason": "Observed in one log as /data/anr/mtk_traces.txt."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.mtk-stack-trace-file",
+            "value": "/data/anr/mtk_traces.txt",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "MTK stack trace file",
+            "reason": "Observed in one log as /data/anr/mtk_traces.txt.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "systemui_compiler_filter",
+          "label": "SystemUI compiler filter",
+          "description": "Retains dalvik.vm.systemuicompilerfilter. Default-disabled because SystemUI compiler policy is ROM-sensitive.",
+          "prop": "dalvik.vm.systemuicompilerfilter",
+          "defaultEnabled": false,
+          "defaultValue": "speed",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.systemuicompilerfilter"
+            ],
+            "reason": "Observed in one log as speed."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.systemuicompilerfilter",
+            "value": "speed",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "SystemUI compiler filter",
+            "reason": "Observed in one log as speed.",
+            "confidence": "low"
+          }
+        },
+        {
+          "id": "runtime_metrics_reporting_mods",
+          "label": "Runtime metrics reporting mods",
+          "description": "Retains runtime_native metrics reporting-mods evidence. Default-disabled because it is reporting policy, not tuning.",
+          "prop": "persist.device_config.runtime_native.metrics.reporting-mods",
+          "defaultEnabled": false,
+          "defaultValue": "2",
+          "values": [
+            "",
+            "2"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.metrics.reporting-mods"
+            ],
+            "reason": "Observed in four logs as empty or 2."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.metrics.reporting-mods",
+            "value": "2",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Runtime metrics reporting mods",
+            "reason": "Observed in four logs as empty or 2.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_metrics_reporting_mods_server",
+          "label": "Runtime metrics reporting mods server",
+          "description": "Retains runtime_native metrics reporting-mods-server evidence.",
+          "prop": "persist.device_config.runtime_native.metrics.reporting-mods-server",
+          "defaultEnabled": false,
+          "defaultValue": "2",
+          "values": [
+            "",
+            "2"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.metrics.reporting-mods-server"
+            ],
+            "reason": "Observed in four logs as empty or 2."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.metrics.reporting-mods-server",
+            "value": "2",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Runtime metrics reporting mods server",
+            "reason": "Observed in four logs as empty or 2.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_metrics_reporting_num_mods",
+          "label": "Runtime metrics reporting num mods",
+          "description": "Retains runtime_native metrics reporting-num-mods evidence.",
+          "prop": "persist.device_config.runtime_native.metrics.reporting-num-mods",
+          "defaultEnabled": false,
+          "defaultValue": "100",
+          "values": [
+            "",
+            "100"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.metrics.reporting-num-mods"
+            ],
+            "reason": "Observed in four logs as empty or 100."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.metrics.reporting-num-mods",
+            "value": "100",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Runtime metrics reporting num mods",
+            "reason": "Observed in four logs as empty or 100.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_metrics_reporting_num_mods_server",
+          "label": "Runtime metrics reporting num mods server",
+          "description": "Retains runtime_native metrics reporting-num-mods-server evidence.",
+          "prop": "persist.device_config.runtime_native.metrics.reporting-num-mods-server",
+          "defaultEnabled": false,
+          "defaultValue": "100",
+          "values": [
+            "",
+            "100"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.metrics.reporting-num-mods-server"
+            ],
+            "reason": "Observed in four logs as empty or 100."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.metrics.reporting-num-mods-server",
+            "value": "100",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Runtime metrics reporting num mods server",
+            "reason": "Observed in four logs as empty or 100.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_metrics_reporting_spec",
+          "label": "Runtime metrics reporting spec",
+          "description": "Retains runtime_native metrics reporting-spec evidence.",
+          "prop": "persist.device_config.runtime_native.metrics.reporting-spec",
+          "defaultEnabled": false,
+          "defaultValue": "1,5,30,60,600",
+          "values": [
+            "",
+            "1,5,30,60,600"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.metrics.reporting-spec"
+            ],
+            "reason": "Observed in four logs as empty or 1,5,30,60,600."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.metrics.reporting-spec",
+            "value": "1,5,30,60,600",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Runtime metrics reporting spec",
+            "reason": "Observed in four logs as empty or 1,5,30,60,600.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_metrics_reporting_spec_server",
+          "label": "Runtime metrics reporting spec server",
+          "description": "Retains runtime_native metrics reporting-spec-server evidence.",
+          "prop": "persist.device_config.runtime_native.metrics.reporting-spec-server",
+          "defaultEnabled": false,
+          "defaultValue": "1,10,60,3600,*",
+          "values": [
+            "",
+            "1,10,60,3600,*"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.metrics.reporting-spec-server"
+            ],
+            "reason": "Observed in four logs as empty or 1,10,60,3600,*."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.metrics.reporting-spec-server",
+            "value": "1,10,60,3600,*",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Runtime metrics reporting spec server",
+            "reason": "Observed in four logs as empty or 1,10,60,3600,*.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "runtime_metrics_write_statsd",
+          "label": "Runtime metrics write statsd",
+          "description": "Retains runtime_native metrics write-to-statsd evidence.",
+          "prop": "persist.device_config.runtime_native.metrics.write-to-statsd",
+          "defaultEnabled": false,
+          "defaultValue": "true",
+          "values": [
+            "",
+            "false",
+            "true"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "persist.device_config.runtime_native.metrics.write-to-statsd"
+            ],
+            "reason": "Observed in four logs as empty or true."
+          },
+          "propOutput": {
+            "key": "persist.device_config.runtime_native.metrics.write-to-statsd",
+            "value": "true",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Runtime metrics write statsd",
+            "reason": "Observed in four logs as empty or true.",
+            "confidence": "medium"
+          }
+        }
+      ]
+    },
+    {
+      "id": "aggressive",
+      "title": "危险",
+      "tone": "aggressive",
+      "description": "全量 AOT 性能配置。将所有 dexopt 策略设为 everything，最大化运行时性能。适合愿意接受安装耗时、发热和存储占用以换取极致性能的用户。",
+      "items": [
+        {
+          "id": "force_install_everything",
+          "label": "安装时全量 AOT",
+          "description": "将安装编译策略设为 everything，安装时全量 AOT 编译，追求运行性能。",
+          "prop": "pm.dexopt.install",
+          "defaultEnabled": true,
+          "defaultValue": "everything",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "force_ota_everything",
+          "label": "OTA 后全量 AOT",
+          "description": "将 OTA 后编译策略设为 everything，更新后全量 AOT，提升更新后性能。",
+          "prop": "pm.dexopt.boot-after-ota",
+          "defaultEnabled": true,
+          "defaultValue": "everything",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "force_cmdline_everything",
+          "label": "手动编译全量 AOT",
+          "description": "将命令行手动触发 dexopt 策略设为 everything。",
+          "prop": "pm.dexopt.cmdline",
+          "defaultEnabled": true,
+          "defaultValue": "everything",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "priv_apps_oob",
+          "label": "特权 App 全量 AOT",
+          "description": "将特权应用离线编译策略设为 everything。",
+          "prop": "pm.dexopt.priv-apps-oob",
+          "defaultEnabled": true,
+          "defaultValue": "everything",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "secondary_everything",
+          "label": "secondary dex 全量 AOT",
+          "description": "将 secondary dex 编译策略设为 everything，插件化应用全量编译。",
+          "prop": "pm.dexopt.secondary",
+          "defaultEnabled": true,
+          "defaultValue": "everything",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "global_everything",
+          "label": "全局 dex2oat filter AOT",
+          "description": "将全局 dex2oat-filter 设为 everything，兜底全量 AOT。",
+          "prop": "dalvik.vm.dex2oat-filter",
+          "defaultEnabled": true,
+          "defaultValue": "everything",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ]
+        },
+        {
+          "id": "priv_apps_oob_list",
+          "label": "特权 App OOB 列表",
+          "description": "指定参与 priv-apps-oob 的特权应用列表。ALL 表示全部。",
+          "prop": "pm.dexopt.priv-apps-oob-list",
+          "defaultEnabled": true,
+          "defaultValue": "ALL",
+          "values": [
+            "ALL"
+          ]
+        },
+        {
+          "id": "disable_art_service",
+          "label": "禁用 ART Service",
+          "description": "禁用 ART Service 调度器，可能阻断系统正常 dexopt 维护和 OTA 后优化。",
+          "prop": "dalvik.vm.useartservice",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "disable_jit",
+          "label": "禁用 JIT",
+          "description": "禁用 ART JIT 即时编译。可减少运行时编译，但降低热点代码性能。",
+          "prop": "dalvik.vm.usejit",
+          "defaultEnabled": false,
+          "defaultValue": "false",
+          "values": [
+            "false",
+            "true"
+          ]
+        },
+        {
+          "id": "heapgrowthlimit",
+          "label": "ART heap growth limit",
+          "description": "Retains dalvik.vm.heapgrowthlimit from capture logs. This is broad ART runtime evidence, so it is default-disabled and primarily preserved for diagnostics.",
+          "prop": "dalvik.vm.heapgrowthlimit",
+          "defaultEnabled": false,
+          "defaultValue": "256m",
+          "values": [
+            "256m",
+            "384m"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.heapgrowthlimit"
+            ],
+            "reason": "Observed in all six logs with values 256m or 384m."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.heapgrowthlimit",
+            "value": "256m",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART heap growth limit",
+            "reason": "Observed in all six logs with values 256m or 384m.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "heapmaxfree",
+          "label": "ART heap max free",
+          "description": "Retains dalvik.vm.heapmaxfree from capture logs. Default-disabled to avoid forcing runtime heap policy across ROMs.",
+          "prop": "dalvik.vm.heapmaxfree",
+          "defaultEnabled": false,
+          "defaultValue": "8m",
+          "values": [
+            "8m",
+            "16m",
+            "32m"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.heapmaxfree"
+            ],
+            "reason": "Observed in all six logs with values 8m, 16m or 32m."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.heapmaxfree",
+            "value": "8m",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART heap max free",
+            "reason": "Observed in all six logs with values 8m, 16m or 32m.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "heapminfree",
+          "label": "ART heap min free",
+          "description": "Retains dalvik.vm.heapminfree from capture logs. Default-disabled because heap tuning can affect every app process.",
+          "prop": "dalvik.vm.heapminfree",
+          "defaultEnabled": false,
+          "defaultValue": "2m",
+          "values": [
+            "512k",
+            "2m",
+            "4m",
+            "8m"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.heapminfree"
+            ],
+            "reason": "Observed in all six logs with values 512k, 2m, 4m or 8m."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.heapminfree",
+            "value": "2m",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART heap min free",
+            "reason": "Observed in all six logs with values 512k, 2m, 4m or 8m.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "heapsize",
+          "label": "ART heap size",
+          "description": "Retains dalvik.vm.heapsize from capture logs. Default-disabled and treated as high-impact runtime evidence.",
+          "prop": "dalvik.vm.heapsize",
+          "defaultEnabled": false,
+          "defaultValue": "512m",
+          "values": [
+            "512m",
+            "768m"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.heapsize"
+            ],
+            "reason": "Observed in all six logs with values 512m or 768m."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.heapsize",
+            "value": "512m",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART heap size",
+            "reason": "Observed in all six logs with values 512m or 768m.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "heapstartsize",
+          "label": "ART heap start size",
+          "description": "Retains dalvik.vm.heapstartsize from capture logs. Default-disabled to avoid broad runtime side effects.",
+          "prop": "dalvik.vm.heapstartsize",
+          "defaultEnabled": false,
+          "defaultValue": "16m",
+          "values": [
+            "8m",
+            "16m",
+            "32m"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.heapstartsize"
+            ],
+            "reason": "Observed in all six logs with values 8m, 16m or 32m."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.heapstartsize",
+            "value": "16m",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART heap start size",
+            "reason": "Observed in all six logs with values 8m, 16m or 32m.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "heaptargetutilization",
+          "label": "ART heap target utilization",
+          "description": "Retains dalvik.vm.heaptargetutilization from capture logs. Default-disabled because GC behavior is device-sensitive.",
+          "prop": "dalvik.vm.heaptargetutilization",
+          "defaultEnabled": false,
+          "defaultValue": "0.5",
+          "values": [
+            "0.5",
+            "0.8"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.heaptargetutilization"
+            ],
+            "reason": "Observed in all six logs with values 0.5 or 0.8."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.heaptargetutilization",
+            "value": "0.5",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "ART heap target utilization",
+            "reason": "Observed in all six logs with values 0.5 or 0.8.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "isa_arm64_features",
+          "label": "arm64 ISA features",
+          "description": "Retains dalvik.vm.isa.arm64.features. This describes CPU capability evidence and is default-disabled.",
+          "prop": "dalvik.vm.isa.arm64.features",
+          "defaultEnabled": false,
+          "defaultValue": "default",
+          "values": [
+            "default"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.isa.arm64.features"
+            ],
+            "reason": "Observed in all six logs as default."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.isa.arm64.features",
+            "value": "default",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "arm64 ISA features",
+            "reason": "Observed in all six logs as default.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "isa_arm64_variant",
+          "label": "arm64 ISA variant",
+          "description": "Retains dalvik.vm.isa.arm64.variant. This is ABI/CPU evidence and must not be generalized across devices.",
+          "prop": "dalvik.vm.isa.arm64.variant",
+          "defaultEnabled": false,
+          "defaultValue": "cortex-a55",
+          "values": [
+            "default",
+            "oryon",
+            "kryo300",
+            "cortex-a55"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.isa.arm64.variant"
+            ],
+            "reason": "Observed in all six logs with oryon, kryo300 or cortex-a55."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.isa.arm64.variant",
+            "value": "cortex-a55",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "arm64 ISA variant",
+            "reason": "Observed in all six logs with oryon, kryo300 or cortex-a55.",
+            "confidence": "high"
+          }
+        },
+        {
+          "id": "isa_arm_features",
+          "label": "arm ISA features",
+          "description": "Retains dalvik.vm.isa.arm.features for devices exposing 32-bit ARM runtime evidence.",
+          "prop": "dalvik.vm.isa.arm.features",
+          "defaultEnabled": false,
+          "defaultValue": "default",
+          "values": [
+            "default"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.isa.arm.features"
+            ],
+            "reason": "Observed in three logs as default."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.isa.arm.features",
+            "value": "default",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "arm ISA features",
+            "reason": "Observed in three logs as default.",
+            "confidence": "medium"
+          }
+        },
+        {
+          "id": "isa_arm_variant",
+          "label": "arm ISA variant",
+          "description": "Retains dalvik.vm.isa.arm.variant. Default-disabled because CPU variant values are device-specific.",
+          "prop": "dalvik.vm.isa.arm.variant",
+          "defaultEnabled": false,
+          "defaultValue": "cortex-a55",
+          "values": [
+            "default",
+            "cortex-a75",
+            "cortex-a55"
+          ],
+          "priority": 340,
+          "fallback": "retain-as-captured-evidence",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "dalvik.vm.isa.arm.variant"
+            ],
+            "reason": "Observed in three logs with cortex-a75 or cortex-a55."
+          },
+          "propOutput": {
+            "key": "dalvik.vm.isa.arm.variant",
+            "value": "cortex-a55",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "arm ISA variant",
+            "reason": "Observed in three logs with cortex-a75 or cortex-a55.",
+            "confidence": "medium"
+          }
+        }
+      ]
+    }
+  ],
+  "evidenceLogs": [
+    {
+      "id": "oneplus-1",
+      "family": "OnePlus/OPlus",
+      "propCount": 802,
+      "sourceFile": "oneplus-capture-1.txt",
+      "role": "common-art-dexopt-evidence"
+    },
+    {
+      "id": "oneplus-2",
+      "family": "OnePlus/OPlus",
+      "propCount": 737,
+      "sourceFile": "oneplus-capture-2.txt",
+      "role": "common-art-dexopt-evidence"
+    },
+    {
+      "id": "oneplus-3",
+      "family": "OnePlus/OPlus",
+      "propCount": 712,
+      "sourceFile": "oneplus-capture-3.txt",
+      "role": "common-art-dexopt-evidence"
+    },
+    {
+      "id": "xiaomi-1",
+      "family": "Xiaomi/MIUI-HyperOS",
+      "propCount": 324,
+      "sourceFile": "xiaomi-capture-1.txt",
+      "role": "xiaomi-preload-evidence"
+    },
+    {
+      "id": "xiaomi-2",
+      "family": "Xiaomi/MIUI-HyperOS",
+      "propCount": 275,
+      "sourceFile": "xiaomi-capture-2.txt",
+      "role": "xiaomi-preload-evidence"
+    },
+    {
+      "id": "motorola-1",
+      "family": "Motorola/AOSP-like",
+      "propCount": 333,
+      "sourceFile": "motorola-capture-1.txt",
+      "role": "aosp-baseline-evidence"
+    }
+  ],
+  "matchPolicy": {
+    "ok": "Captured ART/dexopt evidence generated a usable system.prop; safe defaults may fill non-captured managed rules.",
+    "partial": "Captured evidence exists but too few managed rules matched, so conservative defaults filled gaps.",
+    "fallback": "No reliable capture evidence or no managed hit; safe defaults generated system.prop.",
+    "warning": "Rules generated output but duplicate or diagnostic-only evidence needs attention.",
+    "error": "Generation failed or a blocking input/output file is missing."
+  },
+  "logEvidenceVersion": "six-device-2026-06-25",
+  "retainedEvidencePolicy": {
+    "policy": "All remaining relevant keys from the six capture logs are retained as rules. High-impact runtime, heap, ISA, metrics and app-list keys are default-disabled and are only written when captured or manually enabled.",
+    "reason": "The user requested the remaining 29 keys be kept; retaining them preserves diagnostics and device evidence without forcing one ROM default onto every device."
+  }
+}
