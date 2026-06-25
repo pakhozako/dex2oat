@@ -1,6 +1,6 @@
 {
   "version": "v3.2",
   "versionCode": 32,
-  "zipUrl": "https://github.com/pakhozako/dex2oat/raw/Mian/Dex2oat-Lock-v3.2-release.zip",
-  "changelog": "https://raw.githubusercontent.com/pakhozako/dex2oat/Mian/CHANGELOG.md"
+  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v3.2/Dex2oat-Lock-v3.2-release.zip",
+  "changelog": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/CHANGELOG.md"
 }

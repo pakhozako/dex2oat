@@ -4,4 +4,4 @@ version=v3.2
 versionCode=32
 author=pakhozako
 description=Rule-driven dexopt tuning and unified state monitor | 🟨 Pending (fresh install)
-updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/Mian/update.json
+updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json
