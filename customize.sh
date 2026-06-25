@@ -58,12 +58,66 @@ log_install() {
   fi
 }
 
+install_progress_bar() {
+  BAR_PERCENT="$1"
+  case "$BAR_PERCENT" in ''|*[!0-9]*) BAR_PERCENT=0 ;; esac
+  [ "$BAR_PERCENT" -lt 0 ] 2>/dev/null && BAR_PERCENT=0
+  [ "$BAR_PERCENT" -gt 100 ] 2>/dev/null && BAR_PERCENT=100
+  BAR_FILLED=$((BAR_PERCENT / 5))
+  BAR_INDEX=0
+  BAR_TEXT=""
+  while [ "$BAR_INDEX" -lt 20 ]; do
+    if [ "$BAR_INDEX" -lt "$BAR_FILLED" ]; then
+      BAR_TEXT="${BAR_TEXT}#"
+    else
+      BAR_TEXT="${BAR_TEXT}-"
+    fi
+    BAR_INDEX=$((BAR_INDEX + 1))
+  done
+  printf '%s' "$BAR_TEXT"
+}
+
+install_stage_label() {
+  case "$1" in
+    init) printf 'INIT' ;;
+    environment) printf 'ENV' ;;
+    prepare) printf 'PREP' ;;
+    device) printf 'DEVICE' ;;
+    backup) printf 'BACKUP' ;;
+    capture) printf 'CAPTURE' ;;
+    match) printf 'MATCH' ;;
+    system_prop) printf 'PROP' ;;
+    lock) printf 'LOCK' ;;
+    conflict) printf 'CONFLICT' ;;
+    health) printf 'HEALTH' ;;
+    integrity) printf 'CHECK' ;;
+    permissions) printf 'PERM' ;;
+    state) printf 'STATE' ;;
+    complete) printf 'DONE' ;;
+    failed) printf 'FAIL' ;;
+    *) printf '%s' "$1" | tr '[:lower:]' '[:upper:]' ;;
+  esac
+}
+
+install_banner() {
+  ui_print " " 
+  ui_print "╔══════════════════════════════════════"
+  ui_print "║ Dex2oat Lock ${MODULE_VERSION:-v3.4}"
+  ui_print "║ Rule-driven ART / dexopt tuning"
+  ui_print "║ WebUI + unified state + integrity"
+  ui_print "╚══════════════════════════════════════"
+}
+
 install_progress() {
   INSTALL_PROGRESS_PERCENT="$1"
   INSTALL_PROGRESS_STAGE="$2"
   INSTALL_PROGRESS_MESSAGE="$3"
   INSTALL_PROGRESS_STATUS="${4:-running}"
-  ui_print "[$INSTALL_PROGRESS_PERCENT%] $INSTALL_PROGRESS_MESSAGE"
+  INSTALL_PROGRESS_BAR="$(install_progress_bar "$INSTALL_PROGRESS_PERCENT")"
+  INSTALL_PROGRESS_LABEL="$(install_stage_label "$INSTALL_PROGRESS_STAGE")"
+  ui_print " " 
+  ui_print "[$INSTALL_PROGRESS_LABEL] [$INSTALL_PROGRESS_BAR] ${INSTALL_PROGRESS_PERCENT}%"
+  ui_print "  $INSTALL_PROGRESS_MESSAGE"
   if [ "$INSTALL_STARTED" = "1" ]; then
     rotate_log "$INSTALL_LOG"
     printf '%s [%s%%] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$INSTALL_PROGRESS_PERCENT" "$INSTALL_PROGRESS_MESSAGE" >> "$INSTALL_LOG"
@@ -336,14 +390,14 @@ write_prop_lock_list() {
   done < "$PROP_FILE"
 }
 
-ui_print "- Installing Dex2oat Lock"
-install_progress 1 init "初始化安装流程" running
-
 [ -n "$MODPATH" ] || fail_install "MODPATH is not set"
 [ -f "$PROP_FILE" ] || fail_install "system.prop not found at $PROP_FILE"
 
 MODULE_VERSION="$(sed -n 's/^version=//p' "$MODPATH/module.prop" 2>/dev/null | head -n 1)"
 [ -n "$MODULE_VERSION" ] || MODULE_VERSION=unknown
+
+install_banner
+install_progress 1 init "初始化安装流程" running
 
 if [ -f "$MODPATH/core/state.sh" ]; then
   . "$MODPATH/core/state.sh"
@@ -355,6 +409,18 @@ STATE_CREATED=1
 INSTALL_STARTED=1
 touch "$INSTALL_LOG" || fail_install "Failed to create install.log"
 [ -f "$OPTIONS_FILE" ] || fail_install "options.json not found"
+command -v state_update >/dev/null 2>&1 && state_update \
+  "integrity.status=pending" \
+  "integrity.reason=install-integrity-check-pending" \
+  "integrity.checked_total=0" \
+  "integrity.missing_total=0" \
+  "integrity.blocking_missing_total=0" \
+  "integrity.changed_total=0" \
+  "integrity.runtime_missing_total=0" \
+  "integrity.runtime_warning_total=0" \
+  "integrity.baseline_refreshed=no" \
+  "integrity.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
 state_set_lifecycle running install starting 2>/dev/null || true
 install_progress 14 prepare "准备状态目录与安装日志" running
 

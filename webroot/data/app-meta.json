@@ -1,1 +1,1 @@
-{"moduleName":"Dex2oat Lock","version":"v3.3","versionCode":33,"author":"pakhozako","githubUrl":"https://github.com/pakhozako/dex2oat","architecture":"规则驱动 / 统一状态","description":"Dex2oat Lock v3.3 修复完整性误报、规则匹配为 0、自定义档位切换失效，并优化 WebUI 状态总览。"}
+{"moduleName":"Dex2oat Lock","version":"v3.4","versionCode":34,"author":"pakhozako","githubUrl":"https://github.com/pakhozako/dex2oat","architecture":"规则驱动 / 统一状态","description":"Dex2oat Lock 是一个基于规则库生成 ART / dex2oat 配置并通过统一状态展示运行健康度的模块。"}

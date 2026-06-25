@@ -1,6 +1,6 @@
 {
   "schemaVersion": 32,
-  "rulesVersion": "v3.3-final",
+  "rulesVersion": "v3.4-final",
   "schema": {
     "itemFields": [
       "key",
