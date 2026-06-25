@@ -1,5 +1,1 @@
-{
-"moduleName": "Dex2oat Lock",
-"version": "v3.1",
-"githubUrl": "https://github.com/pakhozako/dex2oat"
-}
+{"moduleName":"Dex2oat Lock","version":"v3.2","versionCode":32,"author":"pakhozako","githubUrl":"https://github.com/pakhozako/dex2oat","architecture":"规则驱动 / 统一状态","description":"Dex2oat Lock v3.2 以规则匹配、统一状态、安装进度和完整性校验为主线，不恢复厂商模板架构。","changelogSummary":["基于 6 份真机日志补全规则库，保留 29 个高价值证据属性","发布版 WebUI 使用保护资源，公开上传树不包含原始 WebUI 源码","首页、关于和自定义交互按正式版要求收口，风险协议查看保持只读"]}

@@ -5,6 +5,7 @@ BACKUP_DIR="$STATE_DIR/backup"
 LOG_DIR="$STATE_DIR/logs"
 INSTALL_LOG="$STATE_DIR/install.log"
 FINAL_INSTALL_STATE=/data/adb/dex2oat-lock-install.prop
+INSTALL_PROGRESS_FILE="$STATE_DIR/install-progress.prop"
 CONFIG_FILE="$STATE_DIR/config.json"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
@@ -23,6 +24,8 @@ BACKUP_READY=0
 STATE_CREATED=0
 INSTALL_SOURCE=auto-rules
 MATCHED_TOTAL=0
+INSTALL_PROGRESS_PERCENT=0
+INSTALL_PROGRESS_STAGE=init
 
 if ! command -v ui_print >/dev/null 2>&1; then
   ui_print() { printf '%s\n' "$*"; }
@@ -55,6 +58,33 @@ log_install() {
   fi
 }
 
+install_progress() {
+  INSTALL_PROGRESS_PERCENT="$1"
+  INSTALL_PROGRESS_STAGE="$2"
+  INSTALL_PROGRESS_MESSAGE="$3"
+  INSTALL_PROGRESS_STATUS="${4:-running}"
+  ui_print "[$INSTALL_PROGRESS_PERCENT%] $INSTALL_PROGRESS_MESSAGE"
+  if [ "$INSTALL_STARTED" = "1" ]; then
+    rotate_log "$INSTALL_LOG"
+    printf '%s [%s%%] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$INSTALL_PROGRESS_PERCENT" "$INSTALL_PROGRESS_MESSAGE" >> "$INSTALL_LOG"
+  fi
+  if command -v state_set_install_progress >/dev/null 2>&1; then
+    state_set_install_progress "$INSTALL_PROGRESS_PERCENT" "$INSTALL_PROGRESS_STAGE" "$INSTALL_PROGRESS_STATUS" "$INSTALL_PROGRESS_MESSAGE" || true
+  else
+    mkdir -p "$STATE_DIR" 2>/dev/null || true
+    {
+      printf 'status=%s\n' "$INSTALL_PROGRESS_STATUS"
+      printf 'percent=%s\n' "$INSTALL_PROGRESS_PERCENT"
+      printf 'progress=%s\n' "$INSTALL_PROGRESS_PERCENT"
+      printf 'stage=%s\n' "$INSTALL_PROGRESS_STAGE"
+      printf 'step=%s\n' "$INSTALL_PROGRESS_STAGE"
+      printf 'message=%s\n' "$INSTALL_PROGRESS_MESSAGE"
+      printf 'updated_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+    } > "$INSTALL_PROGRESS_FILE" 2>/dev/null || true
+    chmod 0600 "$INSTALL_PROGRESS_FILE" 2>/dev/null || true
+  fi
+}
+
 write_install_state() {
   INSTALL_STATUS="$1"
   INSTALL_REASON="$2"
@@ -68,6 +98,15 @@ write_install_state() {
     printf 'updated_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
   } > "$FINAL_INSTALL_STATE" 2>/dev/null || true
   chmod 0600 "$FINAL_INSTALL_STATE" 2>/dev/null || true
+  if command -v state_update >/dev/null 2>&1; then
+    state_update \
+      "install.status=$INSTALL_STATUS" \
+      "install.reason=$INSTALL_REASON" \
+      "install.source=${INSTALL_SOURCE:-unknown}" \
+      "install.matched_total=${MATCHED_TOTAL:-0}" \
+      "install.version=${MODULE_VERSION:-unknown}" \
+      "install.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+  fi
   if command -v state_set_lifecycle >/dev/null 2>&1; then
     state_set_lifecycle "$INSTALL_STATUS" install "$INSTALL_REASON" || true
   fi
@@ -81,6 +120,7 @@ cleanup_partial_state() {
 
 fail_install() {
   log_install "! $*"
+  install_progress "${INSTALL_PROGRESS_PERCENT:-0}" failed "$*" failed
   write_install_state failed "$*"
   cleanup_partial_state
   abort "$*"
@@ -241,22 +281,30 @@ run_dex2oat_match() {
   CAPTURE_SCRIPT="$MODPATH/scripts/capture-props.sh"
   GENERATE_SCRIPT="$MODPATH/scripts/generate-props.sh"
 
+  install_progress 30 capture "抓取设备 ART/dex2oat 属性" running
+  command -v state_update >/dev/null 2>&1 && state_update "match.status=pending" "match.mode=rule-driven" "match.reason=capturing" || true
   [ -f "$CAPTURE_SCRIPT" ] || return 10
   [ -f "$GENERATE_SCRIPT" ] || return 11
   chmod 0755 "$CAPTURE_SCRIPT" "$GENERATE_SCRIPT" 2>/dev/null || true
 
   sh "$CAPTURE_SCRIPT" "$CAPTURED_PROPS" "$CAPTURE_EXPORT" || : > "$CAPTURED_PROPS"
+  install_progress 42 match "规则匹配并生成配置" running
+  command -v state_update >/dev/null 2>&1 && state_update "config.status=pending" "config.reason=generating-system-prop" || true
   sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS" || return $?
 
   MATCHED_TOTAL="$(sed -n 's/^matched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)"
   [ -n "$MATCHED_TOTAL" ] || MATCHED_TOTAL=0
   if command -v state_update >/dev/null 2>&1; then
     state_update \
-      "match.status=ok" \
+      "match.status=$(sed -n 's/^status=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.mode=rule-driven" \
+      "match.reason=$(sed -n 's/^reason=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.confidence=$(sed -n 's/^confidence=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.matched_total=$MATCHED_TOTAL" \
       "match.captured_total=$(sed -n 's/^captured_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.default_total=$(sed -n 's/^default_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.fallback_total=$(sed -n 's/^fallback_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.unmatched_total=$(sed -n 's/^unmatched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
     state_recompute_summary || true
   fi
@@ -289,6 +337,7 @@ write_prop_lock_list() {
 }
 
 ui_print "- Installing Dex2oat Lock"
+install_progress 1 init "初始化安装流程" running
 
 [ -n "$MODPATH" ] || fail_install "MODPATH is not set"
 [ -f "$PROP_FILE" ] || fail_install "system.prop not found at $PROP_FILE"
@@ -299,6 +348,7 @@ MODULE_VERSION="$(sed -n 's/^version=//p' "$MODPATH/module.prop" 2>/dev/null | h
 if [ -f "$MODPATH/core/state.sh" ]; then
   . "$MODPATH/core/state.sh"
 fi
+install_progress 8 environment "读取模块环境与版本信息" running
 
 mkdir -p "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" || fail_install "Failed to create state dirs"
 STATE_CREATED=1
@@ -306,9 +356,12 @@ INSTALL_STARTED=1
 touch "$INSTALL_LOG" || fail_install "Failed to create install.log"
 [ -f "$OPTIONS_FILE" ] || fail_install "options.json not found"
 state_set_lifecycle running install starting 2>/dev/null || true
+install_progress 14 prepare "准备状态目录与安装日志" running
 
 write_device_prop
+install_progress 22 device "记录设备属性摘要" running
 backup_original_props
+install_progress 26 backup "备份原始属性状态" running
 BACKUP_READY=1
 
 EXISTING_SOURCE="$(sed -n 's/^source=//p' "$CONFIG_SOURCE_FILE" 2>/dev/null | head -n 1)"
@@ -320,12 +373,14 @@ if [ "$EXISTING_SOURCE" = "webui-custom" ] && [ -s "$PROP_FILE" ]; then
     [ -n "$MATCHED_TOTAL" ] || MATCHED_TOTAL=0
     write_config_source webui-custom preserved
     SKIP_CONFIG_GENERATION=1
+    install_progress 55 system_prop "保留 WebUI 自定义 system.prop" running
   fi
 fi
 
 if [ "$SKIP_CONFIG_GENERATION" != "1" ]; then
   if run_dex2oat_match; then
     write_config_source auto-rules matched
+    install_progress 55 system_prop "写入 system.prop 与匹配摘要" running
   else
     MATCH_STATUS=$?
     command -v state_update >/dev/null 2>&1 && state_update "match.status=failed" "match.reason=install_generation_failed_$MATCH_STATUS" "config.status=failed" "config.reason=rule-driven generation failed: $MATCH_STATUS" || true
@@ -335,6 +390,7 @@ if [ "$SKIP_CONFIG_GENERATION" != "1" ]; then
 fi
 
 write_prop_lock_list
+install_progress 64 lock "生成运行时锁定快照" running
 cp -af "$PROP_FILE" "$BACKUP_DIR/system.prop.factory" 2>/dev/null || true
 cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
 init_webui_config
@@ -342,10 +398,17 @@ touch "$STATE_DIR/service.log" 2>/dev/null || true
 append_install_log
 
 if [ -f "$MODPATH/core/conflict-detect.sh" ]; then
+  install_progress 74 conflict "执行冲突检测" running
   sh "$MODPATH/core/conflict-detect.sh" "$MODPATH" 2>/dev/null || true
 fi
 
+if [ -f "$MODPATH/core/health-check.sh" ]; then
+  install_progress 84 health "初始化健康检查" running
+  sh "$MODPATH/core/health-check.sh" "$MODPATH" 2>/dev/null || true
+fi
+
 if [ -f "$MODPATH/core/integrity-check.sh" ]; then
+  install_progress 88 integrity "执行完整性校验" running
   sh "$MODPATH/core/integrity-check.sh" "$MODPATH" 2>/dev/null || true
 fi
 
@@ -357,9 +420,12 @@ set_perm "$MODPATH/system.prop" 0 0 0644 || fail_install "Failed to chmod system
 set_perm "$MODPATH/module.prop" 0 0 0644 || fail_install "Failed to chmod module.prop"
 chmod_readable_tree "$MODPATH/scripts" || fail_install "Failed to chmod scripts"
 chmod_readable_tree "$MODPATH/core" || fail_install "Failed to chmod core"
+install_progress 92 permissions "设置模块文件权限" running
 
 chmod 0700 "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" 2>/dev/null || true
 chmod 0600 "$CONFIG_FILE" "$CONFIG_SOURCE_FILE" "$DEVICE_FILE" "$ORIGINAL_PROPS" "$SYSTEM_PROP_BAK" "$INSTALL_LOG" "$CAPTURED_PROPS" "$MATCHED_PROPS" "$MATCH_REPORT" "$PROP_LOCK_LIST" "$STATE_FILE" 2>/dev/null || true
 
 log_install "- Installation completed: source=$INSTALL_SOURCE matched=$MATCHED_TOTAL version=$MODULE_VERSION"
-write_install_state ok installed
+install_progress 96 state "写入最终状态摘要" running
+write_install_state done installed
+install_progress 100 complete "安装完成" ok

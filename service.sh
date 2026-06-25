@@ -68,23 +68,42 @@ write_service_state() {
   STATE_REASON="$3"
   BOOT_ID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
   STATE_HEALTH="ok"
+  APPLY_STATUS="ok"
 
   case "$STATE_STATUS" in
-    error)
-      STATE_HEALTH="problem"
-      ;;
-    skipped)
-      STATE_HEALTH="skipped"
-      ;;
-    running)
-      STATE_HEALTH="running"
+    error) STATE_HEALTH="problem"; APPLY_STATUS="error" ;;
+    skipped) STATE_HEALTH="skipped"; APPLY_STATUS="pending" ;;
+    running) STATE_HEALTH="running"; APPLY_STATUS="running" ;;
+    settled)
+      if [ "${TOTAL_FAILED_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+        STATE_HEALTH="problem"
+        APPLY_STATUS="error"
+      elif [ "${TOTAL_MISMATCH_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+        STATE_HEALTH="warning"
+        APPLY_STATUS="warning"
+      fi
       ;;
     *)
-      if [ "${TOTAL_FAILED_COUNT:-0}" -gt 0 ] || [ "${TOTAL_MISMATCH_COUNT:-0}" -gt 0 ]; then
+      if [ "${TOTAL_FAILED_COUNT:-0}" -gt 0 ] 2>/dev/null; then
         STATE_HEALTH="problem"
+        APPLY_STATUS="error"
+      elif [ "${TOTAL_MISMATCH_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+        STATE_HEALTH="warning"
+        APPLY_STATUS="warning"
       fi
       ;;
   esac
+
+  APPLY_REASON="$STATE_REASON"
+  if [ -z "$APPLY_REASON" ]; then
+    case "$APPLY_STATUS" in
+      error) APPLY_REASON="runtime-apply-failed" ;;
+      warning) APPLY_REASON="runtime-apply-mismatch" ;;
+      running) APPLY_REASON="runtime-apply-running" ;;
+      pending) APPLY_REASON="runtime-apply-pending" ;;
+      *) APPLY_REASON="runtime-apply-ok" ;;
+    esac
+  fi
 
   mkdir -p "$STATE_DIR" 2>/dev/null || true
   {
@@ -119,7 +138,20 @@ write_service_state() {
       "service.mismatch_total=${TOTAL_MISMATCH_COUNT:-0}" \
       "service.failed_total=${TOTAL_FAILED_COUNT:-0}" \
       "service.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" \
-      "service.boot_id=$BOOT_ID" || true
+      "service.boot_id=$BOOT_ID" \
+      "apply.status=$APPLY_STATUS" \
+      "apply.reason=$APPLY_REASON" \
+      "apply.phase=$STATE_PHASE" \
+      "apply.prop_total=${TOTAL_PROP_COUNT:-0}" \
+      "apply.applied_total=${TOTAL_APPLIED_COUNT:-0}" \
+      "apply.matched_total=${TOTAL_MATCHED_COUNT:-0}" \
+      "apply.mismatch_total=${TOTAL_MISMATCH_COUNT:-0}" \
+      "apply.failed_total=${TOTAL_FAILED_COUNT:-0}" \
+      "apply.last_status=$APPLY_STATUS" \
+      "apply.last_reason=$APPLY_REASON" \
+      "apply.last_phase=$STATE_PHASE" \
+      "apply.last_updated_at=$(date '+%Y-%m-%d %H:%M:%S')" \
+      "apply.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
     state_recompute_summary || true
   fi
 }
@@ -139,11 +171,15 @@ run_trigger_rematch() {
     write_prop_lock_list || true
     command -v state_set_config_summary >/dev/null 2>&1 && state_set_config_summary "$PROP_FILE" auto-rules rematch || true
     command -v state_update >/dev/null 2>&1 && state_update \
-      "match.status=ok" \
+      "match.status=$(sed -n 's/^status=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.mode=rule-driven" \
+      "match.reason=$(sed -n 's/^reason=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.confidence=$(sed -n 's/^confidence=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.matched_total=$(sed -n 's/^matched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.captured_total=$(sed -n 's/^captured_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.default_total=$(sed -n 's/^default_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.fallback_total=$(sed -n 's/^fallback_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
+      "match.unmatched_total=$(sed -n 's/^unmatched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
       "match.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
     command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
     [ -f "$MODDIR/core/conflict-detect.sh" ] && sh "$MODDIR/core/conflict-detect.sh" "$MODDIR" 2>/dev/null || true

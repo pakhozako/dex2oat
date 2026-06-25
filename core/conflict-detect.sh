@@ -10,6 +10,7 @@ PROP_FILE="$MODDIR/system.prop"
 TMP_FILE="$STATE_DIR/conflict-report.tmp"
 CONFLICT_TOTAL=0
 SCAN_STATUS=ok
+SCAN_REASON=passed
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 
@@ -65,6 +66,11 @@ if [ -s "$PROP_FILE" ]; then
   done < "$PROP_FILE"
 fi
 
+if [ "$SCAN_STATUS" = "ok" ] && [ "${CONFLICT_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
+  SCAN_STATUS=warning
+  SCAN_REASON=conflicts-found
+fi
+
 {
   printf '[conflict]\n'
   printf 'checked_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
@@ -79,6 +85,7 @@ chmod 0600 "$REPORT_FILE" 2>/dev/null || true
 if command -v state_update >/dev/null 2>&1; then
   state_update \
     "conflict.status=$SCAN_STATUS" \
+    "conflict.reason=$SCAN_REASON" \
     "conflict.total=$CONFLICT_TOTAL" \
     "conflict.checked_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
   state_recompute_summary || true

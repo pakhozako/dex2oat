@@ -14,6 +14,7 @@ FILES_OK=yes
 PROPS_OK=yes
 AUTO_FIXED=no
 STATUS=ok
+REASON=passed
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 
@@ -26,6 +27,9 @@ restore_system_prop() {
   cp -af "$SYSTEM_PROP_BAK" "$PROP_FILE" 2>/dev/null || return 1
   chmod 0644 "$PROP_FILE" 2>/dev/null || true
   AUTO_FIXED=yes
+  if command -v state_update >/dev/null 2>&1; then
+    state_update "restore.status=restored" "restore.reason=system-prop-restored" "restore.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+  fi
   return 0
 }
 
@@ -73,10 +77,12 @@ else
 fi
 
 if [ "$FILES_OK" != "yes" ] || [ "$PROPS_OK" != "yes" ]; then
-  STATUS=warn
+  STATUS=warning
+  REASON=files-or-runtime-props-warning
 fi
 if [ ! -s "$PROP_FILE" ]; then
   STATUS=error
+  REASON=system-prop-missing
 fi
 
 {
@@ -86,6 +92,7 @@ fi
   printf 'props_ok=%s\n' "$PROPS_OK"
   printf 'auto_fixed=%s\n' "$AUTO_FIXED"
   printf 'status=%s\n' "$STATUS"
+  printf 'reason=%s\n' "$REASON"
   BOOT_ID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
   [ -n "$BOOT_ID" ] && printf 'boot_id=%s\n' "$BOOT_ID"
 } > "$HEALTH_LOG" 2>/dev/null || true
@@ -94,6 +101,7 @@ chmod 0600 "$HEALTH_LOG" 2>/dev/null || true
 if command -v state_update >/dev/null 2>&1; then
   state_update \
     "health.status=$STATUS" \
+    "health.reason=$REASON" \
     "health.files_ok=$FILES_OK" \
     "health.props_ok=$PROPS_OK" \
     "health.auto_fixed=$AUTO_FIXED" \

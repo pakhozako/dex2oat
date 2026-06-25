@@ -1,115 +1,58 @@
 # Dex2oat Lock
 
-![:name](https://count.getloli.com/@dex2oat?name=dex2oat&theme=moebooru&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
+Dex2oat Lock 是一个面向 Magisk / KernelSU / APatch 的 ART 与 dexopt 属性调控模块。它通过设备属性抓取、规则匹配和统一状态汇总，生成当前设备可用的 `system.prop`，帮助减少后台、安装、OTA 等场景中不必要的 dex2oat 编译负担。
 
-Magisk / KernelSU / APatch 模块，通过规则驱动的属性抓取、匹配与生成链路，精细调控 `pm.dexopt.*` 与 `dalvik.vm.*` 系列属性，减少后台、安装、OTA 等场景下不必要的 dexopt 编译。内置 WebUI，可在线切换三档方案，无需重新刷入。
+当前公开版本：`v3.2-release` / `versionCode=32`
 
----
+## 主要能力
 
-## 3.1 架构
+- 规则驱动：根据当前设备实际存在的 ART、dexopt、runtime、device_config 属性生成配置，不使用旧厂商模板。
+- 6 份真机日志规则库：覆盖 OnePlus/OPlus、Xiaomi/HyperOS/MIUI、Motorola/AOSP-like 抓取样本中的关键属性。
+- 统一状态：安装、匹配、配置生成、apply、健康、冲突和完整性摘要统一写入 `/data/adb/dex2oat-lock/state.prop`。
+- 安装进度：安装时显示实时百分比，并同步写入 `install-progress.prop` 与统一状态。
+- WebUI：首页显示真实状态总览，自定义页提供安全/谨慎/危险三档工作台，关于页提供模块信息与风险协议入口。
+- 完整性校验：核心脚本、WebUI 资源、规则与元数据都有 baseline/report/state 闭环。
+- 状态摘要：模块管理器中的 `description` 会显示绿色/黄色/红色方块提示当前状态。
 
-v3.1 不再通过厂商识别选择模板，而是走 `capture-props.sh` 抓取当前设备实际属性，再由 `generate-props.sh` 根据 `webroot/data/options.json` 的规则目录生成最终 `system.prop`。
+## 状态分级
 
-运行状态统一汇总到 `/data/adb/dex2oat-lock/state.prop`，WebUI 首页、诊断页、service、health-check 和 conflict-detect 都优先读取或写入这一个主状态源。
+Dex2oat Lock 不把“匹配成功但信息不足”直接当作异常。状态聚合区分：
 
----
+- `ok`：规则匹配与配置生成可信，运行状态正常。
+- `partial`：命中部分规则，配置可用但需要提示。
+- `fallback`：没有足够命中时使用保守默认策略。
+- `warning`：存在非阻断风险，如冲突、完整性变更或健康自愈。
+- `error`：生成失败、apply 失败、关键文件缺失等阻断性问题。
 
-## 功能特性
+## WebUI 说明
 
-- **三档风险模式** — 安全 / 谨慎 / 危险集成在自定义工作台
-- **规则驱动** — 设备属性抓取后按规则目录生成最终配置，不再维护厂商模板
-- **WebUI** — 首页真实状态总览、自定义工作台、关于页三导航
-- **风险协议** — 自定义和危险模式需要 30 秒等待、算术验证和显式同意
-- **完整性校验** — 校验 WebUI、脚本、规则和关键模块文件，结果进入首页和诊断
-- **安全回滚** — 安装时自动备份原始属性，卸载后完整还原
-- **诊断面板** — 内置属性生效验证与 apply.log 摘要分析
-- **云端更新** — 管理器自动检测新版本
-- **统一状态** — `state.prop` 汇总配置来源、prop 摘要、匹配结果、健康状态和冲突状态
+公开发布包中的 WebUI 使用保护版资源，不上传可直接维护的 `webroot/js` 与 `webroot/css` 源码目录。源码维护目录仍保留完整开发文件，公开分支只保留运行所需的受保护资源。
 
----
+## 安装
 
-## 配置档位
+1. 下载 `Dex2oat-Lock-v3.2-release.zip`。
+2. 在 Magisk / KernelSU / APatch 中从本地安装。
+3. 重启设备。
+4. 打开 WebUI 查看首页状态，必要时进入自定义工作台保存配置。
+5. 修改配置后再次重启，使属性在开机阶段应用。
 
-### 安全档（默认启用）
+## 运行目录
 
-压制后台、安装、OTA 等场景的额外编译触发。安装期会优先复用当前设备已存在的相关属性值，未抓到的规则使用安全默认值。
+主要运行态文件位于 `/data/adb/dex2oat-lock/`：
 
-### 谨慎档（默认关闭）
+- `state.prop`：统一主状态源。
+- `install-progress.prop`：安装进度兼容文件。
+- `system.prop.bak`：最近配置备份。
+- `config.json`：WebUI 自定义配置。
+- `prop-lock.list`：运行时锁定快照。
+- `match-report.txt`：规则匹配证据。
+- `integrity-report.txt`：完整性校验证据。
+- `conflict-report.txt`：冲突检测证据。
 
-进阶控制，按需启用：dex2oat 线程数、CPU 亲和性、堆大小、madvise 预读阈值、profile 保存间隔、JIT 配置等。
+## 风险提示
 
-### 危险档（默认关闭）
+Dex2oat Lock 只修改模块内的系统属性配置，不替换系统文件。不同系统版本、ROM 和 Root 管理器对 ART/dexopt 属性的处理可能不同。启用危险模式或高风险配置前，请确认理解对应属性含义。查看风险协议不需要解锁，进入自定义配置、启用危险模式或保存高风险配置时才需要确认。
 
-全量 AOT 模式：将安装、后台、命令行等策略设为 `everything`，适合愿意接受安装耗时换取极致性能的用户。
+## 更新
 
----
-
-## 安装要求
-
-| 项目 | 要求 |
-|:--|:--|
-| Root 框架 | Magisk / KernelSU / APatch |
-| 系统 | Android 12+，不依赖显式厂商模板 |
-| Android 版本 | Android 12+ |
-
----
-
-## 安装步骤
-
-1. 从 [Releases](https://github.com/pakhozako/dex2oat/releases) 下载最新 zip
-2. 在 Magisk / KernelSU / APatch 管理器中选择「从本地安装」
-3. 重启设备
-4. 打开 WebUI 选择配置方案（可选）
-5. 再次重启使属性生效
-
----
-
-## 项目结构
-
-```
-dex2oat/
-├── core/
-│   ├── state.sh            # 统一状态读写 helper
-│   ├── integrity-check.sh  # WebUI / 脚本 / 规则完整性校验
-│   ├── integrity-baseline.prop # 发布构建生成的完整性基线
-│   ├── health-check.sh     # 健康检查与自愈
-│   ├── conflict-detect.sh  # 模块间属性冲突检测
-│   └── prop-lock.sh        # 运行时属性保护
-├── scripts/
-│   ├── capture-props.sh    # 抓取 ART/dex2oat 相关设备属性
-│   └── generate-props.sh   # 规则驱动生成 system.prop
-├── webroot/
-│   ├── css/app.css
-│   ├── data/
-│   │   ├── options.json    # 规则目录与 WebUI 配置 schema
-│   │   └── app-meta.json
-│   ├── js/
-│   │   ├── app.js bridge.js config.js utils.js ui.js system-info.js
-│   └── index.html
-├── tools/
-│   ├── validate-options.js # 打包前自动校验
-│   ├── generate-integrity-baseline.js # 生成完整性 hash 基线
-│   └── build-release.js    # 自动化构建脚本
-├── customize.sh             # 安装脚本（抓取 + 规则生成）
-├── service.sh               # 开机属性应用脚本
-├── uninstall.sh             # 卸载还原脚本
-├── system.prop              # 当前生效配置（由 WebUI/安装脚本生成）
-├── module.prop
-└── update.json
-```
-
----
-
-## 注意事项
-
-- 仅修改系统属性，不涉及任何系统文件，卸载后完全还原
-- 激进模式下关闭 JIT 可能影响性能敏感型应用，按需选用
-- iorap 相关属性仅适用于 Android 12，Android 13+ 已移除
-- v3.1 已移除厂商模板主链路，更新后建议执行一次“重新抓取匹配”或重新保存配置
-- 首页和诊断可直接查看；自定义配置和危险模式需先完成风险协议确认
-
----
-
-## License
-
-MIT License
+更新日志见 [CHANGELOG.md](./CHANGELOG.md)。
