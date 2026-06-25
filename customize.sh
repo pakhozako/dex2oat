@@ -102,7 +102,7 @@ install_stage_label() {
 install_banner() {
   ui_print " " 
   ui_print "╔══════════════════════════════════════"
-  ui_print "║ Dex2oat Lock ${MODULE_VERSION:-v3.4}"
+  ui_print "║ Dex2oat Lock ${MODULE_VERSION:-v3.4.1}"
   ui_print "║ Rule-driven ART / dexopt tuning"
   ui_print "║ WebUI + unified state + integrity"
   ui_print "╚══════════════════════════════════════"
@@ -137,6 +137,36 @@ install_progress() {
     } > "$INSTALL_PROGRESS_FILE" 2>/dev/null || true
     chmod 0600 "$INSTALL_PROGRESS_FILE" 2>/dev/null || true
   fi
+}
+
+run_optional_install_check() {
+  CHECK_NAME="$1"
+  CHECK_TIMEOUT="$2"
+  shift 2
+  [ -n "$CHECK_TIMEOUT" ] || CHECK_TIMEOUT=8
+  CHECK_STATUS_FILE="$STATE_DIR/.${CHECK_NAME}-status.$$"
+  rm -f "$CHECK_STATUS_FILE" 2>/dev/null || true
+  ( "$@" >/dev/null 2>&1; printf '%s\n' "$?" > "$CHECK_STATUS_FILE" 2>/dev/null ) &
+  CHECK_PID=$!
+  CHECK_ELAPSED=0
+  while [ ! -f "$CHECK_STATUS_FILE" ]; do
+    if [ "$CHECK_ELAPSED" -ge "$CHECK_TIMEOUT" ] 2>/dev/null; then
+      kill "$CHECK_PID" 2>/dev/null || true
+      sleep 1
+      kill -9 "$CHECK_PID" 2>/dev/null || true
+      wait "$CHECK_PID" 2>/dev/null || true
+      rm -f "$CHECK_STATUS_FILE" 2>/dev/null || true
+      log_install "- Optional install check timed out: $CHECK_NAME after ${CHECK_TIMEOUT}s"
+      return 124
+    fi
+    sleep 1
+    CHECK_ELAPSED=$((CHECK_ELAPSED + 1))
+  done
+  wait "$CHECK_PID" 2>/dev/null || true
+  CHECK_RESULT="$(cat "$CHECK_STATUS_FILE" 2>/dev/null)"
+  rm -f "$CHECK_STATUS_FILE" 2>/dev/null || true
+  case "$CHECK_RESULT" in ''|*[!0-9]*) CHECK_RESULT=1 ;; esac
+  return "$CHECK_RESULT"
 }
 
 write_install_state() {
@@ -465,7 +495,26 @@ append_install_log
 
 if [ -f "$MODPATH/core/conflict-detect.sh" ]; then
   install_progress 74 conflict "执行冲突检测" running
-  sh "$MODPATH/core/conflict-detect.sh" "$MODPATH" 2>/dev/null || true
+  if run_optional_install_check conflict 8 sh "$MODPATH/core/conflict-detect.sh" "$MODPATH"; then
+    log_install "- Conflict detection completed"
+  else
+    CONFLICT_CHECK_STATUS=$?
+    log_install "- Conflict detection skipped or timed out: $CONFLICT_CHECK_STATUS"
+    {
+      printf '[conflict]\n'
+      printf 'checked_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+      printf 'scan_status=warning\n'
+      printf 'conflict_total=0\n'
+      printf 'reason=install-conflict-scan-timeout\n'
+      printf '[items]\n'
+    } > "$STATE_DIR/conflict-report.txt" 2>/dev/null || true
+    command -v state_update >/dev/null 2>&1 && state_update \
+      "conflict.status=warning" \
+      "conflict.reason=install-conflict-scan-timeout" \
+      "conflict.total=0" \
+      "conflict.checked_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+    command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
+  fi
 fi
 
 if [ -f "$MODPATH/core/health-check.sh" ]; then
