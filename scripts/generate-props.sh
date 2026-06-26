@@ -18,7 +18,7 @@ ORIGINAL_PROPS="$8"
 STATE_DIR="${REPORT_FILE%/*}"
 VALUES_FILE="$STATE_DIR/captured-values.prop"
 RULES_FILE="$STATE_DIR/rule-props.tsv"
-NORMALIZED_OPTIONS_FILE="$STATE_DIR/options-normalized.json"
+BUILT_RULES_FILE="${OPTIONS_FILE%/*}/rule-props.tsv"
 TMP_OUTPUT="$OUTPUT_FILE.tmp"
 TMP_MATCHED="$MATCHED_FILE.tmp"
 TMP_REPORT="$REPORT_FILE.tmp"
@@ -35,33 +35,8 @@ if [ -s "$CAPTURED_FILE" ]; then
     "$CAPTURED_FILE" > "$VALUES_FILE" || exit 1
 fi
 
-sed 's/},{/}\
-{/g; s/,"/\
-"/g; s/{"/{\
-"/g' "$OPTIONS_FILE" > "$NORMALIZED_OPTIONS_FILE" 2>/dev/null || cp "$OPTIONS_FILE" "$NORMALIZED_OPTIONS_FILE"
-
-awk '
-  /"id"[[:space:]]*:/ {
-    line=$0; sub(/^.*"id"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line); id=line
-  }
-  /"label"[[:space:]]*:/ {
-    line=$0; sub(/^.*"label"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line); label=line
-  }
-  /"prop"[[:space:]]*:/ {
-    line=$0; sub(/^.*"prop"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line); prop=line
-  }
-  /"defaultEnabled"[[:space:]]*:/ {
-    enabled=($0 ~ /true/) ? "true" : "false"
-  }
-  /"defaultValue"[[:space:]]*:/ {
-    line=$0; sub(/^.*"defaultValue"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line); value=line
-    if (id != "" && prop != "") {
-      gsub(/\|/, "/", label)
-      print id "|" label "|" prop "|" enabled "|" value
-    }
-    id=""; label=""; prop=""; enabled="false"; value=""
-  }
-' "$NORMALIZED_OPTIONS_FILE" > "$RULES_FILE" || exit 1
+[ -s "$BUILT_RULES_FILE" ] || exit 1
+cp "$BUILT_RULES_FILE" "$RULES_FILE" || exit 1
 
 [ -s "$RULES_FILE" ] || exit 1
 
@@ -89,8 +64,17 @@ MATCH_CONFIDENCE=high
 SEEN_PROPS="$STATE_DIR/rule-seen-props.txt"
 : > "$SEEN_PROPS" || exit 1
 
-while IFS='|' read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RULE_DEFAULT || [ -n "$RULE_PROP" ]; do
+FIRST_RULE=1
+while IFS="$(printf '\t')" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RULE_DEFAULT RULE_RISK RULE_OWNER RULE_OWNER_REASON RULE_EXPLAIN_TITLE RULE_EXPLAIN_REASON RULE_CONFIDENCE || [ -n "$RULE_PROP" ]; do
+  if [ "$FIRST_RULE" = "1" ]; then
+    FIRST_RULE=0
+    [ "$RULE_ID" = "id" ] && continue
+  fi
   [ -n "$RULE_PROP" ] || continue
+  [ "$RULE_OWNER" = "$RULE_ID" ] || {
+    SKIPPED_DUP_TOTAL=$((SKIPPED_DUP_TOTAL + 1))
+    continue
+  }
   if grep -F -x -q "$RULE_PROP" "$SEEN_PROPS" 2>/dev/null; then
     SKIPPED_DUP_TOTAL=$((SKIPPED_DUP_TOTAL + 1))
     continue
@@ -121,7 +105,8 @@ while IFS='|' read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RULE_DEFAULT || 
   fi
 
   printf '# %s\n' "${RULE_LABEL:-$RULE_ID}" >> "$TMP_OUTPUT"
-  printf '# rule_id=%s source=%s default=%s\n' "$RULE_ID" "$FINAL_SOURCE" "$RULE_DEFAULT" >> "$TMP_OUTPUT"
+  printf '# rule_id=%s owner=%s risk=%s source=%s default=%s confidence=%s\n' "$RULE_ID" "$RULE_OWNER" "$RULE_RISK" "$FINAL_SOURCE" "$RULE_DEFAULT" "${RULE_CONFIDENCE:-medium}" >> "$TMP_OUTPUT"
+  [ -n "$RULE_EXPLAIN_REASON" ] && printf '# explain=%s\n' "$RULE_EXPLAIN_REASON" >> "$TMP_OUTPUT"
   if [ "$RULE_ENABLED" = "true" ] || [ "$FINAL_SOURCE" = "captured" ]; then
     printf '# prop.action=enable prop.key=%s prop.value=%s\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
     printf '%s=%s\n\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
@@ -176,6 +161,7 @@ fi
   printf 'fallback_total=%s\n' "${FALLBACK_TOTAL:-0}"
   printf 'unmatched_total=%s\n' "${UNMATCHED_TOTAL:-0}"
   printf 'skipped_duplicate_total=%s\n' "${SKIPPED_DUP_TOTAL:-0}"
+  printf 'resolver=rule-props-tsv\n'
   printf 'generated_system_prop=%s\n' "$OUTPUT_FILE"
   printf '[diff]\n'
   while IFS='=' read -r DIFF_KEY DIFF_VALUE || [ -n "$DIFF_KEY" ]; do
@@ -209,6 +195,6 @@ mv -f "$TMP_OUTPUT" "$OUTPUT_FILE" || exit 1
 mv -f "$TMP_MATCHED" "$MATCHED_FILE" || exit 1
 mv -f "$TMP_REPORT" "$REPORT_FILE" || exit 1
 mv -f "$TMP_SOURCE" "$SOURCE_FILE" || exit 1
-chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$VALUES_FILE" "$RULES_FILE" "$NORMALIZED_OPTIONS_FILE" "$SEEN_PROPS" 2>/dev/null || true
+chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$VALUES_FILE" "$RULES_FILE" "$SEEN_PROPS" 2>/dev/null || true
 
 exit 0

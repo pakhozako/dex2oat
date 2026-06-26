@@ -48,34 +48,11 @@ hash_file() {
   fi
 }
 
-baseline_files() {
-  for REL_PATH in \
-    customize.sh service.sh uninstall.sh system.prop module.prop update.json README.md CHANGELOG.md \
-    core/state.sh core/health-check.sh core/conflict-detect.sh core/prop-lock.sh core/integrity-check.sh \
-    scripts/capture-props.sh scripts/generate-props.sh \
-    webroot/index.html webroot/css/app.css webroot/js/app.js webroot/js/config.js webroot/js/bridge.js webroot/js/ui.js webroot/js/utils.js webroot/js/system-info.js \
-    webroot/data/options.json webroot/data/app-meta.json; do
-    [ -f "$MODDIR/$REL_PATH" ] && printf '%s\n' "$REL_PATH"
-  done
-  if [ -d "$MODDIR/webroot/assets" ]; then
-    find "$MODDIR/webroot/assets" -type f 2>/dev/null | sort | while IFS= read -r ASSET_PATH; do
-      case "$ASSET_PATH" in
-        *.mjs|*.js|*.css|*.json) printf '%s\n' "${ASSET_PATH#$MODDIR/}" ;;
-      esac
-    done
-  fi
-}
-
-write_baseline() {
-  : > "$BASELINE_FILE" 2>/dev/null || return 1
-  baseline_files | while IFS= read -r REL_PATH; do
-    printf '%s=%s\n' "$REL_PATH" "$(hash_file "$MODDIR/$REL_PATH")" >> "$BASELINE_FILE" || exit 1
-  done
-  chmod 0644 "$BASELINE_FILE" 2>/dev/null || true
-}
-
 is_refresh_safe_missing_path() {
   case "$1" in
+    core/integrity-baseline.prop)
+      return 0
+      ;;
     README.md|CHANGELOG.md|update.json|docs/*|tools/*|webroot/css/*|webroot/js/*)
       return 0
       ;;
@@ -167,13 +144,6 @@ check_runtime_file() {
 }
 
 BASELINE_CREATED=no
-if [ ! -s "$BASELINE_FILE" ]; then
-  if write_baseline; then
-    BASELINE_CREATED=yes
-  else
-    BASELINE_CREATED=failed
-  fi
-fi
 
 STATUS=ok
 REASON=passed
@@ -200,16 +170,6 @@ if [ "$STATUS" != "error" ] && [ -s "$BASELINE_FILE" ]; then
   scan_baseline || STATUS=error
 fi
 
-if [ "$STATUS" != "error" ] && [ "${MISSING_TOTAL:-0}" -gt 0 ] 2>/dev/null && [ "${BLOCKING_MISSING_TOTAL:-0}" -eq 0 ] 2>/dev/null && [ "${BLOCKING_CHANGED_TOTAL:-0}" -eq 0 ] 2>/dev/null; then
-  BASELINE_REFRESH_MISSING_TOTAL="$MISSING_TOTAL"
-  if write_baseline; then
-    BASELINE_REFRESHED=yes
-    scan_baseline || STATUS=error
-  else
-    BASELINE_REFRESHED=failed
-  fi
-fi
-
 cat "$SOURCE_REPORT_TMP" >> "$TMP_REPORT" 2>/dev/null || true
 {
   printf '[baseline-refresh]\n'
@@ -232,9 +192,9 @@ fi
 
 if [ "$STATUS" = "error" ]; then
   REASON=check-error
-elif [ "$BASELINE_CREATED" = "failed" ]; then
+elif [ ! -s "$BASELINE_FILE" ]; then
   STATUS=error
-  REASON=baseline-create-failed
+  REASON=baseline-missing
 elif [ "$BASELINE_REFRESHED" = "failed" ]; then
   STATUS=error
   REASON=baseline-refresh-failed

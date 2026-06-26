@@ -5,6 +5,14 @@ STATE_FILE=${STATE_FILE:-$STATE_DIR/state.prop}
 STATE_SCHEMA_VERSION=32
 STATE_BASE_DESCRIPTION="Rule-driven dexopt tuning and unified state monitor"
 
+if [ -n "$MODPATH" ] && [ -f "$MODPATH/core/common.sh" ]; then
+  . "$MODPATH/core/common.sh"
+elif [ -n "$MODDIR" ] && [ -f "$MODDIR/core/common.sh" ]; then
+  . "$MODDIR/core/common.sh"
+elif [ -f "${0%/*}/common.sh" ]; then
+  . "${0%/*}/common.sh"
+fi
+
 state_now() {
   date '+%Y-%m-%d %H:%M:%S'
 }
@@ -55,10 +63,27 @@ state_num() {
 }
 
 state_update() {
+  STATECTL=""
+  if [ -n "$MODPATH" ] && [ -x "$MODPATH/core/statectl.sh" ]; then
+    STATECTL="$MODPATH/core/statectl.sh"
+  elif [ -n "$MODDIR" ] && [ -x "$MODDIR/core/statectl.sh" ]; then
+    STATECTL="$MODDIR/core/statectl.sh"
+  elif [ -x "${0%/*}/statectl.sh" ]; then
+    STATECTL="${0%/*}/statectl.sh"
+  fi
+  if [ -n "$STATECTL" ]; then
+    STATE_DIR="$STATE_DIR" STATE_FILE="$STATE_FILE" sh "$STATECTL" update "$@"
+    return $?
+  fi
   mkdir -p "$STATE_DIR" 2>/dev/null || return 1
-  TMP_STATE="$STATE_FILE.tmp"
-  : > "$TMP_STATE" 2>/dev/null || return 1
+  TMP_STATE="$STATE_FILE.tmp.$$"
+  state_update_apply "$TMP_STATE" "$@"
+}
 
+state_update_apply() {
+  TMP_STATE="$1"
+  shift
+  : > "$TMP_STATE" 2>/dev/null || return 1
   if [ -f "$STATE_FILE" ]; then
     while IFS= read -r STATE_LINE || [ -n "$STATE_LINE" ]; do
       STATE_KEY="${STATE_LINE%%=*}"
@@ -70,10 +95,10 @@ state_update() {
       [ "$SKIP_STATE_KEY" = "1" ] || printf '%s\n' "$STATE_LINE" >> "$TMP_STATE"
     done < "$STATE_FILE"
   fi
-
   for STATE_PAIR in "$@"; do
     printf '%s\n' "$STATE_PAIR" >> "$TMP_STATE"
   done
+  sync "$TMP_STATE" 2>/dev/null || true
   mv -f "$TMP_STATE" "$STATE_FILE" 2>/dev/null || return 1
   chmod 0600 "$STATE_FILE" 2>/dev/null || true
 }

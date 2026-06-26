@@ -293,6 +293,7 @@ chooseport_once() {
     sleep 1
     WAITED=$((WAITED + 1))
     kill "$GETEVENT_PID" 2>/dev/null || true
+    sleep 0.1
     grep -q 'KEY_VOLUMEUP *DOWN' "$EVENT_FILE" 2>/dev/null && return 0
     grep -q 'KEY_VOLUMEDOWN *DOWN' "$EVENT_FILE" 2>/dev/null && return 1
   done

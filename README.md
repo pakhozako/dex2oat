@@ -1,5 +1,9 @@
 # Dex2oat Lock
 
+
+<!-- build:version -->
+当前版本：`v3.5 / 350`
+<!-- /build:version -->
 ![:name](https://count.getloli.com/@dex2oat?name=dex2oat&theme=moebooru&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
 
 Dex2oat Lock 是一个适用于 Magisk / KernelSU / APatch 的 Android ART 编译策略调控模块。

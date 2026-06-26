@@ -8,6 +8,8 @@ SERVICE_STATE="$STATE_DIR/service-state.prop"
 STATE_FILE="$STATE_DIR/state.prop"
 FALLBACK_LOG=/data/adb/dex2oat-lock-service.log
 PROP_FILE="$MODDIR/system.prop"
+RUNTIME_PROP_FILE="$STATE_DIR/runtime-props.tmp"
+RUNTIME_PROP_HASH_FILE="$STATE_DIR/runtime-props.hash"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
 SYSTEM_PROP_BAK="$STATE_DIR/system.prop.bak"
 CAPTURED_PROPS="$STATE_DIR/captured-props.txt"
@@ -19,6 +21,9 @@ TRIGGER_REMATCH="$STATE_DIR/trigger-rematch"
 
 if [ -f "$MODDIR/core/state.sh" ]; then
   . "$MODDIR/core/state.sh"
+fi
+if [ -f "$MODDIR/core/common.sh" ]; then
+  . "$MODDIR/core/common.sh"
 fi
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
@@ -168,6 +173,7 @@ run_trigger_rematch() {
   if sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
     cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
     chmod 0600 "$SYSTEM_PROP_BAK" 2>/dev/null || true
+    rm -f "$RUNTIME_PROP_FILE" "$RUNTIME_PROP_HASH_FILE" 2>/dev/null || true
     write_prop_lock_list || true
     command -v state_set_config_summary >/dev/null 2>&1 && state_set_config_summary "$PROP_FILE" auto-rules rematch || true
     command -v state_update >/dev/null 2>&1 && state_update \
@@ -304,9 +310,33 @@ stop_service_if_running() {
   fi
 }
 
+prepare_runtime_prop_file() {
+  PROP_HASH="$(dex_hash_file "$PROP_FILE" 2>/dev/null)"
+  OLD_HASH="$(cat "$RUNTIME_PROP_HASH_FILE" 2>/dev/null)"
+  if [ -s "$RUNTIME_PROP_FILE" ] && [ -n "$PROP_HASH" ] && [ "$PROP_HASH" = "$OLD_HASH" ]; then
+    return 0
+  fi
+  : > "$RUNTIME_PROP_FILE" 2>/dev/null || return 0
+  [ -s "$PROP_FILE" ] || return 0
+  while IFS='=' read -r PROP_KEY PROP_VALUE || [ -n "$PROP_KEY" ]; do
+    PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
+    case "$PROP_KEY" in
+      ""|\#*)
+        continue
+        ;;
+    esac
+    is_runtime_prop "$PROP_KEY" || continue
+    PROP_VALUE="$(printf '%s' "$PROP_VALUE" | tr -d '\r')"
+    printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$RUNTIME_PROP_FILE" 2>/dev/null || true
+  done < "$PROP_FILE"
+  printf '%s\n' "$PROP_HASH" > "$RUNTIME_PROP_HASH_FILE" 2>/dev/null || true
+  chmod 0600 "$RUNTIME_PROP_FILE" "$RUNTIME_PROP_HASH_FILE" 2>/dev/null || true
+}
+
 # 等待 Android 完成启动
 apply_runtime_props() {
   APPLY_PHASE="$1"
+  prepare_runtime_prop_file
   write_service_state running "$APPLY_PHASE"
   PHASE_PROP_COUNT=0
   PHASE_APPLIED_COUNT=0
@@ -350,7 +380,7 @@ apply_runtime_props() {
           ;;
       esac
     fi
-  done < "$PROP_FILE"
+  done < "$RUNTIME_PROP_FILE"
 
   log_msg "Runtime property apply pass completed: phase=$APPLY_PHASE total=$PHASE_PROP_COUNT applied=$PHASE_APPLIED_COUNT matched=$PHASE_MATCHED_COUNT mismatch=$PHASE_MISMATCH_COUNT failed=$PHASE_FAILED_COUNT"
   write_service_state running "$APPLY_PHASE"
