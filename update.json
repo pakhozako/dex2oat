@@ -1,6 +1,6 @@
 {
-  "version": "v3.4.1",
-  "versionCode": 341,
-  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v3.4.1/Dex2oat-Lock-v3.4.1-release.zip",
+  "version": "v3.5",
+  "versionCode": 350,
+  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v3.5/Dex2oat-Lock-v3.5-release.zip",
   "changelog": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/CHANGELOG.md"
 }

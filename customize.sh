@@ -99,13 +99,55 @@ install_stage_label() {
   esac
 }
 
+install_stage_detail() {
+  case "$1" in
+    init) ui_print "  -> 建立安装上下文，准备状态写入" ;;
+    environment) ui_print "  -> 读取模块版本、Root 环境和安装路径" ;;
+    prepare) ui_print "  -> 创建日志、备份和状态目录" ;;
+    device) ui_print "  -> 记录设备型号、系统版本和 Root 框架" ;;
+    backup) ui_print "  -> 备份当前 system.prop 与原始属性状态" ;;
+    capture) ui_print "  -> 抓取 ART / dexopt / runtime 相关属性" ;;
+    match) ui_print "  -> 读取 options.json，匹配当前设备规则" ;;
+    system_prop) ui_print "  -> 写入 system.prop，并生成匹配摘要" ;;
+    lock) ui_print "  -> 生成运行时锁定快照，便于开机校验" ;;
+    conflict) ui_print "  -> 扫描可能冲突的模块和属性写入" ;;
+    health) ui_print "  -> 初始化健康检查摘要，供 WebUI 展示" ;;
+    integrity) ui_print "  -> 校验核心脚本和受保护 WebUI 资源" ;;
+    permissions) ui_print "  -> 设置脚本、WebUI 和状态文件权限" ;;
+    state) ui_print "  -> 写入最终安装状态和 WebUI 进度" ;;
+    complete) ui_print "  -> 可以重启后进入 WebUI 查看运行状态" ;;
+    failed) ui_print "  -> 已写入失败状态，可查看日志定位原因" ;;
+  esac
+}
+
+install_stage_code_hint() {
+  case "$1" in
+    capture) ui_print "  $ getprop | grep -E 'dexopt|dex2oat|dalvik|runtime'" ;;
+    match) ui_print "  $ sh scripts/generate-props.sh --rules webroot/data/options.json" ;;
+    system_prop) ui_print "  $ write: $PROP_FILE" ;;
+    conflict) ui_print "  $ sh core/conflict-detect.sh" ;;
+    health) ui_print "  $ sh core/health-check.sh" ;;
+    integrity) ui_print "  $ sh core/integrity-check.sh" ;;
+  esac
+}
+
+install_motion_line() {
+  case $((INSTALL_PROGRESS_PERCENT % 4)) in
+    0) MOTION='.' ;;
+    1) MOTION='..' ;;
+    2) MOTION='...' ;;
+    *) MOTION='....' ;;
+  esac
+  ui_print "  ${MOTION} 正在处理，请稍候"
+}
+
 install_banner() {
   ui_print " " 
-  ui_print "╔══════════════════════════════════════"
-  ui_print "║ Dex2oat Lock ${MODULE_VERSION:-v3.4.1}"
-  ui_print "║ Rule-driven ART / dexopt tuning"
-  ui_print "║ WebUI + unified state + integrity"
-  ui_print "╚══════════════════════════════════════"
+  ui_print "+--------------------------------------"
+  ui_print "| Dex2oat Lock ${MODULE_VERSION:-v3.5}"
+  ui_print "| Rule-driven ART / dexopt tuning"
+  ui_print "| Protected WebUI + unified state"
+  ui_print "+--------------------------------------"
 }
 
 install_progress() {
@@ -118,6 +160,9 @@ install_progress() {
   ui_print " " 
   ui_print "[$INSTALL_PROGRESS_LABEL] [$INSTALL_PROGRESS_BAR] ${INSTALL_PROGRESS_PERCENT}%"
   ui_print "  $INSTALL_PROGRESS_MESSAGE"
+  install_stage_detail "$INSTALL_PROGRESS_STAGE"
+  install_stage_code_hint "$INSTALL_PROGRESS_STAGE"
+  [ "$INSTALL_PROGRESS_STATUS" = "running" ] && install_motion_line
   if [ "$INSTALL_STARTED" = "1" ]; then
     rotate_log "$INSTALL_LOG"
     printf '%s [%s%%] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$INSTALL_PROGRESS_PERCENT" "$INSTALL_PROGRESS_MESSAGE" >> "$INSTALL_LOG"
@@ -158,6 +203,9 @@ run_optional_install_check() {
       rm -f "$CHECK_STATUS_FILE" 2>/dev/null || true
       log_install "- Optional install check timed out: $CHECK_NAME after ${CHECK_TIMEOUT}s"
       return 124
+    fi
+    if [ "$CHECK_ELAPSED" -gt 0 ] && [ $((CHECK_ELAPSED % 3)) -eq 0 ] 2>/dev/null; then
+      ui_print "  ... $CHECK_NAME 仍在执行 (${CHECK_ELAPSED}s/${CHECK_TIMEOUT}s)"
     fi
     sleep 1
     CHECK_ELAPSED=$((CHECK_ELAPSED + 1))

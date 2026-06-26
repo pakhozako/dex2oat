@@ -50,7 +50,7 @@
         {
           "id": "pm_bg_dexopt",
           "label": "跳过后台 dexopt",
-          "description": "作用：控制系统空闲时触发的后台 dexopt 维护任务。可选值：skip 表示跳过后台重编译；speed-profile 按运行画像做性能编译；verify 仅做字节码校验。场景：希望减少待机发热、后台 I/O 和无感重编译时建议使用 skip；如果更看重后台逐步优化应用启动速度，可改为 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.bg-dexopt。可选值：跳过后台编译（skip）、画像优化（speed-profile）、仅校验（verify）。默认值：跳过后台编译（skip）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.bg-dexopt",
           "defaultEnabled": true,
           "defaultValue": "skip",
@@ -58,12 +58,17 @@
             "skip",
             "speed-profile",
             "verify"
-          ]
+          ],
+          "valueLabels": {
+            "skip": "跳过后台编译",
+            "speed-profile": "画像优化",
+            "verify": "仅校验"
+          }
         },
         {
           "id": "pm_boot_after_ota",
           "label": "OTA 后编译策略",
-          "description": "作用：定义系统 OTA 更新后首次启动阶段的包编译策略。可选值：verify 仅校验；speed-profile 基于 profile 编译热点路径；speed 编译更多代码以提升运行速度；everything 尽可能全量 AOT。场景：日常推荐 speed-profile，兼顾 OTA 后恢复速度和后续性能；低存储或怕发热可选 verify；只在愿意接受更长更新后维护时间时使用 speed/everything。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.boot-after-ota。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.boot-after-ota",
           "defaultEnabled": true,
           "defaultValue": "speed-profile",
@@ -72,12 +77,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_mainline",
           "label": "Mainline 更新后编译策略",
-          "description": "作用：控制 ART/Mainline 模块更新后的 dexopt 行为。可选值：verify、speed-profile、speed、everything，编译强度依次升高。场景：Mainline 更新频率较高，默认 verify 可减少更新后的后台负载；遇到运行时组件更新后应用启动异常或性能波动，可临时改为 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.boot-after-mainline-update。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.boot-after-mainline-update",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -86,12 +97,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_install",
           "label": "安装时编译策略",
-          "description": "作用：控制普通安装路径下新安装或更新应用的 dexopt 策略。可选值：verify 最快但优化最少；speed-profile 以 profile 为准进行平衡优化；speed 更偏性能；everything 编译最彻底但安装最慢。场景：日常安装推荐 speed-profile；频繁安装测试包可选 verify；大型游戏或长期使用应用可在可接受安装耗时的情况下选择 speed。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.install",
           "defaultEnabled": true,
           "defaultValue": "speed-profile",
@@ -100,12 +117,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_install_bulk",
           "label": "批量安装编译策略",
-          "description": "作用：控制批量安装多应用时的编译策略，例如恢复备份、应用商店批量更新。可选值：verify、speed-profile、speed、everything。场景：批量安装对耗时和温度更敏感，推荐 speed-profile；大量恢复应用且希望尽快完成安装时可用 verify；不建议在批量场景使用 everything。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.install-bulk",
           "defaultEnabled": true,
           "defaultValue": "speed-profile",
@@ -114,12 +137,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_install_bulk_downgraded",
           "label": "批量安装降级包策略",
-          "description": "作用：控制批量安装降级 APK 时的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：降级包更容易出现 oat/art 产物不匹配，默认 verify 可减少无效编译；如果确认降级包稳定且希望保留运行性能，可改为 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-downgraded。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.install-bulk-downgraded",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -128,12 +157,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_install_bulk_secondary",
           "label": "批量安装 secondary dex",
-          "description": "作用：控制批量安装时 secondary dex 的处理策略，secondary dex 常见于插件化、动态加载或多 dex 应用。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可减少批量安装负载；如果常用大型插件化应用并希望安装后立即优化，可选择 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-secondary。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.install-bulk-secondary",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -142,12 +177,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_install_bulk_secondary_downgraded",
           "label": "批量降级 secondary dex",
-          "description": "作用：控制批量安装降级包时 secondary dex 的编译策略。可选值：verify、speed-profile、speed、everything。场景：降级和 secondary dex 叠加时兼容性风险更高，推荐 verify；仅在明确需要性能优化且确认应用兼容时使用 speed-profile 或更高档位。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-secondary-downgraded。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.install-bulk-secondary-downgraded",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -156,12 +197,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_install_fast",
           "label": "快速安装路径策略",
-          "description": "作用：控制 fast install 路径使用的 dexopt 策略，这类路径通常强调安装完成速度。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可最大化安装速度；如果安装后首次启动性能更重要，可切到 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-fast。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.install-fast",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -170,12 +217,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_post_boot",
           "label": "开机后编译策略",
-          "description": "作用：控制系统启动完成后的 post-boot dexopt 维护策略。可选值：verify、speed-profile、speed、everything。场景：推荐 verify，减少开机后温度和 I/O 峰值；如果设备性能充足且希望系统在开机后自动补齐优化，可选择 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.post-boot。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.post-boot",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -184,12 +237,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_first_boot",
           "label": "首次开机编译策略",
-          "description": "作用：控制首次启动、恢复出厂或系统初始化后的编译策略。可选值：verify、speed-profile、speed、everything。场景：首次启动阶段任务密集，默认 verify 可缩短进入系统时间；刷机后愿意等待完整优化时可选择 speed-profile 或 speed。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.first-boot。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.first-boot",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -198,12 +257,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_shared",
           "label": "共享库编译策略",
-          "description": "作用：控制共享库和被多应用依赖组件的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：共享库影响范围更大，默认 speed 可提升依赖应用的公共路径性能；低端设备或存储紧张时可降为 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.shared。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：速度优化（speed）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.shared",
           "defaultEnabled": true,
           "defaultValue": "speed",
@@ -212,12 +277,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_inactive",
           "label": "闲置 App 编译策略",
-          "description": "作用：控制长期未使用应用被维护任务触发时的编译策略。可选值：verify、speed-profile、speed、everything。场景：默认 verify 可避免为低频应用浪费编译时间和存储；如果某些应用偶尔使用但启动体验重要，可改为 speed-profile。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.inactive。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.inactive",
           "defaultEnabled": true,
           "defaultValue": "verify",
@@ -226,12 +297,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_ab_ota",
           "label": "A/B OTA 编译策略",
-          "description": "作用：控制 A/B 分区 OTA 场景下的 dexopt 策略。可选值：verify、speed-profile、speed、everything。场景：A/B OTA 可在后台准备更新产物，speed-profile 通常能平衡后台耗时与更新后性能；低温控余量设备可降为 verify。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.ab-ota。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.ab-ota",
           "defaultEnabled": true,
           "defaultValue": "speed-profile",
@@ -240,12 +317,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_cmdline",
           "label": "手动触发编译策略",
-          "description": "作用：控制命令行或工具手动触发 dexopt 时的默认策略。可选值：verify、speed-profile、speed、everything。场景：常配合 adb shell cmd package compile 使用，默认 speed-profile 适合手动维护；需要强制性能优化时再手动切换 speed/everything。",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.cmdline。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.cmdline",
           "defaultEnabled": true,
           "defaultValue": "speed-profile",
@@ -254,12 +337,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "pm_first_use",
-          "label": "First-use dexopt policy",
-          "description": "Adds pm.dexopt.first-use from Xiaomi capture evidence. speed-profile is conservative and avoids heavier first-use compilation.",
+          "label": "首次使用编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.first-use。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.first-use",
           "defaultEnabled": true,
           "defaultValue": "speed-profile",
@@ -287,12 +376,18 @@
             "title": "First-use dexopt policy",
             "reason": "Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
           }
         },
         {
           "id": "pm_dexopt_baseline",
-          "label": "Baseline dexopt policy",
-          "description": "Adds pm.dexopt.baseline from real capture evidence. Kept disabled by default because only one log exposes it.",
+          "label": "基线编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.baseline。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.baseline",
           "defaultEnabled": false,
           "defaultValue": "speed-profile",
@@ -320,12 +415,18 @@
             "title": "Baseline dexopt policy",
             "reason": "Observed in one v3.2 capture log as speed-profile.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
           }
         },
         {
           "id": "pm_install_create_dm",
-          "label": "Install create-dm policy",
-          "description": "Adds pm.dexopt.install-create-dm for ROMs that expose dex metadata creation policy. Disabled by default; captured value is inherited.",
+          "label": "安装元数据生成策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-create-dm。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。建议：这是低风险项，适合日常长期使用。",
           "prop": "pm.dexopt.install-create-dm",
           "defaultEnabled": false,
           "defaultValue": "speed-profile",
@@ -353,6 +454,12 @@
             "title": "Install create-dm policy",
             "reason": "Observed in one Xiaomi v3.2 capture log as speed-profile.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
           }
         },
         {
@@ -367,7 +474,13 @@
             "90",
             "365",
             "9999"
-          ]
+          ],
+          "valueLabels": {
+            "15": "15",
+            "90": "90",
+            "365": "365",
+            "9999": "9999"
+          }
         },
         {
           "id": "mini_debug",
@@ -379,7 +492,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "mini_debug_vm",
@@ -391,55 +508,75 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "oplus_bgdex2oat",
-          "label": "ColorOS 后台编译开关",
-          "description": "作用：控制 OPlus/ColorOS 私有后台 dex2oat 触发开关。可选值：false 关闭私有后台编译；true 允许系统按厂商策略执行。场景：推荐 false，减少系统在后台自行触发编译；如果遇到厂商应用更新后性能异常，可临时恢复 true。",
+          "label": "配置项：persist.sys.oplus.bgdex2oat_enabled",
+          "description": "作用：调整ColorOS / OPlus 私有优化中的 persist.sys.oplus.bgdex2oat_enabled。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.oplus.bgdex2oat_enabled",
           "defaultEnabled": true,
           "defaultValue": "false",
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "compile_cache_miss",
-          "label": "ColorOS 编译缓存 miss 触发",
-          "description": "作用：控制 ColorOS 编译缓存 miss 后是否触发额外重编译。可选值：0 表示关闭该触发；1 表示启用厂商逻辑。场景：推荐 0，避免缓存未命中导致频繁后台编译；仅在确认厂商缓存机制对当前 ROM 有正向收益时使用 1。",
+          "label": "配置项：persist.sys.feature.compile.re.cache.miss",
+          "description": "作用：调整ColorOS / OPlus 私有优化中的 persist.sys.feature.compile.re.cache.miss。可选值：关闭 / 0（0）、开启 / 1（1）。默认值：关闭 / 0（0）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.feature.compile.re.cache.miss",
           "defaultEnabled": true,
           "defaultValue": "0",
           "values": [
             "0",
             "1"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1"
+          }
         },
         {
           "id": "compile_cache_fmap",
-          "label": "ColorOS 编译缓存 fmap",
-          "description": "作用：控制 ColorOS 编译缓存 fmap size 相关私有特性。可选值：0 关闭；1 启用。场景：默认 0 更保守，可降低未知 ROM 私有逻辑带来的副作用；除非已验证当前机型启用后有收益，否则不建议打开。",
+          "label": "配置项：persist.sys.feature.compile.re.fmap.size",
+          "description": "作用：调整ColorOS / OPlus 私有优化中的 persist.sys.feature.compile.re.fmap.size。可选值：关闭 / 0（0）、开启 / 1（1）。默认值：关闭 / 0（0）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.feature.compile.re.fmap.size",
           "defaultEnabled": true,
           "defaultValue": "0",
           "values": [
             "0",
             "1"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1"
+          }
         },
         {
           "id": "startup_cache",
           "label": "禁用启动镜像缓存",
-          "description": "作用：控制 runtime_native 的 app image startup cache。可选值：false 禁用；true 启用。场景：禁用可减少启动缓存写入和缓存失效后的维护负担；如果追求应用冷启动缓存收益且设备存储压力不大，可尝试 true。",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.use_app_image_startup_cache。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.device_config.runtime_native.use_app_image_startup_cache",
           "defaultEnabled": true,
           "defaultValue": "false",
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "iorap_readahead",
@@ -451,7 +588,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "iorap_perfetto",
@@ -463,11 +604,15 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "opex_merge",
-          "label": "ColorOS opex merge 触发",
+          "label": "配置项：oplus.opex.merge",
           "description": "作用：控制 OPlus opex merge 私有触发项。可选值：false 关闭；true 启用。场景：该项属于厂商私有行为，跨版本含义可能变化，推荐 false；仅在确认 ROM 需要 opex merge 维护时开启。",
           "prop": "oplus.opex.merge",
           "defaultEnabled": true,
@@ -475,11 +620,15 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "opex_modulemerge",
-          "label": "ColorOS opex modulemerge",
+          "label": "ColorOS 模块合并开关",
           "description": "作用：控制 OPlus opex modulemerge 私有触发项。可选值：false 关闭；true 启用。场景：推荐 false，减少无法预期的厂商后台维护任务；如果系统模块更新后出现厂商组件优化异常，可临时测试 true。",
           "prop": "oplus.opex.modulemerge",
           "defaultEnabled": true,
@@ -487,7 +636,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "ocompiler",
@@ -499,11 +652,15 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "zygote_c",
-          "label": "ZygoteC",
+          "label": "Zygote C 预加载",
           "description": "控制 OPlus ZygoteC 特性（MTK）。false 关闭，减少额外编译链路。",
           "prop": "persist.oplus.zygote_c.enable",
           "defaultEnabled": true,
@@ -511,11 +668,15 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "zygote_ocomp",
-          "label": "Zygote ocomp",
+          "label": "Zygote ocomp 优化",
           "description": "控制 OPlus Zygote ocomp 优化（MTK）。false 关闭，减少 zygote 阶段编译。",
           "prop": "persist.oplus.zygote_ocomp",
           "defaultEnabled": true,
@@ -523,19 +684,27 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "runtime_dexopt",
           "label": "禁用运行时 dexopt",
-          "description": "控制设备配置文件命名空间的 dexopt 开关。false 关闭，阻止 runtime 层触发重编译。",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime.dexopt.enabled。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.device_config.runtime.dexopt.enabled",
           "defaultEnabled": true,
           "defaultValue": "false",
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "runtime_bg_dexopt",
@@ -547,24 +716,32 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "runtime_profile_merge",
-          "label": "禁用运行时 profile merge",
-          "description": "控制设备配置文件命名空间的 profile 合并。false 关闭，减少合并触发 I/O。",
+          "label": "配置项：persist.device_config.runtime.profile_merge",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime.profile_merge。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.device_config.runtime.profile_merge",
           "defaultEnabled": true,
           "defaultValue": "false",
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "xiaomi_app_dexfile_preload",
-          "label": "Xiaomi app dexfile preload",
-          "description": "Controls Xiaomi/MIUI/HyperOS app dexfile preload. Default false reduces ROM preload overhead; non-Xiaomi devices only write it when captured or manually enabled.",
+          "label": "小米应用 dex 文件预加载",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.app_dexfile_preload.enable。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.app_dexfile_preload.enable",
           "defaultEnabled": true,
           "defaultValue": "false",
@@ -590,12 +767,16 @@
             "title": "Xiaomi app dexfile preload",
             "reason": "Observed in both Xiaomi logs with true/false variance.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "xiaomi_art_startup_preload",
-          "label": "Xiaomi ART startup preload",
-          "description": "Controls Xiaomi ART startup class preload. Default false keeps the low-load rule line while avoiding vendor template branching.",
+          "label": "小米 ART 启动预加载",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.art_startup_class_preload.enable。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.art_startup_class_preload.enable",
           "defaultEnabled": true,
           "defaultValue": "false",
@@ -621,12 +802,16 @@
             "title": "Xiaomi ART startup preload",
             "reason": "Observed in Xiaomi v3.2 capture evidence.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "xiaomi_precache",
-          "label": "Xiaomi precache switch",
-          "description": "Controls Xiaomi/MIUI/HyperOS precache. Default false is conservative; captured values can be inherited automatically.",
+          "label": "小米预缓存开关",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.precache.enable。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.precache.enable",
           "defaultEnabled": true,
           "defaultValue": "false",
@@ -652,12 +837,16 @@
             "title": "Xiaomi precache switch",
             "reason": "Observed in both Xiaomi logs with true/false variance.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "xiaomi_precache_appstrs1",
-          "label": "Xiaomi precache app list 1",
-          "description": "Retains Xiaomi precache appstrs1 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "label": "小米预缓存应用列表 1",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.precache.appstrs1。可选值：com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker（com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker）。默认值：com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker（com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.precache.appstrs1",
           "defaultEnabled": false,
           "defaultValue": "com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker",
@@ -682,12 +871,15 @@
             "title": "Xiaomi precache app list 1",
             "reason": "Observed in one Xiaomi log.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker": "com.sina.weibo,com.ss.android.article.news,com.taobao.taobao,com.smile.gifmaker"
           }
         },
         {
           "id": "xiaomi_precache_appstrs2",
-          "label": "Xiaomi precache app list 2",
-          "description": "Retains Xiaomi precache appstrs2 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "label": "小米预缓存应用列表 2",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.precache.appstrs2。可选值：com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili（com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili）。默认值：com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili（com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.precache.appstrs2",
           "defaultEnabled": false,
           "defaultValue": "com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili",
@@ -712,12 +904,15 @@
             "title": "Xiaomi precache app list 2",
             "reason": "Observed in one Xiaomi log.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili": "com.ss.android.ugc.aweme,com.tencent.mm,tv.danmaku.bili"
           }
         },
         {
           "id": "xiaomi_precache_appstrs3",
-          "label": "Xiaomi precache app list 3",
-          "description": "Retains Xiaomi precache appstrs3 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "label": "小米预缓存应用列表 3",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.precache.appstrs3。可选值：com.miui.home,com.android.systemui（com.miui.home,com.android.systemui）。默认值：com.miui.home,com.android.systemui（com.miui.home,com.android.systemui）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.precache.appstrs3",
           "defaultEnabled": false,
           "defaultValue": "com.miui.home,com.android.systemui",
@@ -742,12 +937,15 @@
             "title": "Xiaomi precache app list 3",
             "reason": "Observed in one Xiaomi log.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "com.miui.home,com.android.systemui": "com.miui.home,com.android.systemui"
           }
         },
         {
           "id": "xiaomi_precache_appstrs4",
-          "label": "Xiaomi precache app list 4",
-          "description": "Retains Xiaomi precache appstrs4 evidence. Default-disabled because app package lists are ROM/user specific.",
+          "label": "小米预缓存应用列表 4",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.precache.appstrs4。可选值：com.android.settings（com.android.settings）。默认值：com.android.settings（com.android.settings）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.precache.appstrs4",
           "defaultEnabled": false,
           "defaultValue": "com.android.settings",
@@ -772,12 +970,15 @@
             "title": "Xiaomi precache app list 4",
             "reason": "Observed in one Xiaomi log.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "com.android.settings": "com.android.settings"
           }
         },
         {
           "id": "xiaomi_precache_number",
-          "label": "Xiaomi precache app count",
-          "description": "Retains Xiaomi precache.number evidence. Default-disabled and tied to the retained app list evidence.",
+          "label": "小米预缓存应用数量",
+          "description": "作用：调整ART / dexopt 运行参数中的 persist.sys.precache.number。可选值：关闭 / 0（0）、4 线程（4）。默认值：4 线程（4）。建议：这是低风险项，适合日常长期使用。",
           "prop": "persist.sys.precache.number",
           "defaultEnabled": false,
           "defaultValue": "4",
@@ -803,19 +1004,27 @@
             "title": "Xiaomi precache app count",
             "reason": "Observed in one Xiaomi log as 4.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "4": "4 线程"
           }
         },
         {
           "id": "disable_pr_dexopt",
           "label": "禁用 PR dexopt",
-          "description": "禁用 Package Reference dexopt profile 链路。false 关闭，减少 profile 维护开销。",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.enable_pr_dexopt。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是低风险项，适合日常长期使用。",
           "prop": "dalvik.vm.enable_pr_dexopt",
           "defaultEnabled": true,
           "defaultValue": "false",
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "disable_ota_pr",
@@ -827,7 +1036,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "bgdexopt_new_classes",
@@ -840,7 +1053,12 @@
             "0",
             "10",
             "20"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "10": "阈值 10",
+            "20": "阈值 20"
+          }
         },
         {
           "id": "bgdexopt_new_methods",
@@ -853,7 +1071,12 @@
             "0",
             "10",
             "20"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "10": "阈值 10",
+            "20": "阈值 20"
+          }
         }
       ]
     },
@@ -861,12 +1084,12 @@
       "id": "caution",
       "title": "谨慎",
       "tone": "caution",
-      "description": "进阶配置，涉及全局 dex2oat filter、线程调度、JIT、profile 和厂商私有优化。建议逐项了解后再启用。",
+      "description": "进阶配置，涉及全局 dex2oat、线程调度、JIT、profile 和厂商私有优化，建议逐项确认后启用。",
       "items": [
         {
           "id": "dex2oat_filter",
           "label": "默认 dex2oat 编译过滤器",
-          "description": "设置全局 dex2oat-filter 默认强度。speed-profile 平衡体验，speed/everything 增加编译量，verify 最轻量。",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.dex2oat-filter。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.dex2oat-filter",
           "defaultEnabled": false,
           "defaultValue": "verify",
@@ -875,12 +1098,18 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "very_large",
           "label": "超大 APK 编译策略",
-          "description": "控制 very-large APK 的编译策略。everything 全量 AOT 但安装慢、发热高；speed-profile 平衡；verify 轻量。",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.dex2oat-very-large。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.dex2oat-very-large",
           "defaultEnabled": false,
           "defaultValue": "verify",
@@ -889,7 +1118,13 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "resolve_startup",
@@ -901,7 +1136,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "oplus_tempcontrol",
@@ -913,7 +1152,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "dalvik_sync",
@@ -925,7 +1168,11 @@
           "values": [
             "0,0,0,0,0",
             "1,1,1,1,1"
-          ]
+          ],
+          "valueLabels": {
+            "0,0,0,0,0": "0,0,0,0,0",
+            "1,1,1,1,1": "1,1,1,1,1"
+          }
         },
         {
           "id": "disable_secondary_auto",
@@ -937,7 +1184,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "disable_thermal_cutoff",
@@ -950,12 +1201,17 @@
             "0",
             "1",
             "2"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程"
+          }
         },
         {
           "id": "boot_after_ota_concurrency",
-          "label": "OTA dexopt concurrency",
-          "description": "Controls pm.dexopt.boot-after-ota.concurrency. One log exposes 4; disabled by default to avoid cross-ROM assumptions.",
+          "label": "OTA 后编译并发数",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.boot-after-ota.concurrency。可选值：开启 / 1（1）、2 线程（2）、4 线程（4）、6 线程（6）、8（8）。默认值：4 线程（4）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "pm.dexopt.boot-after-ota.concurrency",
           "defaultEnabled": false,
           "defaultValue": "4",
@@ -984,6 +1240,13 @@
             "title": "OTA dexopt concurrency",
             "reason": "Observed in one v3.2 capture log as 4.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程",
+            "6": "6 线程",
+            "8": "8"
           }
         },
         {
@@ -997,31 +1260,44 @@
             "0",
             "2147483647",
             "4294967295"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "2147483647": "2147483647",
+            "4294967295": "4294967295"
+          }
         },
         {
           "id": "jit_max_zero",
           "label": "JIT 代码缓存上限",
-          "description": "JIT code cache 最大值。0 极限压制，64m 宽松上限。",
+          "description": "作用：调整JIT 运行时中的 dalvik.vm.jitmaxsize。可选值：关闭 / 0（0）、64 MB（64m）。默认值：关闭 / 0（0）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.jitmaxsize",
           "defaultEnabled": false,
           "defaultValue": "0",
           "values": [
             "0",
             "64m"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "64m": "64 MB"
+          }
         },
         {
           "id": "profile_save_max",
-          "label": "profile 保存间隔",
-          "description": "ART profile 最小保存间隔（毫秒）。30000 约30秒，2147483647 压制频繁保存。",
+          "label": "配置项：dalvik.vm.ps-min-save-period-ms",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.ps-min-save-period-ms。可选值：30000（30000）、2147483647（2147483647）。默认值：2147483647（2147483647）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.ps-min-save-period-ms",
           "defaultEnabled": false,
           "defaultValue": "2147483647",
           "values": [
             "30000",
             "2147483647"
-          ]
+          ],
+          "valueLabels": {
+            "30000": "30000",
+            "2147483647": "2147483647"
+          }
         },
         {
           "id": "perf_init_bg_threads_zero",
@@ -1035,7 +1311,13 @@
             "1",
             "2",
             "4"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程"
+          }
         },
         {
           "id": "perf_init_boot_threads_zero",
@@ -1049,7 +1331,13 @@
             "1",
             "2",
             "4"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程"
+          }
         },
         {
           "id": "perf_init_threads_zero",
@@ -1063,7 +1351,13 @@
             "1",
             "2",
             "4"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程"
+          }
         },
         {
           "id": "background_dex2oat_threads_zero",
@@ -1079,7 +1373,15 @@
             "4",
             "5",
             "8"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程",
+            "5": "5 线程",
+            "8": "8"
+          }
         },
         {
           "id": "persist_dex2oat_threads_zero",
@@ -1094,12 +1396,19 @@
             "2",
             "4",
             "8"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程",
+            "8": "8"
+          }
         },
         {
           "id": "dex2oat_threads",
-          "label": "dex2oat thread count",
-          "description": "General dalvik.vm.dex2oat-threads. Six logs show 4 or 6; the generator inherits captured values and only writes default 4 when manually enabled.",
+          "label": "dex2oat 通用线程数",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.dex2oat-threads。可选值：关闭 / 0（0）、开启 / 1（1）、2 线程（2）、4 线程（4）、5 线程（5）、6 线程（6）、8（8）。默认值：4 线程（4）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.dex2oat-threads",
           "defaultEnabled": false,
           "defaultValue": "4",
@@ -1130,12 +1439,21 @@
             "title": "dex2oat thread count",
             "reason": "Observed in all six logs with values 4 or 6.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程",
+            "5": "5 线程",
+            "6": "6 线程",
+            "8": "8"
           }
         },
         {
           "id": "default_dex2oat_cpu_set",
-          "label": "Default dex2oat CPU set",
-          "description": "Adds dalvik.vm.default-dex2oat-cpu-set for ROMs that expose a default compiler CPU affinity.",
+          "label": "默认 dex2oat CPU 亲和性",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.default-dex2oat-cpu-set。可选值：（空）、0,1,2,3,4,5（0,1,2,3,4,5）、3,4,5,6,7（3,4,5,6,7）、4,5,6,7（4,5,6,7）、0,1,2,3,4,5,6,7（0,1,2,3,4,5,6,7）。默认值：3,4,5,6,7（3,4,5,6,7）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.default-dex2oat-cpu-set",
           "defaultEnabled": false,
           "defaultValue": "3,4,5,6,7",
@@ -1164,12 +1482,19 @@
             "title": "Default dex2oat CPU set",
             "reason": "Observed in one v3.2 capture log as 3,4,5,6,7.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "": "",
+            "0,1,2,3,4,5": "0,1,2,3,4,5",
+            "3,4,5,6,7": "3,4,5,6,7",
+            "4,5,6,7": "4,5,6,7",
+            "0,1,2,3,4,5,6,7": "0,1,2,3,4,5,6,7"
           }
         },
         {
           "id": "dex2oat_max_image_block",
-          "label": "dex2oat max image block",
-          "description": "General dalvik.vm.dex2oat-max-image-block-size. Six logs show 524288; keep disabled by default unless captured or manually enabled.",
+          "label": "dex2oat 镜像块上限",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.dex2oat-max-image-block-size。可选值：262144（262144）、524288（524288）、1048576（1048576）。默认值：524288（524288）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.dex2oat-max-image-block-size",
           "defaultEnabled": false,
           "defaultValue": "524288",
@@ -1196,12 +1521,17 @@
             "title": "dex2oat max image block",
             "reason": "Observed in all six logs as 524288.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "262144": "262144",
+            "524288": "524288",
+            "1048576": "1048576"
           }
         },
         {
           "id": "dex2oat64_enabled",
-          "label": "dex2oat64 enabled",
-          "description": "General dex2oat64 switch. Six logs show true; kept as captured evidence, not a forced write for unsupported devices.",
+          "label": "启用 dex2oat64",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.dex2oat64.enabled。可选值：关闭（false）、开启（true）。默认值：开启（true）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.dex2oat64.enabled",
           "defaultEnabled": false,
           "defaultValue": "true",
@@ -1227,12 +1557,16 @@
             "title": "dex2oat64 enabled",
             "reason": "Observed in all six logs as true.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "image_dex2oat_xms",
-          "label": "image dex2oat Xms",
-          "description": "Image dex2oat minimum heap. Six logs show 64m; captured values are inherited and default 64m is available for manual use.",
+          "label": "镜像 dex2oat 最小堆",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.image-dex2oat-Xms。可选值：32m（32m）、64 MB（64m）、128 MB（128m）。默认值：64 MB（64m）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.image-dex2oat-Xms",
           "defaultEnabled": false,
           "defaultValue": "64m",
@@ -1259,12 +1593,17 @@
             "title": "image dex2oat Xms",
             "reason": "Observed in all six logs as 64m.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "32m": "32m",
+            "64m": "64 MB",
+            "128m": "128 MB"
           }
         },
         {
           "id": "image_dex2oat_xmx",
-          "label": "image dex2oat Xmx",
-          "description": "Image dex2oat maximum heap. Six logs show 64m; captured values are inherited and default 64m is available for manual use.",
+          "label": "镜像 dex2oat 最大堆",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.image-dex2oat-Xmx。可选值：64 MB（64m）、128 MB（128m）、256 MB（256m）。默认值：64 MB（64m）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.image-dex2oat-Xmx",
           "defaultEnabled": false,
           "defaultValue": "64m",
@@ -1291,12 +1630,17 @@
             "title": "image dex2oat Xmx",
             "reason": "Observed in all six logs as 64m.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "64m": "64 MB",
+            "128m": "128 MB",
+            "256m": "256 MB"
           }
         },
         {
           "id": "app_image_format",
-          "label": "ART app image format",
-          "description": "ART app image format. Five logs show lz4; kept disabled by default to avoid forcing unsupported ROMs.",
+          "label": "ART 应用镜像格式",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.appimageformat。可选值：LZ4 压缩（lz4）、uncompressed（uncompressed）。默认值：LZ4 压缩（lz4）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.appimageformat",
           "defaultEnabled": false,
           "defaultValue": "lz4",
@@ -1322,12 +1666,16 @@
             "title": "ART app image format",
             "reason": "Observed in five logs as lz4.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "lz4": "LZ4 压缩",
+            "uncompressed": "uncompressed"
           }
         },
         {
           "id": "usap_pool_enabled",
-          "label": "USAP pool enabled",
-          "description": "USAP pool enabled from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "label": "USAP 池开关",
+          "description": "作用：调整USAP 进程池中的 dalvik.vm.usap_pool_enabled。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.usap_pool_enabled",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -1353,12 +1701,16 @@
             "title": "USAP pool enabled",
             "reason": "Observed in five logs as false.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "usap_pool_refill_delay",
-          "label": "USAP refill delay",
-          "description": "USAP refill delay from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "label": "USAP 补充延迟",
+          "description": "作用：调整USAP 进程池中的 dalvik.vm.usap_pool_refill_delay_ms。可选值：1000（1000）、3000（3000）、5000（5000）。默认值：3000（3000）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.usap_pool_refill_delay_ms",
           "defaultEnabled": false,
           "defaultValue": "3000",
@@ -1385,12 +1737,17 @@
             "title": "USAP refill delay",
             "reason": "Observed in five logs as 3000.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "1000": "1000",
+            "3000": "3000",
+            "5000": "5000"
           }
         },
         {
           "id": "usap_pool_size_max",
-          "label": "USAP pool max size",
-          "description": "USAP pool max size from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "label": "USAP 池最大数量",
+          "description": "作用：调整USAP 进程池中的 dalvik.vm.usap_pool_size_max。可选值：开启 / 1（1）、2 线程（2）、3（3）、4 线程（4）、6 线程（6）。默认值：3（3）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.usap_pool_size_max",
           "defaultEnabled": false,
           "defaultValue": "3",
@@ -1419,12 +1776,19 @@
             "title": "USAP pool max size",
             "reason": "Observed in five logs as 3.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "3": "3",
+            "4": "4 线程",
+            "6": "6 线程"
           }
         },
         {
           "id": "usap_pool_size_min",
-          "label": "USAP pool min size",
-          "description": "USAP pool min size from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "label": "USAP 池最小数量",
+          "description": "作用：调整USAP 进程池中的 dalvik.vm.usap_pool_size_min。可选值：关闭 / 0（0）、开启 / 1（1）、2 线程（2）、3（3）。默认值：开启 / 1（1）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.usap_pool_size_min",
           "defaultEnabled": false,
           "defaultValue": "1",
@@ -1452,12 +1816,18 @@
             "title": "USAP pool min size",
             "reason": "Observed in five logs as 1.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "3": "3"
           }
         },
         {
           "id": "usap_refill_threshold",
-          "label": "USAP refill threshold",
-          "description": "USAP refill threshold from ART runtime capture evidence. It is disabled by default and only inherited when the device exposes it.",
+          "label": "USAP 补充阈值",
+          "description": "作用：调整USAP 进程池中的 dalvik.vm.usap_refill_threshold。可选值：开启 / 1（1）、2 线程（2）、3（3）。默认值：开启 / 1（1）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.usap_refill_threshold",
           "defaultEnabled": false,
           "defaultValue": "1",
@@ -1484,12 +1854,17 @@
             "title": "USAP refill threshold",
             "reason": "Observed in five logs as 1.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "3": "3"
           }
         },
         {
           "id": "runtime_native_usap_pool",
-          "label": "runtime_native USAP pool",
-          "description": "Device_config runtime_native USAP pool switch. One log exposes true; disabled by default because support is ROM-specific.",
+          "label": "runtime_native USAP 池",
+          "description": "作用：调整USAP 进程池中的 persist.device_config.runtime_native.usap_pool_enabled。可选值：关闭（false）、开启（true）。默认值：开启（true）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.usap_pool_enabled",
           "defaultEnabled": false,
           "defaultValue": "true",
@@ -1515,12 +1890,16 @@
             "title": "runtime_native USAP pool",
             "reason": "Observed in one v3.2 capture log as true.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "dex2oat_cpu_set",
-          "label": "dex2oat CPU 亲和性",
-          "description": "绑定 dex2oat 到指定 CPU 核心集。留空使用默认，可指定如 4-7 限制到大核。",
+          "label": "配置项：dalvik.vm.dex2oat-cpu-set",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.dex2oat-cpu-set。可选值：（空）、4,5,6,7（4,5,6,7）、0,1,2,3,4,5,6,7（0,1,2,3,4,5,6,7）、0,1,2,3,4,5（0,1,2,3,4,5）、3,4,5,6,7（3,4,5,6,7）。默认值：空（）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.dex2oat-cpu-set",
           "defaultEnabled": false,
           "defaultValue": "",
@@ -1530,12 +1909,19 @@
             "0,1,2,3,4,5,6,7",
             "0,1,2,3,4,5",
             "3,4,5,6,7"
-          ]
+          ],
+          "valueLabels": {
+            "": "",
+            "4,5,6,7": "4,5,6,7",
+            "0,1,2,3,4,5,6,7": "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5": "0,1,2,3,4,5",
+            "3,4,5,6,7": "3,4,5,6,7"
+          }
         },
         {
           "id": "boot_dex2oat_cpu_set",
-          "label": "开机 dex2oat CPU 亲和性",
-          "description": "绑定开机阶段 dex2oat 到指定 CPU 核心集。留空默认，限制可减少开机阶段发热。",
+          "label": "配置项：dalvik.vm.boot-dex2oat-cpu-set",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.boot-dex2oat-cpu-set。可选值：（空）、4,5,6,7（4,5,6,7）、0,1,2,3,4,5,6,7（0,1,2,3,4,5,6,7）、0,1,2,3,4,5（0,1,2,3,4,5）、3,4,5,6,7（3,4,5,6,7）。默认值：空（）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.boot-dex2oat-cpu-set",
           "defaultEnabled": false,
           "defaultValue": "",
@@ -1545,12 +1931,19 @@
             "0,1,2,3,4,5,6,7",
             "0,1,2,3,4,5",
             "3,4,5,6,7"
-          ]
+          ],
+          "valueLabels": {
+            "": "",
+            "4,5,6,7": "4,5,6,7",
+            "0,1,2,3,4,5,6,7": "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5": "0,1,2,3,4,5",
+            "3,4,5,6,7": "3,4,5,6,7"
+          }
         },
         {
           "id": "bg_dex2oat_cpu_set",
-          "label": "后台 dex2oat CPU 亲和性",
-          "description": "绑定后台 dex2oat 到指定 CPU 核心集。留空默认，限制可减少后台编译发热。",
+          "label": "配置项：dalvik.vm.background-dex2oat-cpu-set",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.background-dex2oat-cpu-set。可选值：（空）、4,5,6,7（4,5,6,7）、0,1,2,3,4,5,6,7（0,1,2,3,4,5,6,7）、0,1,2,3,4,5（0,1,2,3,4,5）、3,4,5,6,7（3,4,5,6,7）。默认值：空（）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.background-dex2oat-cpu-set",
           "defaultEnabled": false,
           "defaultValue": "",
@@ -1560,12 +1953,19 @@
             "0,1,2,3,4,5,6,7",
             "0,1,2,3,4,5",
             "3,4,5,6,7"
-          ]
+          ],
+          "valueLabels": {
+            "": "",
+            "4,5,6,7": "4,5,6,7",
+            "0,1,2,3,4,5,6,7": "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5": "0,1,2,3,4,5",
+            "3,4,5,6,7": "3,4,5,6,7"
+          }
         },
         {
           "id": "image_dex2oat_cpu_set",
-          "label": "镜像 dex2oat CPU 亲和性",
-          "description": "绑定镜像编译阶段 dex2oat 到指定 CPU 核心集。留空默认。",
+          "label": "配置项：dalvik.vm.image-dex2oat-cpu-set",
+          "description": "作用：调整dex2oat 编译器中的 dalvik.vm.image-dex2oat-cpu-set。可选值：（空）、4,5,6,7（4,5,6,7）、0,1,2,3,4,5,6,7（0,1,2,3,4,5,6,7）、0,1,2,3,4,5（0,1,2,3,4,5）、3,4,5,6,7（3,4,5,6,7）。默认值：空（）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.image-dex2oat-cpu-set",
           "defaultEnabled": false,
           "defaultValue": "",
@@ -1575,7 +1975,14 @@
             "0,1,2,3,4,5,6,7",
             "0,1,2,3,4,5",
             "3,4,5,6,7"
-          ]
+          ],
+          "valueLabels": {
+            "": "",
+            "4,5,6,7": "4,5,6,7",
+            "0,1,2,3,4,5,6,7": "0,1,2,3,4,5,6,7",
+            "0,1,2,3,4,5": "0,1,2,3,4,5",
+            "3,4,5,6,7": "3,4,5,6,7"
+          }
         },
         {
           "id": "bg_dex2oat_threads",
@@ -1591,7 +1998,15 @@
             "4",
             "5",
             "8"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程",
+            "5": "5 线程",
+            "8": "8"
+          }
         },
         {
           "id": "image_dex2oat_threads",
@@ -1607,7 +2022,15 @@
             "4",
             "5",
             "6"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程",
+            "5": "5 线程",
+            "6": "6 线程"
+          }
         },
         {
           "id": "boot_dex2oat_threads",
@@ -1623,19 +2046,31 @@
             "4",
             "5",
             "6"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "1": "开启 / 1",
+            "2": "2 线程",
+            "4": "4 线程",
+            "5": "5 线程",
+            "6": "6 线程"
+          }
         },
         {
           "id": "mtk_aggressive_cpu",
-          "label": "MTK 激进 CPU 亲和性",
-          "description": "MTK 平台 dex2oat 激进调度 CPU 核心集。默认 0,1,2,3,4 绑定所有性能核。",
+          "label": "配置项：ro.vendor.dex2oat-aggressive-cpu-set",
+          "description": "作用：调整dex2oat 编译器中的 ro.vendor.dex2oat-aggressive-cpu-set。可选值：核心 0-4（0,1,2,3,4）、（空）。默认值：核心 0-4（0,1,2,3,4）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "ro.vendor.dex2oat-aggressive-cpu-set",
           "defaultEnabled": false,
           "defaultValue": "0,1,2,3,4",
           "values": [
             "0,1,2,3,4",
             ""
-          ]
+          ],
+          "valueLabels": {
+            "0,1,2,3,4": "核心 0-4",
+            "": ""
+          }
         },
         {
           "id": "mtk_aggressive_threads",
@@ -1647,7 +2082,11 @@
           "values": [
             "0",
             "5"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "5": "5 线程"
+          }
         },
         {
           "id": "dex2oat_xms",
@@ -1677,6 +2116,11 @@
             "title": "dex2oat 最小堆",
             "reason": "Covered by v3.2 capture evidence.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "32m": "32m",
+            "64m": "64 MB",
+            "128m": "128 MB"
           }
         },
         {
@@ -1707,6 +2151,11 @@
             "title": "dex2oat 最大堆",
             "reason": "Covered by v3.2 capture evidence.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "256m": "256 MB",
+            "512m": "512 MB",
+            "1024m": "1024m"
           }
         },
         {
@@ -1720,7 +2169,12 @@
             "0",
             "104857600",
             "2147483647"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "104857600": "104857600",
+            "2147483647": "2147483647"
+          }
         },
         {
           "id": "vdex_madvise",
@@ -1733,12 +2187,17 @@
             "0",
             "104857600",
             "2147483647"
-          ]
+          ],
+          "valueLabels": {
+            "0": "关闭 / 0",
+            "104857600": "104857600",
+            "2147483647": "2147483647"
+          }
         },
         {
           "id": "profile_first_save",
-          "label": "profile 首次保存延迟",
-          "description": "应用首次 profile 保存的最小延迟时间（毫秒）。5000 约5秒，10000 约10秒。",
+          "label": "配置项：dalvik.vm.ps-min-first-save-ms",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.ps-min-first-save-ms。可选值：5000（5000）、10000（10000）、2147483647（2147483647）、8000（8000）。默认值：2147483647（2147483647）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.ps-min-first-save-ms",
           "defaultEnabled": false,
           "defaultValue": "2147483647",
@@ -1747,12 +2206,18 @@
             "10000",
             "2147483647",
             "8000"
-          ]
+          ],
+          "valueLabels": {
+            "5000": "5000",
+            "8000": "8000",
+            "10000": "10000",
+            "2147483647": "2147483647"
+          }
         },
         {
           "id": "use_jit_profiles",
-          "label": "JIT profile usage",
-          "description": "Controls dalvik.vm.usejitprofiles. One log exposes true; disabled by default because forcing profile behavior can affect app warmup.",
+          "label": "使用 JIT 画像",
+          "description": "作用：调整JIT 运行时中的 dalvik.vm.usejitprofiles。可选值：关闭（false）、开启（true）。默认值：开启（true）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.usejitprofiles",
           "defaultEnabled": false,
           "defaultValue": "true",
@@ -1778,12 +2243,16 @@
             "title": "JIT profile usage",
             "reason": "Observed in one v3.2 capture log as true.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "generational_gc",
-          "label": "Generational GC flag",
-          "description": "runtime_native_boot.use_generational_gc capture rule. Empty captured values are evidence only and do not become errors.",
+          "label": "分代 GC 开关",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native_boot.use_generational_gc。可选值：关闭（false）、开启（true）。默认值：开启（true）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native_boot.use_generational_gc",
           "defaultEnabled": false,
           "defaultValue": "true",
@@ -1809,12 +2278,16 @@
             "title": "Generational GC flag",
             "reason": "Observed in four logs as true or empty device_config evidence.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "uffd_gc_flag",
-          "label": "UFFD GC disable flag",
-          "description": "runtime_native_boot.force_disable_uffd_gc capture rule. false is the conservative value from logs.",
+          "label": "UFFD GC 禁用标志",
+          "description": "作用：调整CPU / ISA 识别信息中的 persist.device_config.runtime_native_boot.force_disable_uffd_gc。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native_boot.force_disable_uffd_gc",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -1840,12 +2313,16 @@
             "title": "UFFD GC disable flag",
             "reason": "Observed in four logs as false or empty device_config evidence.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "lock_profiling_flag",
-          "label": "Lock profiling disable flag",
-          "description": "runtime_native_boot.disable_lock_profiling capture rule. false is the conservative value from logs.",
+          "label": "锁分析禁用标志",
+          "description": "作用：调整CPU / ISA 识别信息中的 persist.device_config.runtime_native_boot.disable_lock_profiling。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native_boot.disable_lock_profiling",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -1871,12 +2348,16 @@
             "title": "Lock profiling disable flag",
             "reason": "Observed in four logs as false or empty device_config evidence.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "runtime_profman_enabled",
-          "label": "runtime profman enabled",
-          "description": "runtime profman enabled from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "label": "runtime profman 开关",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime.profman.enabled。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime.profman.enabled",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -1902,12 +2383,16 @@
             "title": "runtime profman enabled",
             "reason": "Observed in one v3.2 capture log as false.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "runtime_secondary_dex",
-          "label": "runtime secondary dex",
-          "description": "runtime secondary dex from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "label": "runtime 二级 dex",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime.secondary_dex。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime.secondary_dex",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -1933,12 +2418,16 @@
             "title": "runtime secondary dex",
             "reason": "Observed in one v3.2 capture log as false.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "runtime_dex_reconcile",
-          "label": "runtime dex reconcile",
-          "description": "runtime dex reconcile from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "label": "runtime dex 协调",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime.dex_reconcile。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime.dex_reconcile",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -1964,12 +2453,16 @@
             "title": "runtime dex reconcile",
             "reason": "Observed in one v3.2 capture log as false.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "runtime_dynamic_code_opt",
-          "label": "runtime dynamic code opt",
-          "description": "runtime dynamic code opt from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "label": "runtime 动态代码优化",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime.dynamic_code_opt。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime.dynamic_code_opt",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -1995,12 +2488,16 @@
             "title": "runtime dynamic code opt",
             "reason": "Observed in one v3.2 capture log as false.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "enable_uffd_gc_2",
-          "label": "UFFD GC v2 flag",
-          "description": "UFFD GC v2 flag from device_config runtime evidence. Disabled by default; captured value is inherited when present.",
+          "label": "UFFD GC v2 开关",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native_boot.enable_uffd_gc_2。可选值：关闭（false）、开启（true）。默认值：关闭（false）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native_boot.enable_uffd_gc_2",
           "defaultEnabled": false,
           "defaultValue": "false",
@@ -2026,12 +2523,16 @@
             "title": "UFFD GC v2 flag",
             "reason": "Observed in one v3.2 capture log as false.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
           }
         },
         {
           "id": "iorap_blacklisted_packages",
-          "label": "iorap blacklisted packages",
-          "description": "Retains empty iorap blacklist evidence from device_config runtime_native_boot.",
+          "label": "iorap 黑名单包列表",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native_boot.iorap_blacklisted_packages。可选值：（空）。默认值：空（）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native_boot.iorap_blacklisted_packages",
           "defaultEnabled": false,
           "defaultValue": "",
@@ -2056,12 +2557,15 @@
             "title": "iorap blacklisted packages",
             "reason": "Observed in four logs as an empty value.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "": ""
           }
         },
         {
           "id": "iorapd_options",
-          "label": "iorapd options",
-          "description": "Retains empty iorapd options evidence from device_config runtime_native_boot.",
+          "label": "iorapd 选项",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native_boot.iorapd_options。可选值：（空）。默认值：空（）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native_boot.iorapd_options",
           "defaultEnabled": false,
           "defaultValue": "",
@@ -2086,12 +2590,15 @@
             "title": "iorapd options",
             "reason": "Observed in four logs as an empty value.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "": ""
           }
         },
         {
           "id": "thread_suspend_timeout",
-          "label": "Thread suspend timeout",
-          "description": "Retains dalvik.vm.thread-suspend-timeout-ms. Default-disabled because it affects runtime suspension behavior.",
+          "label": "线程挂起超时",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.thread-suspend-timeout-ms。可选值：30000（30000）。默认值：30000（30000）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.thread-suspend-timeout-ms",
           "defaultEnabled": false,
           "defaultValue": "30000",
@@ -2116,12 +2623,15 @@
             "title": "Thread suspend timeout",
             "reason": "Observed in three logs as 30000.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "30000": "30000"
           }
         },
         {
           "id": "extra_opts_xss",
-          "label": "ART extra opts",
-          "description": "Retains dalvik.vm.extra-opts from capture evidence. Default-disabled because VM extra opts are broad runtime flags.",
+          "label": "ART 额外参数",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.extra-opts。可选值：-Xss3M（-Xss3M）。默认值：-Xss3M（-Xss3M）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.extra-opts",
           "defaultEnabled": false,
           "defaultValue": "-Xss3M",
@@ -2146,12 +2656,15 @@
             "title": "ART extra opts",
             "reason": "Observed in two logs as -Xss3M.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "-Xss3M": "-Xss3M"
           }
         },
         {
           "id": "finalizer_timeout",
-          "label": "Finalizer timeout",
-          "description": "Retains dalvik.vm.finalizer-timeout-ms from one log. Default-disabled because it can affect runtime behavior globally.",
+          "label": "Finalizer 超时",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.finalizer-timeout-ms。可选值：40000（40000）。默认值：40000（40000）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.finalizer-timeout-ms",
           "defaultEnabled": false,
           "defaultValue": "40000",
@@ -2176,12 +2689,15 @@
             "title": "Finalizer timeout",
             "reason": "Observed in one log as 40000.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "40000": "40000"
           }
         },
         {
           "id": "mtk_stack_trace_file",
-          "label": "MTK stack trace file",
-          "description": "Retains dalvik.vm.mtk-stack-trace-file evidence. Default-disabled and diagnostic-only for MTK-style ROMs.",
+          "label": "MTK 堆栈跟踪文件",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.mtk-stack-trace-file。可选值：/data/anr/mtk_traces.txt（/data/anr/mtk_traces.txt）。默认值：/data/anr/mtk_traces.txt（/data/anr/mtk_traces.txt）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.mtk-stack-trace-file",
           "defaultEnabled": false,
           "defaultValue": "/data/anr/mtk_traces.txt",
@@ -2206,12 +2722,15 @@
             "title": "MTK stack trace file",
             "reason": "Observed in one log as /data/anr/mtk_traces.txt.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "/data/anr/mtk_traces.txt": "/data/anr/mtk_traces.txt"
           }
         },
         {
           "id": "systemui_compiler_filter",
-          "label": "SystemUI compiler filter",
-          "description": "Retains dalvik.vm.systemuicompilerfilter. Default-disabled because SystemUI compiler policy is ROM-sensitive.",
+          "label": "SystemUI 编译过滤器",
+          "description": "作用：调整ART / dexopt 运行参数中的 dalvik.vm.systemuicompilerfilter。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：速度优化（speed）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "dalvik.vm.systemuicompilerfilter",
           "defaultEnabled": false,
           "defaultValue": "speed",
@@ -2239,12 +2758,18 @@
             "title": "SystemUI compiler filter",
             "reason": "Observed in one log as speed.",
             "confidence": "low"
+          },
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
           }
         },
         {
           "id": "runtime_metrics_reporting_mods",
-          "label": "Runtime metrics reporting mods",
-          "description": "Retains runtime_native metrics reporting-mods evidence. Default-disabled because it is reporting policy, not tuning.",
+          "label": "runtime 指标模块上报",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.metrics.reporting-mods。可选值：（空）、2 线程（2）。默认值：2 线程（2）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.metrics.reporting-mods",
           "defaultEnabled": false,
           "defaultValue": "2",
@@ -2270,12 +2795,16 @@
             "title": "Runtime metrics reporting mods",
             "reason": "Observed in four logs as empty or 2.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "2": "2 线程",
+            "": ""
           }
         },
         {
           "id": "runtime_metrics_reporting_mods_server",
-          "label": "Runtime metrics reporting mods server",
-          "description": "Retains runtime_native metrics reporting-mods-server evidence.",
+          "label": "runtime 指标服务端模块上报",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.metrics.reporting-mods-server。可选值：（空）、2 线程（2）。默认值：2 线程（2）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.metrics.reporting-mods-server",
           "defaultEnabled": false,
           "defaultValue": "2",
@@ -2301,12 +2830,16 @@
             "title": "Runtime metrics reporting mods server",
             "reason": "Observed in four logs as empty or 2.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "2": "2 线程",
+            "": ""
           }
         },
         {
           "id": "runtime_metrics_reporting_num_mods",
-          "label": "Runtime metrics reporting num mods",
-          "description": "Retains runtime_native metrics reporting-num-mods evidence.",
+          "label": "runtime 指标模块数量",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.metrics.reporting-num-mods。可选值：（空）、100（100）。默认值：100（100）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.metrics.reporting-num-mods",
           "defaultEnabled": false,
           "defaultValue": "100",
@@ -2332,12 +2865,16 @@
             "title": "Runtime metrics reporting num mods",
             "reason": "Observed in four logs as empty or 100.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "100": "100",
+            "": ""
           }
         },
         {
           "id": "runtime_metrics_reporting_num_mods_server",
-          "label": "Runtime metrics reporting num mods server",
-          "description": "Retains runtime_native metrics reporting-num-mods-server evidence.",
+          "label": "runtime 指标服务端模块数量",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.metrics.reporting-num-mods-server。可选值：（空）、100（100）。默认值：100（100）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.metrics.reporting-num-mods-server",
           "defaultEnabled": false,
           "defaultValue": "100",
@@ -2363,12 +2900,16 @@
             "title": "Runtime metrics reporting num mods server",
             "reason": "Observed in four logs as empty or 100.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "100": "100",
+            "": ""
           }
         },
         {
           "id": "runtime_metrics_reporting_spec",
-          "label": "Runtime metrics reporting spec",
-          "description": "Retains runtime_native metrics reporting-spec evidence.",
+          "label": "runtime 指标上报规格",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.metrics.reporting-spec。可选值：（空）、1,5,30,60,600（1,5,30,60,600）。默认值：1,5,30,60,600（1,5,30,60,600）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.metrics.reporting-spec",
           "defaultEnabled": false,
           "defaultValue": "1,5,30,60,600",
@@ -2394,12 +2935,16 @@
             "title": "Runtime metrics reporting spec",
             "reason": "Observed in four logs as empty or 1,5,30,60,600.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "": "",
+            "1,5,30,60,600": "1,5,30,60,600"
           }
         },
         {
           "id": "runtime_metrics_reporting_spec_server",
-          "label": "Runtime metrics reporting spec server",
-          "description": "Retains runtime_native metrics reporting-spec-server evidence.",
+          "label": "runtime 指标服务端上报规格",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.metrics.reporting-spec-server。可选值：（空）、1,10,60,3600,*（1,10,60,3600,*）。默认值：1,10,60,3600,*（1,10,60,3600,*）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.metrics.reporting-spec-server",
           "defaultEnabled": false,
           "defaultValue": "1,10,60,3600,*",
@@ -2425,12 +2970,16 @@
             "title": "Runtime metrics reporting spec server",
             "reason": "Observed in four logs as empty or 1,10,60,3600,*.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "": "",
+            "1,10,60,3600,*": "1,10,60,3600,*"
           }
         },
         {
           "id": "runtime_metrics_write_statsd",
-          "label": "Runtime metrics write statsd",
-          "description": "Retains runtime_native metrics write-to-statsd evidence.",
+          "label": "runtime 指标写入 statsd",
+          "description": "作用：调整runtime_native 运行时配置中的 persist.device_config.runtime_native.metrics.write-to-statsd。可选值：（空）、关闭（false）、开启（true）。默认值：开启（true）。建议：这是进阶项，建议逐项启用并重启验证。",
           "prop": "persist.device_config.runtime_native.metrics.write-to-statsd",
           "defaultEnabled": false,
           "defaultValue": "true",
@@ -2457,6 +3006,11 @@
             "title": "Runtime metrics write statsd",
             "reason": "Observed in four logs as empty or true.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "": "",
+            "false": "关闭",
+            "true": "开启"
           }
         }
       ]
@@ -2465,7 +3019,7 @@
       "id": "aggressive",
       "title": "危险",
       "tone": "aggressive",
-      "description": "全量 AOT 性能配置。将所有 dexopt 策略设为 everything，最大化运行时性能。适合愿意接受安装耗时、发热和存储占用以换取极致性能的用户。",
+      "description": "高风险配置，可能明显影响安装耗时、发热、功耗、兼容性和系统稳定性。",
       "items": [
         {
           "id": "force_install_everything",
@@ -2479,7 +3033,13 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "force_ota_everything",
@@ -2493,7 +3053,13 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "force_cmdline_everything",
@@ -2507,7 +3073,13 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "priv_apps_oob",
@@ -2521,7 +3093,13 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "secondary_everything",
@@ -2535,11 +3113,17 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "global_everything",
-          "label": "全局 dex2oat filter AOT",
+          "label": "全局 dex2oat 全量 AOT",
           "description": "将全局 dex2oat-filter 设为 everything，兜底全量 AOT。",
           "prop": "dalvik.vm.dex2oat-filter",
           "defaultEnabled": true,
@@ -2549,7 +3133,13 @@
             "speed-profile",
             "speed",
             "everything"
-          ]
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
         },
         {
           "id": "priv_apps_oob_list",
@@ -2560,7 +3150,10 @@
           "defaultValue": "ALL",
           "values": [
             "ALL"
-          ]
+          ],
+          "valueLabels": {
+            "ALL": "ALL"
+          }
         },
         {
           "id": "disable_art_service",
@@ -2572,7 +3165,11 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "disable_jit",
@@ -2584,12 +3181,16 @@
           "values": [
             "false",
             "true"
-          ]
+          ],
+          "valueLabels": {
+            "false": "关闭",
+            "true": "开启"
+          }
         },
         {
           "id": "heapgrowthlimit",
-          "label": "ART heap growth limit",
-          "description": "Retains dalvik.vm.heapgrowthlimit from capture logs. This is broad ART runtime evidence, so it is default-disabled and primarily preserved for diagnostics.",
+          "label": "ART 堆增长上限",
+          "description": "作用：调整ART 堆参数中的 dalvik.vm.heapgrowthlimit。可选值：256 MB（256m）、384m（384m）。默认值：256 MB（256m）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.heapgrowthlimit",
           "defaultEnabled": false,
           "defaultValue": "256m",
@@ -2615,12 +3216,16 @@
             "title": "ART heap growth limit",
             "reason": "Observed in all six logs with values 256m or 384m.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "256m": "256 MB",
+            "384m": "384m"
           }
         },
         {
           "id": "heapmaxfree",
-          "label": "ART heap max free",
-          "description": "Retains dalvik.vm.heapmaxfree from capture logs. Default-disabled to avoid forcing runtime heap policy across ROMs.",
+          "label": "ART 堆最大空闲",
+          "description": "作用：调整ART 堆参数中的 dalvik.vm.heapmaxfree。可选值：8m（8m）、16m（16m）、32m（32m）。默认值：8m（8m）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.heapmaxfree",
           "defaultEnabled": false,
           "defaultValue": "8m",
@@ -2647,12 +3252,17 @@
             "title": "ART heap max free",
             "reason": "Observed in all six logs with values 8m, 16m or 32m.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "8m": "8m",
+            "16m": "16m",
+            "32m": "32m"
           }
         },
         {
           "id": "heapminfree",
-          "label": "ART heap min free",
-          "description": "Retains dalvik.vm.heapminfree from capture logs. Default-disabled because heap tuning can affect every app process.",
+          "label": "ART 堆最小空闲",
+          "description": "作用：调整ART 堆参数中的 dalvik.vm.heapminfree。可选值：512k（512k）、2m（2m）、4m（4m）、8m（8m）。默认值：2m（2m）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.heapminfree",
           "defaultEnabled": false,
           "defaultValue": "2m",
@@ -2680,12 +3290,18 @@
             "title": "ART heap min free",
             "reason": "Observed in all six logs with values 512k, 2m, 4m or 8m.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "512k": "512k",
+            "2m": "2m",
+            "4m": "4m",
+            "8m": "8m"
           }
         },
         {
           "id": "heapsize",
-          "label": "ART heap size",
-          "description": "Retains dalvik.vm.heapsize from capture logs. Default-disabled and treated as high-impact runtime evidence.",
+          "label": "ART 堆大小",
+          "description": "作用：调整ART 堆参数中的 dalvik.vm.heapsize。可选值：512 MB（512m）、768m（768m）。默认值：512 MB（512m）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.heapsize",
           "defaultEnabled": false,
           "defaultValue": "512m",
@@ -2711,12 +3327,16 @@
             "title": "ART heap size",
             "reason": "Observed in all six logs with values 512m or 768m.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "512m": "512 MB",
+            "768m": "768m"
           }
         },
         {
           "id": "heapstartsize",
-          "label": "ART heap start size",
-          "description": "Retains dalvik.vm.heapstartsize from capture logs. Default-disabled to avoid broad runtime side effects.",
+          "label": "ART 堆起始大小",
+          "description": "作用：调整ART 堆参数中的 dalvik.vm.heapstartsize。可选值：8m（8m）、16m（16m）、32m（32m）。默认值：16m（16m）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.heapstartsize",
           "defaultEnabled": false,
           "defaultValue": "16m",
@@ -2743,12 +3363,17 @@
             "title": "ART heap start size",
             "reason": "Observed in all six logs with values 8m, 16m or 32m.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "8m": "8m",
+            "16m": "16m",
+            "32m": "32m"
           }
         },
         {
           "id": "heaptargetutilization",
-          "label": "ART heap target utilization",
-          "description": "Retains dalvik.vm.heaptargetutilization from capture logs. Default-disabled because GC behavior is device-sensitive.",
+          "label": "ART 堆目标利用率",
+          "description": "作用：调整ART 堆参数中的 dalvik.vm.heaptargetutilization。可选值：0.5（0.5）、0.8（0.8）。默认值：0.5（0.5）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.heaptargetutilization",
           "defaultEnabled": false,
           "defaultValue": "0.5",
@@ -2774,12 +3399,16 @@
             "title": "ART heap target utilization",
             "reason": "Observed in all six logs with values 0.5 or 0.8.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "0.5": "0.5",
+            "0.8": "0.8"
           }
         },
         {
           "id": "isa_arm64_features",
-          "label": "arm64 ISA features",
-          "description": "Retains dalvik.vm.isa.arm64.features. This describes CPU capability evidence and is default-disabled.",
+          "label": "arm64 ISA 特性",
+          "description": "作用：调整CPU / ISA 识别信息中的 dalvik.vm.isa.arm64.features。可选值：default（default）。默认值：default（default）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.isa.arm64.features",
           "defaultEnabled": false,
           "defaultValue": "default",
@@ -2804,12 +3433,15 @@
             "title": "arm64 ISA features",
             "reason": "Observed in all six logs as default.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "default": "default"
           }
         },
         {
           "id": "isa_arm64_variant",
-          "label": "arm64 ISA variant",
-          "description": "Retains dalvik.vm.isa.arm64.variant. This is ABI/CPU evidence and must not be generalized across devices.",
+          "label": "arm64 ISA 变体",
+          "description": "作用：调整CPU / ISA 识别信息中的 dalvik.vm.isa.arm64.variant。可选值：default（default）、oryon（oryon）、kryo300（kryo300）、cortex-a55（cortex-a55）。默认值：cortex-a55（cortex-a55）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.isa.arm64.variant",
           "defaultEnabled": false,
           "defaultValue": "cortex-a55",
@@ -2837,12 +3469,18 @@
             "title": "arm64 ISA variant",
             "reason": "Observed in all six logs with oryon, kryo300 or cortex-a55.",
             "confidence": "high"
+          },
+          "valueLabels": {
+            "default": "default",
+            "oryon": "oryon",
+            "kryo300": "kryo300",
+            "cortex-a55": "cortex-a55"
           }
         },
         {
           "id": "isa_arm_features",
-          "label": "arm ISA features",
-          "description": "Retains dalvik.vm.isa.arm.features for devices exposing 32-bit ARM runtime evidence.",
+          "label": "arm ISA 特性",
+          "description": "作用：调整CPU / ISA 识别信息中的 dalvik.vm.isa.arm.features。可选值：default（default）。默认值：default（default）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.isa.arm.features",
           "defaultEnabled": false,
           "defaultValue": "default",
@@ -2867,12 +3505,15 @@
             "title": "arm ISA features",
             "reason": "Observed in three logs as default.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "default": "default"
           }
         },
         {
           "id": "isa_arm_variant",
-          "label": "arm ISA variant",
-          "description": "Retains dalvik.vm.isa.arm.variant. Default-disabled because CPU variant values are device-specific.",
+          "label": "arm ISA 变体",
+          "description": "作用：调整CPU / ISA 识别信息中的 dalvik.vm.isa.arm.variant。可选值：default（default）、cortex-a75（cortex-a75）、cortex-a55（cortex-a55）。默认值：cortex-a55（cortex-a55）。建议：这是高风险项，建议只在明确知道用途并能回滚时启用。",
           "prop": "dalvik.vm.isa.arm.variant",
           "defaultEnabled": false,
           "defaultValue": "cortex-a55",
@@ -2899,6 +3540,11 @@
             "title": "arm ISA variant",
             "reason": "Observed in three logs with cortex-a75 or cortex-a55.",
             "confidence": "medium"
+          },
+          "valueLabels": {
+            "default": "default",
+            "cortex-a75": "cortex-a75",
+            "cortex-a55": "cortex-a55"
           }
         }
       ]

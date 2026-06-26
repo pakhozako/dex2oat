@@ -1,7 +1,7 @@
 id=dex2oat-lock
 name=Dex2oat Lock
-version=v3.4.1
-versionCode=341
+version=v3.5
+versionCode=350
 author=pakhozako
 description=Rule-driven dexopt tuning and unified state monitor | 🟩 OK | 🟨 Warning | 🟥 Error
 updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json
