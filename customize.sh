@@ -99,6 +99,50 @@ install_stage_label() {
   esac
 }
 
+install_stage_index() {
+  case "$1" in
+    init) printf '01' ;;
+    environment) printf '02' ;;
+    prepare) printf '03' ;;
+    device) printf '04' ;;
+    backup) printf '05' ;;
+    capture) printf '06' ;;
+    match) printf '07' ;;
+    system_prop) printf '08' ;;
+    lock) printf '09' ;;
+    conflict) printf '10' ;;
+    health) printf '11' ;;
+    integrity) printf '12' ;;
+    permissions) printf '13' ;;
+    state) printf '14' ;;
+    complete) printf '15' ;;
+    failed) printf '!!' ;;
+    *) printf '--' ;;
+  esac
+}
+
+install_stage_title() {
+  case "$1" in
+    init) printf '初始化安装上下文' ;;
+    environment) printf '读取模块环境' ;;
+    prepare) printf '准备数据目录' ;;
+    device) printf '记录设备摘要' ;;
+    backup) printf '备份原始属性' ;;
+    capture) printf '抓取运行时属性' ;;
+    match) printf '生成规则配置' ;;
+    system_prop) printf '同步 system.prop' ;;
+    lock) printf '生成锁定快照' ;;
+    conflict) printf '冲突检测' ;;
+    health) printf '健康摘要' ;;
+    integrity) printf '完整性校验' ;;
+    permissions) printf '权限整理' ;;
+    state) printf '写入最终状态' ;;
+    complete) printf '安装完成' ;;
+    failed) printf '安装失败' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 install_stage_detail() {
   case "$1" in
     init) ui_print "  -> 建立安装上下文，准备状态写入" ;;
@@ -122,12 +166,33 @@ install_stage_detail() {
 
 install_stage_code_hint() {
   case "$1" in
+    init) ui_print "  code: install.state=running progress=1" ;;
+    environment) ui_print "  code: version=$(sed -n 's/^version=//p' "$MODPATH/module.prop" 2>/dev/null | head -n 1)" ;;
+    prepare) ui_print "  code: mkdir -p $STATE_DIR $BACKUP_DIR $LOG_DIR" ;;
+    device) ui_print "  code: getprop ro.product.model / ro.build.version.release" ;;
+    backup) ui_print "  code: backup -> $ORIGINAL_PROPS" ;;
     capture) ui_print "  $ getprop | grep -E 'dexopt|dex2oat|dalvik|runtime'" ;;
     match) ui_print "  $ sh scripts/generate-props.sh --rules webroot/data/options.json" ;;
     system_prop) ui_print "  $ write: $PROP_FILE" ;;
+    lock) ui_print "  code: prop-lock.list + system.prop.bak" ;;
     conflict) ui_print "  $ sh core/conflict-detect.sh" ;;
     health) ui_print "  $ sh core/health-check.sh" ;;
     integrity) ui_print "  $ sh core/integrity-check.sh" ;;
+    permissions) ui_print "  code: chmod scripts/core/webroot" ;;
+    state) ui_print "  code: state.prop <- install.status=done" ;;
+    complete) ui_print "  code: reboot 后 WebUI 会继续读取 state.prop" ;;
+  esac
+}
+
+install_stage_wait_hint() {
+  case "$1" in
+    capture) ui_print "  wait: 正在读取设备属性，低端设备可能需要几秒" ;;
+    match) ui_print "  wait: 正在匹配规则并生成输出，不是卡住" ;;
+    conflict) ui_print "  wait: 正在扫描其它模块，最多等待 8 秒" ;;
+    health) ui_print "  wait: 正在汇总健康状态，稍后会写入 WebUI 首页" ;;
+    integrity) ui_print "  wait: 正在核对核心文件和受保护 WebUI" ;;
+    permissions) ui_print "  wait: 正在整理权限，避免 WebUI 或脚本不可读" ;;
+    *) ui_print "  wait: 阶段处理中，请保持安装窗口打开" ;;
   esac
 }
 
@@ -138,7 +203,7 @@ install_motion_line() {
     2) MOTION='...' ;;
     *) MOTION='....' ;;
   esac
-  ui_print "  ${MOTION} 正在处理，请稍候"
+  ui_print "  live: ${MOTION} 仍在执行，下一阶段会自动继续"
 }
 
 install_banner() {
@@ -157,11 +222,15 @@ install_progress() {
   INSTALL_PROGRESS_STATUS="${4:-running}"
   INSTALL_PROGRESS_BAR="$(install_progress_bar "$INSTALL_PROGRESS_PERCENT")"
   INSTALL_PROGRESS_LABEL="$(install_stage_label "$INSTALL_PROGRESS_STAGE")"
+  INSTALL_PROGRESS_INDEX="$(install_stage_index "$INSTALL_PROGRESS_STAGE")"
+  INSTALL_PROGRESS_TITLE="$(install_stage_title "$INSTALL_PROGRESS_STAGE")"
   ui_print " " 
+  ui_print "[${INSTALL_PROGRESS_INDEX}/15] $INSTALL_PROGRESS_TITLE"
   ui_print "[$INSTALL_PROGRESS_LABEL] [$INSTALL_PROGRESS_BAR] ${INSTALL_PROGRESS_PERCENT}%"
-  ui_print "  $INSTALL_PROGRESS_MESSAGE"
+  ui_print "  now: $INSTALL_PROGRESS_MESSAGE"
   install_stage_detail "$INSTALL_PROGRESS_STAGE"
   install_stage_code_hint "$INSTALL_PROGRESS_STAGE"
+  [ "$INSTALL_PROGRESS_STATUS" = "running" ] && install_stage_wait_hint "$INSTALL_PROGRESS_STAGE"
   [ "$INSTALL_PROGRESS_STATUS" = "running" ] && install_motion_line
   if [ "$INSTALL_STARTED" = "1" ]; then
     rotate_log "$INSTALL_LOG"
@@ -205,7 +274,10 @@ run_optional_install_check() {
       return 124
     fi
     if [ "$CHECK_ELAPSED" -gt 0 ] && [ $((CHECK_ELAPSED % 3)) -eq 0 ] 2>/dev/null; then
-      ui_print "  ... $CHECK_NAME 仍在执行 (${CHECK_ELAPSED}s/${CHECK_TIMEOUT}s)"
+      CHECK_LEFT=$((CHECK_TIMEOUT - CHECK_ELAPSED))
+      [ "$CHECK_LEFT" -lt 0 ] 2>/dev/null && CHECK_LEFT=0
+      ui_print "  wait: $CHECK_NAME 仍在执行，已等待 ${CHECK_ELAPSED}s，最多还等 ${CHECK_LEFT}s"
+      ui_print "  code: optional-check=$CHECK_NAME timeout=${CHECK_TIMEOUT}s"
     fi
     sleep 1
     CHECK_ELAPSED=$((CHECK_ELAPSED + 1))

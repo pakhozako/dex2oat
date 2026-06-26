@@ -877,24 +877,70 @@ async function persistWebConfig() {
 function renderAbout() {
   const page = $("#page");
   page.innerHTML = "";
-  const about = createSection("关于", state.meta.version);
-  const grid = createElement("div", "metric-grid compact");
-  grid.append(metric("版本", state.meta.version));
-  grid.append(metric("VersionCode", state.meta.versionCode || "350"));
-  grid.append(metric("作者", state.meta.author || "pakhozako"));
-  grid.append(metric("架构", state.meta.architecture || "规则驱动 / 统一状态"));
-  grid.append(metric("License", "GPL / Open"));
-  grid.append(metric("规则数量", state.options?.categories?.reduce((sum, category) => sum + category.items.length, 0) || 0));
-  grid.append(metric("Schema", state.options?.schemaVersion || "32"));
-  grid.append(metric("状态源", "state.prop"));
-  grid.append(metric("模块路径", MODULE_DIR));
-  grid.append(metric("数据路径", STATE_DIR));
-  about.append(grid);
-  const summary = createElement("p", "risk-note", state.meta.description || "规则驱动生成 system.prop，并以统一状态模型汇总安装、匹配、应用、健康、冲突和完整性结果。");
-  about.append(summary);
-  const actions = createElement("section", "link-row about-link-row");
-  actions.append(createButton("Github项目地址", "wide-button", () => openUrl(state.meta.githubUrl)));
-  page.append(about, actions);
+  const ruleTotal = countOptionItems();
+  const categoryTotal = state.options?.categories?.length || 0;
+  const finalPropCount = state.configSource?.prop_count || state.unifiedState?.["config.prop_count"] || "0";
+  const status = currentSummary();
+
+  const overview = createSection("关于", `${state.meta.version} / ${state.meta.versionCode || "350"}`);
+  overview.classList.add("about-section");
+  const overviewGrid = createElement("div", "about-info-grid");
+  overviewGrid.append(createAboutInfoCard("规则数量", `${ruleTotal} 项`, `${categoryTotal} 个分类`));
+  overviewGrid.append(createAboutInfoCard("配置来源", sourceLabel(state.configSource), `最终 prop ${finalPropCount} 项`));
+  overviewGrid.append(createAboutInfoCard("Schema", state.options?.schemaVersion || "32", `Rules ${state.options?.rulesVersion || state.meta.version || "v3.5"}`));
+  overviewGrid.append(createAboutInfoCard("状态", status.title, status.message));
+  overviewGrid.append(createAboutInfoCard("架构", state.meta.architecture || "规则驱动 / 统一状态", "规则生成 + state.prop 汇总"));
+  overviewGrid.append(createAboutInfoCard("协议", "本地风险确认", "仅控制自定义和危险配置解锁"));
+  overview.append(overviewGrid);
+  overview.append(createElement("p", "risk-note", state.meta.description || "规则驱动生成 system.prop，并以统一状态模型汇总安装、匹配、应用、健康、冲突和完整性结果。"));
+
+  const paths = createSection("路径与配置文件", "排查常用");
+  paths.classList.add("about-section", "about-path-section");
+  const pathList = createElement("div", "about-path-list");
+  pathList.append(createAboutPathItem("模块路径", MODULE_DIR));
+  pathList.append(createAboutPathItem("数据路径", STATE_DIR));
+  pathList.append(createAboutPathItem("system.prop", `${MODULE_DIR}/system.prop`, "最终写入模块的属性配置"));
+  pathList.append(createAboutPathItem("config.json", `${STATE_DIR}/config.json`, "WebUI 自定义配置"));
+  pathList.append(createAboutPathItem("state.prop", `${STATE_DIR}/state.prop`, "统一状态源"));
+  pathList.append(createAboutPathItem("prop-lock.list", `${STATE_DIR}/prop-lock.list`, "运行时锁定快照"));
+  paths.append(pathList);
+
+  const project = createSection("项目", "GitHub / License / Author");
+  project.classList.add("about-section", "about-project-section");
+  const projectGrid = createElement("div", "about-info-grid compact");
+  projectGrid.append(createAboutInfoCard("作者", state.meta.author || "pakhozako", "维护与发布"));
+  projectGrid.append(createAboutInfoCard("License", "GPL / Open", "遵循项目开源许可"));
+  projectGrid.append(createAboutInfoCard("版本", state.meta.version || "v3.5", `versionCode ${state.meta.versionCode || "350"}`));
+  project.append(projectGrid);
+  const githubRow = createElement("div", "about-github-row");
+  githubRow.append(createButton("Github项目地址", "wide-button about-github-button", () => openUrl(state.meta.githubUrl)));
+  project.append(githubRow);
+
+  page.append(overview, paths, project);
+}
+
+function countOptionItems() {
+  return (state.options?.categories || []).reduce((sum, category) => sum + (category.items?.length || 0), 0);
+}
+
+function createAboutInfoCard(label, value, detail) {
+  const card = createElement("article", "about-info-card");
+  card.innerHTML = `
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(String(value || "暂不可用"))}</strong>
+    ${detail ? `<small>${escapeHtml(String(detail))}</small>` : ""}
+  `;
+  return card;
+}
+
+function createAboutPathItem(label, path, detail) {
+  const item = createElement("article", "about-path-item");
+  item.innerHTML = `
+    <span>${escapeHtml(label)}</span>
+    <code>${escapeHtml(path || "暂不可用")}</code>
+    ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
+  `;
+  return item;
 }
 
 function renderCategory(categoryId) {
