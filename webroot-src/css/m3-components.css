@@ -1,0 +1,496 @@
+/* ============================================================
+   Material Design 3 — Components
+   按 M3 规范实现常用组件，使用 token 变量
+   ============================================================ */
+
+/* ── Surface ── */
+.m3-surface {
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
+
+.m3-surface-container {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+}
+
+.m3-surface-container-high {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+/* ── Buttons ── */
+.m3-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: var(--md-sys-shape-full);
+  font: var(--md-sys-typescale-label-large);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+              background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+
+/* Filled */
+.m3-button-filled {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.m3-button-filled:hover {
+  box-shadow: var(--md-sys-elevation-1);
+}
+.m3-button-filled:active {
+  box-shadow: none;
+}
+
+/* Tonal */
+.m3-button-tonal {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.m3-button-tonal:hover {
+  box-shadow: var(--md-sys-elevation-1);
+}
+
+/* Outlined */
+.m3-button-outlined {
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  border: 1px solid var(--md-sys-color-outline);
+}
+.m3-button-outlined:hover {
+  background: var(--md-sys-color-primary-container);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+/* Text */
+.m3-button-text {
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  padding: 0 12px;
+}
+.m3-button-text:hover {
+  background: var(--md-sys-color-primary-container);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+/* Icon button */
+.m3-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-sys-shape-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-icon-button:hover {
+  background: var(--md-sys-color-surface-container);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 8%, transparent);
+}
+.m3-icon-button.outlined {
+  border: 1px solid var(--md-sys-color-outline);
+}
+
+/* FAB */
+.m3-fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 56px;
+  min-width: 56px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--md-sys-shape-large);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: var(--md-sys-elevation-3);
+  font: var(--md-sys-typescale-label-large);
+  cursor: pointer;
+  transition: box-shadow var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-fab:hover {
+  box-shadow: var(--md-sys-elevation-4);
+}
+.m3-fab.small {
+  height: 40px;
+  min-width: 40px;
+  padding: 0 8px;
+  border-radius: var(--md-sys-shape-medium);
+}
+
+/* ── Cards ── */
+.m3-card {
+  border-radius: var(--md-sys-shape-medium);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+  overflow: hidden;
+}
+.m3-card.elevated {
+  box-shadow: var(--md-sys-elevation-1);
+  background: var(--md-sys-color-surface-container-low);
+}
+.m3-card.filled {
+  background: var(--md-sys-color-surface-container-highest);
+}
+.m3-card.outlined {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface);
+}
+
+/* ── Chips ── */
+.m3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: var(--md-sys-shape-small);
+  font: var(--md-sys-typescale-label-large);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-chip.assist {
+  border: 1px solid var(--md-sys-color-outline);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+}
+.m3-chip.assist:hover {
+  background: var(--md-sys-color-surface-container);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.m3-chip.filter {
+  border: 1px solid var(--md-sys-color-outline);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-chip.filter.selected {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-color: transparent;
+}
+.m3-chip.status-ok {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-color: transparent;
+}
+.m3-chip.status-warn {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  border-color: transparent;
+}
+.m3-chip.status-error {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  border-color: transparent;
+}
+
+/* ── Text Fields ── */
+.m3-text-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.m3-text-field input,
+.m3-text-field textarea {
+  height: 56px;
+  padding: 24px 16px 8px;
+  border: none;
+  border-radius: var(--md-sys-shape-extra-small) var(--md-sys-shape-extra-small) 0 0;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  font: var(--md-sys-typescale-body-large);
+  outline: none;
+  border-bottom: 2px solid var(--md-sys-color-on-surface-variant);
+  transition: border-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-text-field input:focus,
+.m3-text-field textarea:focus {
+  border-bottom-color: var(--md-sys-color-primary);
+}
+.m3-text-field textarea {
+  height: auto;
+  min-height: 100px;
+  resize: vertical;
+}
+.m3-text-field label {
+  position: absolute;
+  left: 16px;
+  top: 8px;
+  font: var(--md-sys-typescale-body-small);
+  color: var(--md-sys-color-on-surface-variant);
+  pointer-events: none;
+}
+
+/* ── Dialogs ── */
+.m3-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.32);
+  z-index: 1000;
+  animation: m3-fade-in var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);
+}
+.m3-dialog {
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: var(--md-sys-shape-extra-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-3);
+  padding: 24px;
+  animation: m3-scale-in var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.m3-dialog-title {
+  font: var(--md-sys-typescale-headline-small);
+  margin: 0 0 16px;
+}
+.m3-dialog-content {
+  font: var(--md-sys-typescale-body-medium);
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 24px;
+}
+.m3-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ── Lists ── */
+.m3-list {
+  list-style: none;
+  padding: 8px 0;
+  margin: 0;
+}
+.m3-list-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  min-height: 56px;
+  cursor: pointer;
+  transition: background var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-list-item:hover {
+  background: var(--md-sys-color-surface-container);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.m3-list-item-headline {
+  font: var(--md-sys-typescale-body-large);
+  color: var(--md-sys-color-on-surface);
+}
+.m3-list-item-supporting {
+  font: var(--md-sys-typescale-body-medium);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-list-item-leading {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ── Navigation Bar ── */
+.m3-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 80px;
+  background: var(--md-sys-color-surface-container);
+  border-top: 1px solid var(--md-sys-color-surface-variant);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+.m3-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0 16px;
+  min-width: 64px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-medium);
+  transition: color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-nav-item.active {
+  color: var(--md-sys-color-on-surface);
+}
+.m3-nav-item-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 32px;
+  border-radius: var(--md-sys-shape-full);
+  transition: background var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-nav-item.active .m3-nav-item-indicator {
+  background: var(--md-sys-color-secondary-container);
+}
+
+/* ── Top App Bar ── */
+.m3-top-app-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 64px;
+  padding: 0 4px 0 16px;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font: var(--md-sys-typescale-title-large);
+}
+.m3-top-app-bar-title {
+  flex: 1;
+  font: var(--md-sys-typescale-title-large);
+  padding: 0 12px;
+}
+
+/* ── Switch ── */
+.m3-switch {
+  position: relative;
+  width: 52px;
+  height: 32px;
+  background: var(--md-sys-color-surface-container-highest);
+  border: 2px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-full);
+  cursor: pointer;
+  transition: background var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+              border-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-switch::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: var(--md-sys-shape-full);
+  background: var(--md-sys-color-outline);
+  transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.m3-switch.on {
+  background: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
+.m3-switch.on::after {
+  left: calc(100% - 22px);
+  width: 24px;
+  height: 24px;
+  background: var(--md-sys-color-on-primary);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* ── Snackbar ── */
+.m3-snackbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 280px;
+  max-width: 560px;
+  padding: 14px 16px;
+  border-radius: var(--md-sys-shape-extra-small);
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  font: var(--md-sys-typescale-body-medium);
+  box-shadow: var(--md-sys-elevation-3);
+  z-index: 2000;
+  animation: m3-slide-up var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.m3-snackbar-action {
+  color: var(--md-sys-color-inverse-primary);
+  background: none;
+  border: none;
+  font: var(--md-sys-typescale-label-large);
+  cursor: pointer;
+  padding: 0 8px;
+  margin-left: 8px;
+}
+
+/* ── Progress ── */
+.m3-linear-progress {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--md-sys-shape-full);
+  background: var(--md-sys-color-surface-container-highest);
+  overflow: hidden;
+}
+.m3-linear-progress-bar {
+  height: 100%;
+  border-radius: var(--md-sys-shape-full);
+  background: var(--md-sys-color-primary);
+  transition: width var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
+}
+
+/* ── Badge ── */
+.m3-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--md-sys-shape-full);
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  font: var(--md-sys-typescale-label-small);
+}
+.m3-badge.large {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+}
+
+/* ── Divider ── */
+.m3-divider {
+  height: 1px;
+  background: var(--md-sys-color-outline-variant);
+  border: none;
+  margin: 0;
+}
+
+/* ── State layer overlay (ripple 替代) ── */
+.m3-state-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard);
+}
+
+/* ── Animations ── */
+@keyframes m3-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes m3-scale-in {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes m3-slide-up {
+  from { transform: translate(-50%, 100%); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}

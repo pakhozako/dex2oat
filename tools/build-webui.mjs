@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rm, stat, writeFile, copyFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+const require = createRequire(import.meta.url);
+const { generateIntegrityBaseline } = require("./generate-integrity");
 const root = process.cwd();
 const srcRoot = path.join(root, "webroot-src");
 const outRoot = path.join(root, "webroot");
@@ -14,6 +17,55 @@ function sha256(textOrBuffer) {
 
 function shortHash(textOrBuffer) {
   return sha256(textOrBuffer).slice(0, 10);
+}
+
+function protectedSeed(name, buffer) {
+  const hash = sha256(`${version.version}:${version.versionCode}:${name}:${sha256(buffer)}`);
+  return parseInt(hash.slice(0, 8), 16) >>> 0;
+}
+
+function nextMaskState(state, index, nameCode) {
+  return (Math.imul(state ^ (index + 0x9e3779b9) ^ nameCode, 1664525) + 1013904223) >>> 0;
+}
+
+function protectBuffer(name, buffer, mime) {
+  const seed = protectedSeed(name, buffer);
+  const masked = Buffer.alloc(buffer.length);
+  let maskState = seed ^ buffer.length ^ name.charCodeAt(0);
+  for (let index = 0; index < buffer.length; index += 1) {
+    const sourceIndex = buffer.length - 1 - index;
+    maskState = nextMaskState(maskState, index, name.charCodeAt(index % name.length));
+    const mask = (maskState ^ (maskState >>> 8) ^ (maskState >>> 16) ^ (seed >>> ((index & 3) * 8))) & 0xff;
+    masked[index] = buffer[sourceIndex] ^ mask;
+  }
+  const base64 = masked.toString("base64");
+  const chunks = [];
+  for (let index = 0; index < base64.length; index += 61) {
+    chunks.push(base64.slice(index, index + 61));
+  }
+  const rotation = chunks.length ? seed % chunks.length : 0;
+  const rotatedChunks = chunks.slice(rotation).concat(chunks.slice(0, rotation)).reverse();
+  return {
+    v: 2,
+    n: name,
+    m: mime,
+    l: buffer.length,
+    s: seed,
+    r: rotation,
+    c: rotatedChunks
+  };
+}
+
+async function buildProtectedData(optionsJson) {
+  const appMeta = await readFile(path.join(srcRoot, "data", "app-meta.json"));
+  const lyrics = await readFile(path.join(srcRoot, "data", "easter-lyrics.txt"));
+  const cover = await readFile(path.join(srcRoot, "data", "easter-cover.jpg"));
+  return {
+    a: protectBuffer("a", appMeta, "application/json"),
+    o: protectBuffer("o", Buffer.from(optionsJson, "utf8"), "application/json"),
+    l: protectBuffer("l", lyrics, "text/plain;charset=utf-8"),
+    c: protectBuffer("c", cover, "image/jpeg")
+  };
 }
 
 function normalizeNewlines(text) {
@@ -48,10 +100,11 @@ function wrapModule({ fileName, varName, imports = [], exports = [] }) {
 async function appModule() {
   const source = await readFile(path.join(srcRoot, "js", "app.js"), "utf8");
   return `\n/* app.js */\n(() => {\n${destructure("__bridge", ["MODULE_DIR", "STATE_DIR", "exec", "readText", "writeBase64"])}
-${destructure("__config", ["countChanged", "countEnabled", "countHighRiskEnabled", "loadJson", "loadUserConfig", "mergeConfig", "readGeneratedSystemProp", "saveConfig"])}
+${destructure("__config", ["countChanged", "countEnabled", "countHighRiskEnabled", "decodeProtectedBytes", "decodeProtectedText", "loadJson", "loadUserConfig", "mergeConfig", "readGeneratedSystemProp", "saveConfig"])}
 ${destructure("__systemInfo", ["readSystemInfo"])}
 ${destructure("__ui", ["$", "createElement", "metric", "setStatus", "showConfirm"])}
 ${destructure("__utils", ["shellQuote", "resultMessage", "parseKeyValueLines", "parseStateFile"])}
+${destructure("__m3Theme", ["initTheme"])}
 ${stripModuleSyntax(source)}
 })();\n`;
 }
@@ -76,13 +129,14 @@ function protectHtml(html) {
       ? `%u${code.toString(16).padStart(4, "0").toUpperCase()}`
       : `%${code.toString(16).padStart(2, "0").toUpperCase()}`;
   }
-  return `<script>document.write(unescape(function(a){a=unescape(a);var c=String.fromCharCode(a.charCodeAt(0)-a.length);for(var i=1;i<a.length;i++){c+=String.fromCharCode(a.charCodeAt(i)-c.charCodeAt(i-1))}return c}("${encoded}")));</script>\n`;
+  return `<!doctype html><meta charset="utf-8"><script charset="utf-8">document.write(unescape(function(a){a=unescape(a);var c=String.fromCharCode(a.charCodeAt(0)-a.length);for(var i=1;i<a.length;i++){c+=String.fromCharCode(a.charCodeAt(i)-c.charCodeAt(i-1))}return c}("${encoded}")));</script>\n`;
 }
 
 function encodeLegacy(text) {
   let output = "";
-  for (const ch of text) {
-    const code = ch.charCodeAt(0);
+  for (let index = 0; index < text.length; index += 1) {
+    const ch = text.charAt(index);
+    const code = text.charCodeAt(index);
     if (/^[A-Za-z0-9@*_+\-./]$/.test(ch)) {
       output += ch;
     } else if (code < 0x100) {
@@ -162,7 +216,7 @@ async function syncMetadata() {
     `version=${version.version}`,
     `versionCode=${version.versionCode}`,
     `author=${version.author}`,
-    `description=${version.description} | 🟩 OK | 🟨 Warning | 🟥 Error`,
+    `description=${version.description} | 🟩 OK`,
     `updateJson=${version.updateJson}`,
     ""
   ].join("\n");
@@ -206,7 +260,8 @@ async function buildRules() {
       "ownerReason",
       "explainTitle",
       "explainReason",
-      "confidence"
+      "confidence",
+      "values"
     ].join("\t")
   ];
 
@@ -226,22 +281,21 @@ async function buildRules() {
         owner === item.id ? "owner" : "shadowed-by-owner",
         item.explain?.title || item.label || item.id,
         item.explain?.reason || item.description || "",
-        item.explain?.confidence || "medium"
-      ].map(tsvValue).join("\t"));
+        item.explain?.confidence || "medium",
+        (item.values || []).join("|")
+      ].map(tsvValue).join("\t").replace(/\t+$/g, ""));
     }
   }
 
   const normalizedOptions = `${JSON.stringify(options, null, 2)}\n`;
   await writeFile(optionsPath, normalizedOptions, "utf8");
+  await rm(path.join(outRoot, "data"), { recursive: true, force: true });
   await mkdir(path.join(outRoot, "data"), { recursive: true });
-  await writeFile(path.join(outRoot, "data", "options.json"), normalizedOptions, "utf8");
   await writeFile(path.join(outRoot, "data", "rule-props.tsv"), `${rows.join("\n")}\n`, "utf8");
-  await writeFile(path.join(outRoot, "data", "rule-conflicts.json"), `${JSON.stringify({ generatedAt: "build", conflicts }, null, 2)}\n`, "utf8");
-  await copyFile(path.join(srcRoot, "data", "app-meta.json"), path.join(outRoot, "data", "app-meta.json"));
-  return { options, conflicts };
+  return { options, conflicts, protectedData: await buildProtectedData(normalizedOptions) };
 }
 
-async function buildJs() {
+async function buildJs(protectedData) {
   const builders = [
     wrapModule({
       fileName: "utils.js",
@@ -260,6 +314,11 @@ async function buildJs() {
       exports: ["$", "createElement", "metric", "setStatus", "showConfirm"]
     }),
     wrapModule({
+      fileName: "m3-theme.js",
+      varName: "__m3Theme",
+      exports: ["generateColorScheme", "applyScheme", "applySourceColor", "restoreSourceColor", "setTheme", "getTheme", "initTheme"]
+    }),
+    wrapModule({
       fileName: "system-info.js",
       varName: "__systemInfo",
       imports: [["__bridge", ["exec"]], ["__utils", ["parseKeyValue"]]],
@@ -272,7 +331,7 @@ async function buildJs() {
         ["__bridge", ["MODULE_DIR", "STATE_DIR", "exec", "readText", "writeBase64"]],
         ["__utils", ["shellQuote", "resultMessage", "parseKeyValueLines", "parseStateFile"]]
       ],
-      exports: ["countChanged", "countEnabled", "countHighRiskEnabled", "loadJson", "loadUserConfig", "mergeConfig", "readGeneratedSystemProp", "saveConfig"]
+      exports: ["countChanged", "countEnabled", "countHighRiskEnabled", "decodeProtectedBytes", "decodeProtectedText", "loadJson", "loadUserConfig", "mergeConfig", "readGeneratedSystemProp", "saveConfig"]
     }),
     appModule
   ];
@@ -280,18 +339,30 @@ async function buildJs() {
   for (const buildChunk of builders) {
     chunks.push(await buildChunk());
   }
+  const protectedDataScript = `globalThis.__DEX2OAT_WEBUI_DATA=${JSON.stringify(protectedData)};\n`;
   const banner = `/* ${version.name} ${version.version} protected bundle. Built from webroot-src. */\n`;
-  const bundled = `${banner}${chunks.join("\n")}\n`;
-  const assetName = `dex2oat-ui.${shortHash(bundled)}.protected.mjs`;
+  const bundled = `${banner}${protectedDataScript}${chunks.join("\n").trimEnd()}\n`;
+  const assetName = "dex2oat-ui.protected.js";
   await mkdir(path.join(outRoot, "assets"), { recursive: true });
   await writeFile(path.join(outRoot, "assets", assetName), bundled, "utf8");
   return { assetName, hash: sha256(bundled), content: bundled };
 }
 
 async function buildCss() {
-  const css = await readFile(path.join(srcRoot, "css", "app.css"), "utf8");
+  const cssFiles = [
+    "m3-tokens.css",
+    "m3-theme.css",
+    "m3-components.css",
+    "m3-utils.css",
+    "app.css"
+  ];
+  const cssParts = [];
+  for (const fileName of cssFiles) {
+    cssParts.push(await readFile(path.join(srcRoot, "css", fileName), "utf8"));
+  }
+  const css = cssParts.join("\n");
   const minified = `${minifyCss(css)}\n`;
-  const assetName = `dex2oat-ui.${shortHash(minified)}.protected.css`;
+  const assetName = "dex2oat-ui.protected.css";
   await mkdir(path.join(outRoot, "assets"), { recursive: true });
   await writeFile(path.join(outRoot, "assets", assetName), minified, "utf8");
   return { assetName, hash: sha256(minified), content: minified };
@@ -319,7 +390,7 @@ async function writeIndex(jsAsset, cssAsset) {
         <p>&#27491;&#22312;&#21152;&#36733; WebUI...</p>
       </main>
     </div>
-    <script type="module" src="./assets/${jsAsset}"></script>
+    <script charset="utf-8" src="./assets/${jsAsset}"></script>
   </body>
 </html>
 `;
@@ -330,7 +401,8 @@ async function listReleaseFiles(dir, prefix = "") {
   const entries = [];
   for (const item of await readdir(dir, { withFileTypes: true })) {
     if (item.name === ".git" || item.name === ".webui-src-temp" || item.name === "webroot-src" || item.name === "tools") continue;
-    if (item.name === "发布版" || item.name.startsWith("修复前备份-")) continue;
+    if (item.name === "发布版" || item.name === "源码版" || item.name === "releases" || item.name === "backups") continue;
+    if (item.name.startsWith("legacy-artifacts-") || item.name.startsWith("修复前备份-")) continue;
     const rel = prefix ? `${prefix}/${item.name}` : item.name;
     const full = path.join(dir, item.name);
     if (item.isDirectory()) {
@@ -343,28 +415,7 @@ async function listReleaseFiles(dir, prefix = "") {
 }
 
 async function writeIntegrityBaseline() {
-  const files = (await listReleaseFiles(root)).filter((file) => {
-    if (["README.md", "CHANGELOG.md", "update.json", ".gitattributes", ".gitignore", ".env.local", "build.config.json", "environment-report.md", "v3.5 自动化开发与构建报告.md"].includes(file)) return false;
-    if (file === "core/integrity-baseline.prop") return false;
-    if (file.startsWith("发布版/") || file.startsWith("修复前备份-")) return false;
-    return true;
-  });
-  const rows = [];
-  for (const rel of files) {
-    const full = path.join(root, ...rel.split("/"));
-    const content = await readFile(full);
-    if (rel === "module.prop") {
-      const normalized = normalizeNewlines(content.toString("utf8"))
-        .split("\n")
-        .filter((line) => !line.startsWith("description="))
-        .join("\n")
-        .trimEnd() + "\n";
-      rows.push(`${rel}=${sha256(normalized)}`);
-    } else {
-      rows.push(`${rel}=${sha256(content)}`);
-    }
-  }
-  await writeFile(path.join(root, "core", "integrity-baseline.prop"), `${rows.join("\n")}\n`, "utf8");
+  await generateIntegrityBaseline({ staging: path.join(root, "temp", "webui-integrity-staging") });
 }
 
 async function verifyBuild(js, css) {
@@ -378,12 +429,21 @@ async function verifyBuild(js, css) {
   if (!decodedIndex.includes(js.assetName) || !decodedIndex.includes(css.assetName)) {
     throw new Error("index.html does not reference generated protected assets");
   }
+  const dataFiles = await readdir(path.join(outRoot, "data"));
+  for (const forbidden of ["options.json", "app-meta.json", "easter-lyrics.txt", "easter-cover.jpg", "rule-conflicts.json"]) {
+    if (dataFiles.includes(forbidden)) {
+      throw new Error(`protected WebUI data leaked as plain file: ${forbidden}`);
+    }
+  }
+  if (!dataFiles.includes("rule-props.tsv")) {
+    throw new Error("rule-props.tsv missing from release WebUI data");
+  }
 }
 
 await syncMetadata();
 await cleanAssets();
-const { conflicts } = await buildRules();
-const js = await buildJs();
+const { conflicts, protectedData } = await buildRules();
+const js = await buildJs(protectedData);
 const css = await buildCss();
 await writeIndex(js.assetName, css.assetName);
 await writeIntegrityBaseline();

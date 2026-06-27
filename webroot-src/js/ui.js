@@ -35,12 +35,13 @@ export function showConfirm(message) {
     cancel.type = "button";
     ok.type = "button";
     actions.append(cancel, ok);
-    title.append(actions);
-    panel.append(title, createElement("p", "risk-note", message));
+    panel.append(title, createElement("p", "risk-note", message), actions);
     dialog.append(panel);
 
     const finish = (value) => {
-      dialog.remove();
+      if (dialog.classList.contains("is-closing")) return;
+      dialog.classList.add("is-closing");
+      setTimeout(() => dialog.remove(), 220);
       resolve(value);
     };
     cancel.addEventListener("click", () => finish(false));

@@ -10,7 +10,7 @@ const { root, run } = require("./toolkit");
 const { validateAll } = require("./validate");
 const { syncVersion } = require("./version");
 
-const reportPath = path.join(root, "v3.5 自动化开发与构建报告.md");
+const reportPath = path.join(root, "v3.6 自动化开发与构建报告.md");
 
 async function maybeNpmInstall() {
   try {
@@ -52,7 +52,7 @@ async function writeBuildReport({ status, steps, environment, version, validatio
   }
 
   const content = [
-    "# v3.5 自动化开发与构建报告",
+    "# v3.6 自动化开发与构建报告",
     "",
     `- 构建状态：${status}`,
     `- 构建时间：${new Date().toISOString()}`,

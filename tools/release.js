@@ -21,6 +21,15 @@ const include = [
 
 const forbiddenNames = new Set(["README.md", "CHANGELOG.md", "update.json"]);
 
+async function stageReleaseTree(staging) {
+  await safeRemove(staging, root);
+  await ensureDir(staging);
+
+  for (const item of include) {
+    await copyReleaseItem(path.join(root, item), path.join(staging, item));
+  }
+}
+
 async function copyReleaseItem(source, target) {
   const stat = await fs.stat(source);
   if (stat.isDirectory()) {
@@ -42,7 +51,7 @@ async function copyReleaseItem(source, target) {
 
 async function releaseBuild(options = {}) {
   const version = await readVersion();
-  const releaseRoot = options.releaseDir || path.join(path.dirname(root), "发布版");
+  const releaseRoot = options.releaseDir || path.join(root, "releases");
   const staging = path.join(root, "temp", "release-staging");
   const zipPath = path.join(releaseRoot, `Dex2oat-Lock-${version.version}-release.zip`);
   const shaPath = path.join(releaseRoot, `Dex2oat-Lock-${version.version}-release.sha256`);
@@ -50,12 +59,7 @@ async function releaseBuild(options = {}) {
   const hashTool = options.hashTool || detectHashTool();
 
   await ensureDir(releaseRoot);
-  await safeRemove(staging, root);
-  await ensureDir(staging);
-
-  for (const item of include) {
-    await copyReleaseItem(path.join(root, item), path.join(staging, item));
-  }
+  await stageReleaseTree(staging);
 
   await fs.rm(zipPath, { force: true });
   const zip = await createZipFromDirectory(staging, zipPath);
@@ -81,7 +85,8 @@ async function releaseBuild(options = {}) {
 }
 
 module.exports = {
-  releaseBuild
+  releaseBuild,
+  stageReleaseTree
 };
 
 if (require.main === module) {

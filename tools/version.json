@@ -1,15 +1,15 @@
 {
   "id": "dex2oat-lock",
   "name": "Dex2oat Lock",
-  "version": "v3.5",
-  "versionCode": 350,
+  "version": "v3.6",
+  "versionCode": 360,
   "author": "pakhozako",
   "githubUrl": "https://github.com/pakhozako/dex2oat",
   "updateJson": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json",
-  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v3.5/Dex2oat-Lock-v3.5-release.zip",
+  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v3.6/Dex2oat-Lock-v3.6-release.zip",
   "changelog": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/CHANGELOG.md",
   "schemaVersion": 32,
-  "rulesVersion": "v3.5",
+  "rulesVersion": "v3.6",
   "description": "Rule-driven dexopt tuning and unified state monitor",
   "architecture": "规则驱动 / 统一状态"
 }

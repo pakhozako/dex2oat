@@ -43,13 +43,36 @@ statectl_update() {
   fi
 }
 
+statectl_clear_attention_apply() {
+  mkdir -p "$STATE_DIR" 2>/dev/null || return 1
+  [ -f "$STATE_FILE" ] || return 0
+  TMP_STATE="$STATE_FILE.clear.tmp.$$"
+  grep -v -E '^(summary\.attention\.|summary\.attention_total=|summary\.attention_alert_total=)' "$STATE_FILE" > "$TMP_STATE" 2>/dev/null || : > "$TMP_STATE"
+  mv -f "$TMP_STATE" "$STATE_FILE" 2>/dev/null || {
+    rm -f "$TMP_STATE" 2>/dev/null || true
+    return 1
+  }
+  chmod 0600 "$STATE_FILE" 2>/dev/null || true
+}
+
+statectl_clear_attention() {
+  if command -v dex_with_lock >/dev/null 2>&1; then
+    dex_with_lock "$STATE_LOCK_DIR" 15 statectl_clear_attention_apply
+  else
+    statectl_clear_attention_apply
+  fi
+}
+
 case "$1" in
   update)
     shift
     statectl_update "$@"
     ;;
+  clear-attention)
+    statectl_clear_attention
+    ;;
   *)
-    printf 'usage: statectl.sh update key=value [...]\n' >&2
+    printf 'usage: statectl.sh update key=value [...] | clear-attention\n' >&2
     exit 2
     ;;
 esac

@@ -13,33 +13,27 @@ function moduleProp(version) {
     `version=${version.version}`,
     `versionCode=${version.versionCode}`,
     `author=${version.author}`,
-    `description=${version.description} | 🟩 OK | 🟨 Warning | 🟥 Error`,
+    `description=${version.description} | 🟩 OK`,
     `updateJson=${version.updateJson}`,
     ""
   ].join("\n");
 }
 
-async function syncReadme(version) {
+async function syncReadme(_version) {
   const readmePath = path.join(root, "README.md");
   let content = await fs.readFile(readmePath, "utf8");
-  const block = [
-    "<!-- build:version -->",
-    `当前版本：\`${version.version} / ${version.versionCode}\``,
-    "<!-- /build:version -->"
-  ].join("\n");
-
   if (content.includes("<!-- build:version -->")) {
-    content = content.replace(/<!-- build:version -->[\s\S]*?<!-- \/build:version -->/, block);
-  } else {
-    content = content.replace(/(# Dex2oat Lock\s*)/, `$1\n${block}\n`);
+    content = content.replace(/\n*<!-- build:version -->[\s\S]*?<!-- \/build:version -->\n*/, "\n\n");
+    await fs.writeFile(readmePath, content, "utf8");
   }
-  await fs.writeFile(readmePath, content, "utf8");
 }
 
 async function syncChangelog(version) {
   const changelogPath = path.join(root, "CHANGELOG.md");
   let content = await fs.readFile(changelogPath, "utf8");
-  if (!content.includes(`## ${version.version}`)) {
+  const escapedVersion = version.version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const versionHeading = new RegExp(`^## .*${escapedVersion}`, "m");
+  if (!versionHeading.test(content)) {
     content = content.replace(
       /# Dex2oat Lock 更新日志\s*/,
       `# Dex2oat Lock 更新日志\n\n## ${version.version} (${new Date().toISOString().slice(0, 10)})\n\n- 自动同步版本元数据。\n\n`

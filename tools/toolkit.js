@@ -111,12 +111,15 @@ async function safeRemove(target, allowedRoot = root) {
 function shouldSkipRel(relativePath, extraSkips = []) {
   const normalized = slash(relativePath);
   const first = normalized.split("/")[0];
+  if (first.startsWith("legacy-artifacts-") || first.startsWith("修复前备份-")) return true;
   const defaults = new Set([
     ".git",
     ".webui-src-temp",
     "node_modules",
     "dist",
     "release",
+    "releases",
+    "backups",
     "temp",
     "cache",
     ".cache",
@@ -179,8 +182,8 @@ function defaultConfig() {
     toolsDir: path.join(root, "tools"),
     webuiSourceDir: pathExists(path.join(root, "webroot-src")) ? path.join(root, "webroot-src") : path.join(root, "webroot"),
     webuiOutDir: path.join(root, "webroot"),
-    releaseDir: path.join(path.dirname(root), "发布版"),
-    sourceDir: path.join(path.dirname(root), "源码版"),
+    releaseDir: path.join(root, "releases"),
+    sourceDir: path.join(root, "backups"),
     tempDir: path.join(root, "temp"),
     cacheDir: path.join(root, "cache"),
     distDir: path.join(root, "dist"),

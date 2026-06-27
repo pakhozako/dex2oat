@@ -63,14 +63,7 @@ state_num() {
 }
 
 state_update() {
-  STATECTL=""
-  if [ -n "$MODPATH" ] && [ -x "$MODPATH/core/statectl.sh" ]; then
-    STATECTL="$MODPATH/core/statectl.sh"
-  elif [ -n "$MODDIR" ] && [ -x "$MODDIR/core/statectl.sh" ]; then
-    STATECTL="$MODDIR/core/statectl.sh"
-  elif [ -x "${0%/*}/statectl.sh" ]; then
-    STATECTL="${0%/*}/statectl.sh"
-  fi
+  STATECTL="$(state_statectl_path)"
   if [ -n "$STATECTL" ]; then
     STATE_DIR="$STATE_DIR" STATE_FILE="$STATE_FILE" sh "$STATECTL" update "$@"
     return $?
@@ -78,6 +71,16 @@ state_update() {
   mkdir -p "$STATE_DIR" 2>/dev/null || return 1
   TMP_STATE="$STATE_FILE.tmp.$$"
   state_update_apply "$TMP_STATE" "$@"
+}
+
+state_statectl_path() {
+  if [ -n "$MODPATH" ] && [ -r "$MODPATH/core/statectl.sh" ]; then
+    printf '%s\n' "$MODPATH/core/statectl.sh"
+  elif [ -n "$MODDIR" ] && [ -r "$MODDIR/core/statectl.sh" ]; then
+    printf '%s\n' "$MODDIR/core/statectl.sh"
+  elif [ -r "${0%/*}/statectl.sh" ]; then
+    printf '%s\n' "${0%/*}/statectl.sh"
+  fi
 }
 
 state_update_apply() {
@@ -111,7 +114,12 @@ state_get() {
 
 state_clear_attention_keys() {
   [ -f "$STATE_FILE" ] || return 0
-  TMP_STATE="$STATE_FILE.clear.tmp"
+  STATECTL="$(state_statectl_path)"
+  if [ -n "$STATECTL" ]; then
+    STATE_DIR="$STATE_DIR" STATE_FILE="$STATE_FILE" sh "$STATECTL" clear-attention
+    return $?
+  fi
+  TMP_STATE="$STATE_FILE.clear.tmp.$$"
   grep -v -E '^(summary\.attention\.|summary\.attention_total=|summary\.attention_alert_total=)' "$STATE_FILE" > "$TMP_STATE" 2>/dev/null || : > "$TMP_STATE"
   mv -f "$TMP_STATE" "$STATE_FILE" 2>/dev/null || true
 }
@@ -178,9 +186,7 @@ state_collect_attention() {
   case "$MATCH_STATUS" in
     error|failed) state_attention_add error match "Rule match failed: $(state_get match.reason)" ;;
     warning) state_attention_add warning match "Rule match completed with warnings: $(state_get match.reason)" ;;
-    partial) state_attention_add warning match "Partial rule match; conservative defaults were used" ;;
-    fallback) state_attention_add warning match "Fallback rule strategy is active because capture evidence was insufficient" ;;
-    ok) : ;;
+    partial|fallback|ok) : ;;
   esac
 
   case "$CONFIG_STATUS" in
@@ -188,25 +194,23 @@ state_collect_attention() {
     warning) state_attention_add warning config "Config generation warning: $(state_get config.reason)" ;;
   esac
 
-  if [ "$CONFIG_SOURCE" = "webui-custom" ]; then
-    state_attention_add info risk "Custom WebUI configuration overrides automatic rule output"
-  fi
-
   case "$APPLY_STATUS" in
     error) state_attention_add error apply "Apply failed for ${APPLY_FAILED:-0} runtime properties" ;;
-    warning) state_attention_add warning apply "Apply mismatch detected for ${APPLY_MISMATCH:-0} runtime properties" ;;
-    pending|running) state_attention_add info apply "Apply result is pending after config generation" ;;
+    warning) state_attention_add info apply "Apply completed with ${APPLY_MISMATCH:-0} runtime property details" ;;
+    pending|running) state_attention_add info apply "Apply is waiting for reboot or service settle pass" ;;
   esac
 
   if [ "$SERVICE_STATUS" = "error" ]; then
     state_attention_add error service "Service error: $(state_get service.reason)"
-  elif [ "$SERVICE_HEALTH" = "problem" ] && { [ "${SERVICE_FAILED:-0}" -gt 0 ] 2>/dev/null || [ "${SERVICE_MISMATCH:-0}" -gt 0 ] 2>/dev/null; }; then
-    state_attention_add warning service "Runtime service reported failed=${SERVICE_FAILED:-0}, mismatch=${SERVICE_MISMATCH:-0}"
+  elif [ "$SERVICE_HEALTH" = "problem" ] && [ "${SERVICE_FAILED:-0}" -gt 0 ] 2>/dev/null; then
+    state_attention_add error service "Runtime service reported failed=${SERVICE_FAILED:-0}"
+  elif [ "$SERVICE_HEALTH" = "warning" ] && [ "${SERVICE_MISMATCH:-0}" -gt 0 ] 2>/dev/null; then
+    state_attention_add info service "Runtime service recorded ${SERVICE_MISMATCH:-0} property details"
   fi
 
   case "$HEALTH_STATUS" in
     error) state_attention_add error health "Health check failed: $(state_get health.reason)" ;;
-    warning|warn) state_attention_add warning health "Health check warning: $(state_get health.reason)" ;;
+    warning|warn) state_attention_add info health "Health check detail: $(state_get health.reason)" ;;
   esac
   [ "$(state_get health.auto_fixed)" = "yes" ] && state_attention_add info health "Health check repaired a missing runtime file"
 
@@ -218,14 +222,28 @@ state_collect_attention() {
 
   case "$INTEGRITY_STATUS" in
     error) state_attention_add error integrity "Integrity check failed: $(state_get integrity.reason)" ;;
-    missing) state_attention_add warning integrity "Integrity check found ${INTEGRITY_MISSING:-0} missing files" ;;
-    changed) state_attention_add warning integrity "Integrity check found ${INTEGRITY_CHANGED:-0} changed files" ;;
-    warning|warn) state_attention_add warning integrity "Integrity warning: $(state_get integrity.reason)" ;;
+    missing)
+      INTEGRITY_BLOCKING_MISSING="$(state_num integrity.blocking_missing_total)"
+      if [ "${INTEGRITY_BLOCKING_MISSING:-0}" -gt 0 ] 2>/dev/null; then
+        state_attention_add warning integrity "Integrity check found ${INTEGRITY_BLOCKING_MISSING:-0} missing key files"
+      else
+        state_attention_add info integrity "Integrity check recorded ${INTEGRITY_MISSING:-0} non-key missing files"
+      fi
+      ;;
+    changed)
+      INTEGRITY_BLOCKING_CHANGED="$(state_num integrity.blocking_changed_total)"
+      if [ "${INTEGRITY_BLOCKING_CHANGED:-0}" -gt 0 ] 2>/dev/null; then
+        state_attention_add warning integrity "Integrity check found ${INTEGRITY_BLOCKING_CHANGED:-0} changed key files"
+      else
+        state_attention_add info integrity "Integrity check recorded ${INTEGRITY_CHANGED:-0} non-key changed files"
+      fi
+      ;;
+    warning|warn) state_attention_add info integrity "Integrity detail: $(state_get integrity.reason)" ;;
   esac
 
   case "$RESTORE_STATUS" in
     restored|recovered) state_attention_add info restore "Runtime restore was performed: $(state_get restore.reason)" ;;
-    recovery) state_attention_add warning restore "Recovery is active: $(state_get restore.reason)" ;;
+    recovery) state_attention_add info restore "Recovery is active: $(state_get restore.reason)" ;;
     failed) state_attention_add error restore "Restore failed: $(state_get restore.reason)" ;;
   esac
 
@@ -235,23 +253,17 @@ state_collect_attention() {
 state_summary_reason() {
   REASON=""
   MATCH_STATUS="$(state_get match.status)"
-  CONFIG_SOURCE="$(state_get config.source)"
   APPLY_STATUS="$(state_get apply.status)"
   SERVICE_STATUS="$(state_get service.status)"
   INTEGRITY_STATUS="$(state_get integrity.status)"
   HEALTH_STATUS="$(state_get health.status)"
   CONFLICT_TOTAL="$(state_num conflict.total)"
+  INTEGRITY_BLOCKING_MISSING="$(state_num integrity.blocking_missing_total)"
+  INTEGRITY_BLOCKING_CHANGED="$(state_num integrity.blocking_changed_total)"
 
-  case "$MATCH_STATUS" in
-    partial) REASON="partial match" ;;
-    fallback) REASON="fallback rule set" ;;
-  esac
-
-  [ "$CONFIG_SOURCE" = "webui-custom" ] && REASON="${REASON:+$REASON / }custom config"
   [ "${CONFLICT_TOTAL:-0}" -gt 0 ] 2>/dev/null && REASON="${REASON:+$REASON / }conflict"
 
   case "$APPLY_STATUS" in
-    warning) REASON="${REASON:+$REASON / }apply warning" ;;
     error) REASON="${REASON:+$REASON / }apply error" ;;
   esac
 
@@ -260,11 +272,17 @@ state_summary_reason() {
   esac
 
   case "$INTEGRITY_STATUS" in
-    missing|changed|warning|warn|error) REASON="${REASON:+$REASON / }integrity $INTEGRITY_STATUS" ;;
+    error) REASON="${REASON:+$REASON / }integrity error" ;;
+    missing)
+      [ "${INTEGRITY_BLOCKING_MISSING:-0}" -gt 0 ] 2>/dev/null && REASON="${REASON:+$REASON / }integrity missing"
+      ;;
+    changed)
+      [ "${INTEGRITY_BLOCKING_CHANGED:-0}" -gt 0 ] 2>/dev/null && REASON="${REASON:+$REASON / }integrity changed"
+      ;;
   esac
 
   case "$HEALTH_STATUS" in
-    warning|warn|error) REASON="${REASON:+$REASON / }health $HEALTH_STATUS" ;;
+    error) REASON="${REASON:+$REASON / }health error" ;;
   esac
 
   [ -n "$REASON" ] || REASON="clean"
@@ -278,21 +296,10 @@ state_write_module_summary() {
 
   SUMMARY_STATUS_VALUE="$(state_get summary.status)"
   SUMMARY_REASON_VALUE="$(state_summary_reason)"
-  SUMMARY_ICON="🟨"
   case "$SUMMARY_STATUS_VALUE" in
-    ok) SUMMARY_ICON="🟩" ;;
-    warning|partial|fallback|pending|recovery) SUMMARY_ICON="🟨" ;;
-    error) SUMMARY_ICON="🟥" ;;
-  esac
-  case "$SUMMARY_STATUS_VALUE" in
-    ok) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | $SUMMARY_ICON OK" ;;
-    warning) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | $SUMMARY_ICON Warning ($SUMMARY_REASON_VALUE)" ;;
-    error) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | $SUMMARY_ICON Error ($SUMMARY_REASON_VALUE)" ;;
-    partial) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | $SUMMARY_ICON Partial ($SUMMARY_REASON_VALUE)" ;;
-    fallback) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | $SUMMARY_ICON Fallback ($SUMMARY_REASON_VALUE)" ;;
-    recovery) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | $SUMMARY_ICON Recovery ($SUMMARY_REASON_VALUE)" ;;
-    pending) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | $SUMMARY_ICON Pending ($SUMMARY_REASON_VALUE)" ;;
-    *) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟨 Unknown" ;;
+    error) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟥 Error ($SUMMARY_REASON_VALUE)" ;;
+    warning) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟨 Warning ($SUMMARY_REASON_VALUE)" ;;
+    *) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟩 OK" ;;
   esac
 
   CURRENT_DESCRIPTION="$(sed -n 's/^description=//p' "$MODULE_PROP_TARGET" 2>/dev/null | head -n 1)"
@@ -350,19 +357,7 @@ state_recompute_summary() {
     SUMMARY_STATUS=recovery
     SUMMARY_TITLE="Recovery In Progress"
     SUMMARY_MESSAGE="The module is trying to recover a required runtime file."
-  elif [ "$MATCH_STATUS" = "partial" ]; then
-    SUMMARY_STATUS=partial
-    SUMMARY_TITLE="Partial Rule Match"
-    SUMMARY_MESSAGE="Rules matched useful evidence, but conservative defaults filled missing inputs."
-  elif [ "$MATCH_STATUS" = "fallback" ]; then
-    SUMMARY_STATUS=fallback
-    SUMMARY_TITLE="Fallback Strategy"
-    SUMMARY_MESSAGE="No reliable capture evidence was found; safe defaults generated system.prop."
-  elif [ "$APPLY_STATUS" = "pending" ] || { [ "$(state_get config.source)" = "webui-custom" ] && [ "$(state_get service.status)" != "settled" ]; }; then
-    SUMMARY_STATUS=pending
-    SUMMARY_TITLE="Pending Apply"
-    SUMMARY_MESSAGE="system.prop has been generated and normally needs a reboot or service settle pass."
-  elif [ "${ALERT_TOTAL:-0}" -gt 0 ] 2>/dev/null || [ "$INTEGRITY_STATUS" = "missing" ] || [ "$INTEGRITY_STATUS" = "changed" ] || [ "$INTEGRITY_STATUS" = "warning" ] || [ "$HEALTH_STATUS" = "warning" ] || [ "$HEALTH_STATUS" = "warn" ]; then
+  elif [ "${ALERT_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
     SUMMARY_STATUS=warning
     SUMMARY_TITLE="Warnings Present"
     SUMMARY_MESSAGE="The module is usable, but one or more diagnostics need attention."

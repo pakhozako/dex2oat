@@ -11,20 +11,25 @@ const skip = [
   "node_modules",
   "dist",
   "release",
+  "releases",
+  "backups",
+  "reports",
   "temp",
   "cache",
   ".cache",
   ".env.local",
   "build.config.json",
   "environment-report.md",
+  "工具路径清单.md",
   "v3.5 自动化开发与构建报告.md",
+  "v3.6 自动化开发与构建报告.md",
   "发布版",
   "源码版"
 ];
 
 async function backupSource(options = {}) {
   const version = await readVersion();
-  const sourceBase = options.sourceDir || path.join(path.dirname(root), "源码版");
+  const sourceBase = options.sourceDir || path.join(root, "backups");
   const versionDir = path.join(sourceBase, version.version);
   const sourceTree = path.join(versionDir, "source");
   const zipPath = path.join(versionDir, `Dex2oat-Lock-${version.version}-source.zip`);

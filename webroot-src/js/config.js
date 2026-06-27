@@ -20,13 +20,111 @@ function riskAllowed(categoryId, config) {
   return allowedRiskSet(config).has(categoryId);
 }
 
+function shouldPromoteToEverything(value, prop, categoryId) {
+  if (!["safe", "caution"].includes(categoryId)) return false;
+  if (!["verify", "speed-profile", "speed"].includes(String(value))) return false;
+  return prop.startsWith("pm.dexopt.")
+    || prop === "dalvik.vm.dex2oat-filter"
+    || prop === "dalvik.vm.dex2oat-very-large"
+    || prop === "dalvik.vm.systemuicompilerfilter";
+}
+
+function shouldKeepBackgroundDefault(prop) {
+  return new Set([
+    "pm.dexopt.bg-dexopt",
+    "persist.sys.oplus.bgdex2oat_enabled",
+    "persist.oplus.ocompiler",
+    "oplus.opex.modulemerge",
+    "persist.device_config.runtime.dexopt.enabled",
+    "persist.device_config.runtime.bg_dexopt.enabled",
+    "persist.device_config.runtime.profile_merge",
+    "persist.device_config.runtime_native_boot.iorap_readahead_enable",
+    "persist.device_config.runtime_native_boot.iorap_perfetto_enable",
+    "persist.sys.app_dexfile_preload.enable",
+    "persist.sys.art_startup_class_preload.enable",
+    "persist.sys.precache.enable",
+    "dalvik.vm.enable_pr_dexopt",
+    "dalvik.vm.pr_dexopt_async_for_ota",
+    "dalvik.vm.bgdexopt.new-classes-percent",
+    "dalvik.vm.bgdexopt.new-methods-percent",
+    "sys.oplus.dalvik_sync_config",
+    "system_perf_init.bg-dex2oat-threads",
+    "dalvik.vm.background-dex2oat-threads",
+    "dalvik.vm.background-dex2oat-cpu-set",
+    "dalvik.vm.bg-dex2oat-threads"
+  ]).has(prop);
+}
+
 export async function loadJson(path, fallback) {
+  const protectedJson = readProtectedJson(path);
+  if (protectedJson) return protectedJson;
+
   try {
     const response = await fetch(path, { cache: "no-store" });
     if (!response.ok) throw new Error(response.statusText);
     return await response.json();
   } catch {
     return fallback;
+  }
+}
+
+function protectedDataForPath(path) {
+  const data = globalThis.__DEX2OAT_WEBUI_DATA || {};
+  if (path.endsWith("/app-meta.json")) return data.a;
+  if (path.endsWith("/options.json")) return data.o;
+  return null;
+}
+
+function readProtectedJson(path) {
+  const item = protectedDataForPath(path);
+  if (!item) return null;
+  try {
+    return JSON.parse(decodeProtectedText(item));
+  } catch {
+    return null;
+  }
+}
+
+export function decodeProtectedText(item) {
+  const bytes = decodeProtectedBytes(item);
+  let output = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    output += String.fromCharCode.apply(null, bytes.subarray(index, index + chunkSize));
+  }
+  return decodeUtf8(output);
+}
+
+export function decodeProtectedBytes(item) {
+  const chunks = item.c.slice().reverse();
+  if (item.v >= 2 && chunks.length) {
+    const rotation = Number(item.r || 0) % chunks.length;
+    chunks.unshift(...chunks.splice(chunks.length - rotation, rotation));
+  }
+  const base64 = chunks.join("");
+  const binary = atob(base64);
+  const output = new Uint8Array(item.l);
+  const name = item.n || "data";
+  let maskState = (item.s ^ item.l ^ name.charCodeAt(0)) >>> 0;
+  for (let index = 0; index < item.l; index += 1) {
+    const nameCode = name.charCodeAt(index % name.length);
+    let mask;
+    if (item.v >= 2) {
+      maskState = (Math.imul(maskState ^ (index + 0x9e3779b9) ^ nameCode, 1664525) + 1013904223) >>> 0;
+      mask = (maskState ^ (maskState >>> 8) ^ (maskState >>> 16) ^ (item.s >>> ((index & 3) * 8))) & 0xff;
+    } else {
+      mask = (item.s + index * 31 + (index >>> 3) * 17 + nameCode) & 0xff;
+    }
+    output[item.l - 1 - index] = binary.charCodeAt(index) ^ mask;
+  }
+  return output;
+}
+
+function decodeUtf8(binaryText) {
+  try {
+    return decodeURIComponent(escape(binaryText));
+  } catch {
+    return binaryText;
   }
 }
 
@@ -167,8 +265,16 @@ export function applySystemPropState(options, config, systemProp) {
       const entry = propBestEntry.get(item.prop);
       if (!entry) continue;
 
+      if (entry.enabled && shouldKeepBackgroundDefault(item.prop) && item.defaultValue !== "") {
+        itemState.enabled = true;
+        itemState.value = item.defaultValue;
+        continue;
+      }
+
       itemState.enabled = entry.enabled;
-      itemState.value = entry.value;
+      itemState.value = shouldPromoteToEverything(entry.value, item.prop, category.id) && item.values?.includes("everything")
+        ? "everything"
+        : entry.value;
     }
   }
 
@@ -235,7 +341,7 @@ function serviceCount(serviceState, key) {
 }
 
 function hasServiceProblems(serviceState) {
-  return serviceCount(serviceState, "failed_total") > 0 || serviceCount(serviceState, "mismatch_total") > 0;
+  return serviceCount(serviceState, "failed_total") > 0 || serviceState.status === "error" || serviceState.health === "problem";
 }
 
 function buildRebootState(config, bootId, serviceState) {
@@ -253,7 +359,7 @@ function buildRebootState(config, bootId, serviceState) {
   const serviceSummary = servicePropTotal
     ? `${servicePropTotal} 项，失败 ${serviceFailedTotal}，未粘住 ${serviceMismatchTotal}`
     : "";
-  const serviceStateProblem = serviceStatus === "error" || serviceHealth === "problem" || serviceProblemTotal > 0;
+  const serviceStateProblem = serviceStatus === "error" || serviceHealth === "problem" || serviceFailedTotal > 0;
   const serviceSkipped = serviceStatus === "skipped" || serviceHealth === "skipped";
 
   if (!config.pendingReboot) {

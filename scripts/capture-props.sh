@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
 OUT_FILE="${1:-/data/adb/dex2oat-lock/captured-props.txt}"
-EXPORT_FILE="${2:-/storage/emulated/0/Download/dex2oat-captured-props.txt}"
+EXPORT_FILE="${2-}"
 OUT_DIR="${OUT_FILE%/*}"
 TMP_FILE="$OUT_FILE.tmp"
 

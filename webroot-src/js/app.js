@@ -1,8 +1,9 @@
 import { MODULE_DIR, STATE_DIR, exec, readText, writeBase64 } from "./bridge.js";
-import { countChanged, countEnabled, countHighRiskEnabled, loadJson, loadUserConfig, mergeConfig, readGeneratedSystemProp, saveConfig } from "./config.js";
+import { countChanged, countEnabled, countHighRiskEnabled, decodeProtectedBytes, decodeProtectedText, loadJson, loadUserConfig, mergeConfig, readGeneratedSystemProp, saveConfig } from "./config.js";
 import { readSystemInfo } from "./system-info.js";
 import { $, createElement, metric, setStatus, showConfirm } from "./ui.js";
 import { shellQuote, resultMessage, parseKeyValueLines, parseStateFile } from "./utils.js";
+import { initTheme } from "./m3-theme.js";
 
 const state = {
   meta: null,
@@ -18,12 +19,33 @@ const state = {
   agreementReadyAt: 0,
   agreementTimer: null,
   customFilter: "all",
-  customSearch: ""
+  customSearch: "",
+  customDraftDirty: false
 };
 
 const RISK_AGREEMENT_VERSION = 2;
 const RISK_WAIT_SECONDS = 30;
 const CONFIG_BACKUP_PATH = "/storage/emulated/0/Download/dex2oat-lock-config-backup.json";
+const DIAGNOSTIC_EXPORT_PATH = "/storage/emulated/0/Download/dex2oat-lock-diagnostic.txt";
+const BONUS_TEXT_PATH = "";
+const BONUS_ART_PATH = "";
+const PULL_REFRESH_THRESHOLD = 76;
+const PULL_REFRESH_MAX = 112;
+const PULL_REFRESH_COMBO_WINDOW_MS = 45000;
+let refreshInFlight = null;
+let pullRefreshBound = false;
+let bonusTapCount = 0;
+let bonusTapTimer = null;
+let bonusArtUrl = "";
+let bonusMeta = null;
+let pullRefreshComboCount = 0;
+let pullRefreshLastAt = 0;
+const pullRefreshState = {
+  tracking: false,
+  refreshing: false,
+  startY: 0,
+  distance: 0
+};
 const riskModes = {
   safe: {
     label: "安全",
@@ -241,20 +263,24 @@ function renderShell() {
       </div>
       <div class="topbar-center"><span class="topbar-status" id="statusMessage" data-tone="neutral">准备就绪</span></div>
       <div class="top-actions">
-        <button class="icon-button" id="refreshButton" title="刷新">↻</button>
         <button class="icon-button" id="rebootButton" title="重启">⏻</button>
       </div>
     </header>
+    <div class="pull-refresh-indicator" id="pullRefreshIndicator" role="status" aria-live="polite">
+      <span class="pull-refresh-spinner" aria-hidden="true"></span>
+      <span id="pullRefreshText">下拉刷新</span>
+    </div>
     <main id="page"></main>
     <nav class="bottom-nav">
-      <button data-page="home">首页</button>
-      <button data-page="custom">自定义</button>
-      <button data-page="about">关于</button>
+      <button data-page="home"><span class="nav-label">首页</span></button>
+      <button data-page="custom"><span class="nav-label">自定义</span></button>
+      <button data-page="about"><span class="nav-label">关于</span></button>
     </nav>
   `;
 
-  $("#refreshButton").addEventListener("click", refreshAll);
   $("#rebootButton").addEventListener("click", rebootDevice);
+  $(".brand-logo")?.addEventListener("click", triggerLogoEasterEgg);
+  setupPullRefresh();
 
   document.querySelectorAll(".bottom-nav button").forEach((button) => {
     button.addEventListener("click", () => setPage(button.dataset.page));
@@ -262,11 +288,14 @@ function renderShell() {
 }
 
 function setPage(page) {
+  const changed = state.page !== page;
   state.page = page;
   document.querySelectorAll(".bottom-nav button").forEach((button) => {
     button.classList.toggle("active", button.dataset.page === page);
   });
-  renderPage();
+  if (changed || !$("#page")?.hasChildNodes()) {
+    renderPage();
+  }
 }
 
 function renderPage() {
@@ -279,6 +308,97 @@ function renderPage() {
   } else {
     renderHome();
   }
+  animatePageTransition();
+}
+
+function animatePageTransition() {
+  const page = $("#page");
+  if (!page) return;
+  page.classList.remove("is-transitioning");
+  void page.offsetWidth;
+  page.classList.add("is-transitioning");
+}
+
+function triggerLogoEasterEgg() {
+  bonusTapCount += 1;
+  if (bonusTapTimer) clearTimeout(bonusTapTimer);
+  bonusTapTimer = setTimeout(() => {
+    bonusTapCount = 0;
+  }, 1200);
+  if (bonusTapCount < 5) return;
+  bonusTapCount = 0;
+  document.body.classList.add("bonus-pulse");
+  setStatus("已打开隐藏彩蛋", "ok");
+  void showBonusDialog();
+  setTimeout(() => document.body.classList.remove("bonus-pulse"), 1200);
+}
+
+async function loadBonusText() {
+  const protectedLyrics = globalThis.__DEX2OAT_WEBUI_DATA?.l;
+  if (protectedLyrics) return decodeProtectedText(protectedLyrics);
+
+  try {
+    if (!BONUS_TEXT_PATH) throw new Error("protected text unavailable");
+    const response = await fetch(BONUS_TEXT_PATH, { cache: "no-store" });
+    if (response.ok) return response.text();
+  } catch {
+    // Keep the hidden dialog usable in WebUI hosts with restricted fetch behavior.
+  }
+  return "内容暂不可用，请重新构建 WebUI。";
+}
+
+function loadBonusArt() {
+  if (bonusArtUrl) return bonusArtUrl;
+  const protectedCover = globalThis.__DEX2OAT_WEBUI_DATA?.c;
+  if (!protectedCover) return BONUS_ART_PATH;
+  try {
+    const bytes = decodeProtectedBytes(protectedCover);
+    const blob = new Blob([bytes], { type: protectedCover.m || "image/jpeg" });
+    bonusArtUrl = URL.createObjectURL(blob);
+    return bonusArtUrl;
+  } catch {
+    return BONUS_ART_PATH;
+  }
+}
+
+function parseBonusMeta(lyrics) {
+  if (bonusMeta) return bonusMeta;
+  const firstLine = String(lyrics || "").split(/\r?\n/).find((line) => line.trim()) || "隐藏曲目";
+  const parts = firstLine.split(/\s*-\s*/);
+  bonusMeta = {
+    title: parts[0]?.trim() || "隐藏曲目",
+    artist: parts.slice(1).join(" - ").trim() || "Dex2oat Lock"
+  };
+  return bonusMeta;
+}
+
+function createBonusHeader(lyrics) {
+  const meta = parseBonusMeta(lyrics);
+  const header = createElement("div", "bonus-dialog-header");
+  const copy = createElement("div", "bonus-dialog-copy");
+  copy.append(createElement("strong", "", meta.title));
+  copy.append(createElement("span", "", meta.artist));
+  const cover = document.createElement("img");
+  cover.className = "bonus-art";
+  cover.src = loadBonusArt();
+  cover.alt = meta.artist ? `${meta.title} - ${meta.artist}` : meta.title;
+  header.append(copy, cover);
+  return header;
+}
+
+async function showBonusDialog() {
+  const lyrics = await loadBonusText();
+  showDialog("隐藏彩蛋", lyrics, createBonusHeader(lyrics), {
+    className: "bonus-dialog",
+    copyLabel: "复制歌词"
+  });
+}
+
+function showPullRefreshBonus() {
+  showDialog("提示", "你这么无聊吗，老弟？", null, {
+    className: "bonus-dialog pull-bonus-dialog",
+    copyLabel: "复制"
+  });
 }
 
 function buildAttentionItems() {
@@ -287,36 +407,54 @@ function buildAttentionItems() {
   for (let index = 1; index <= total; index += 1) {
     const value = state.unifiedState?.[`summary.attention.${index}`];
     const level = state.unifiedState?.[`summary.attention.${index}.level`] || String(value || "").split("|")[0] || "warning";
+    if (level === "info" || level === "note" || level === "debug") continue;
     const message = state.unifiedState?.[`summary.attention.${index}.message`] || String(value || "").split("|").slice(2).join("|") || value;
     if (message) items.push({ level, message });
   }
   if (!items.length) {
     const conflictTotal = Number(state.unifiedState?.["conflict.total"] || 0);
     const failedTotal = Number(state.unifiedState?.["service.failed_total"] || 0);
-    const mismatchTotal = Number(state.unifiedState?.["service.mismatch_total"] || 0);
     if (conflictTotal) items.push({ level: "warning", message: `检测到 ${conflictTotal} 项模块间属性冲突` });
-    if (failedTotal || mismatchTotal) items.push({ level: failedTotal ? "error" : "warning", message: `运行时应用异常：失败 ${failedTotal} 项，未粘住 ${mismatchTotal} 项` });
-    if (["warn", "warning", "error"].includes(state.health?.status)) items.push({ level: state.health.status === "error" ? "error" : "warning", message: `健康检查状态：${state.health.status}` });
+    if (failedTotal) items.push({ level: "error", message: `运行时应用失败 ${failedTotal} 项` });
+    if (state.health?.status === "error") items.push({ level: "error", message: `健康检查异常：${state.health.status}` });
   }
   return items;
 }
 
 function currentSummary() {
-  const status = state.unifiedState?.["summary.status"] || (buildAttentionItems().length ? "warning" : "pending");
+  const rawStatus = state.unifiedState?.["summary.status"] || (buildAttentionItems().length ? "warning" : "ok");
+  const rebootState = state.config.rebootState || {};
+  const isPendingReboot = rebootState.label === "待重启";
+  const status = isPendingReboot ? "pending" : ["partial", "fallback"].includes(rawStatus) ? "ok" : rawStatus;
+  const legacyTitleKey = String(state.unifiedState?.["summary.title"] || "").toLowerCase().replace(/\s+/g, "-");
+  const hasLegacyRuleTitle = legacyTitleKey === ["partial", "rule", "match"].join("-")
+    || legacyTitleKey === ["fallback", "strategy"].join("-");
   const labels = {
     ok: "状态正常",
     warning: "存在警告",
     error: "需要处理",
-    pending: "待确认",
-    recovery: "恢复中",
-    partial: "部分匹配",
-    fallback: "回退策略"
+    pending: "待重启",
+    recovery: "恢复中"
   };
+  const rawTitle = state.unifiedState?.["summary.title"] || "";
+  const rawMessage = state.unifiedState?.["summary.message"] || "";
+  const matchedTotal = state.unifiedState?.["match.matched_total"] || state.configSource?.matched_total || "0";
+  const normalizedRuleMessage = `自动规则匹配完成，已根据设备属性生成配置。命中 ${matchedTotal} 项，未匹配项使用保守默认值。`;
+  const title = isPendingReboot
+    ? "待重启"
+    : ["partial", "fallback"].includes(rawStatus) || hasLegacyRuleTitle
+      ? "状态正常"
+      : rawTitle || labels[status] || "状态正常";
+  const message = isPendingReboot
+    ? (rebootState.reason || "配置已保存，重启后完成应用。")
+    : ["partial", "fallback"].includes(rawStatus) || /conservative defaults|safe defaults/i.test(rawMessage)
+    ? normalizedRuleMessage
+    : rawMessage || "正在等待完整状态证据";
   return {
     status,
-    title: state.unifiedState?.["summary.title"] || labels[status] || "待确认",
-    message: state.unifiedState?.["summary.message"] || "正在等待完整状态证据",
-    tone: status === "error" ? "is-error" : status === "ok" ? "is-working" : status === "recovery" ? "is-recovery" : status === "fallback" ? "is-fallback" : status === "partial" ? "is-partial" : "is-warn"
+    title,
+    message,
+    tone: status === "error" ? "is-error" : status === "ok" ? "is-working" : status === "recovery" ? "is-recovery" : "is-warn"
   };
 }
 
@@ -327,6 +465,7 @@ function createStatusCard() {
   const installStatus = state.unifiedState?.["install.status"] || "unknown";
   const installPercent = state.unifiedState?.["install.progress"] || state.unifiedState?.["install.percent"] || "0";
   const applyStatus = state.unifiedState?.["apply.last_status"] || state.unifiedState?.["apply.status"] || state.unifiedState?.["service.status"] || "unknown";
+  const rebootLabel = rebootState.label || (summary.status === "pending" ? "待重启" : "已生效");
   const hero = createElement("section", `module-status-card ${summary.tone}`);
   hero.innerHTML = `
     <div class="module-status-content">
@@ -337,6 +476,7 @@ function createStatusCard() {
         <span>最终 prop ${escapeHtml(state.configSource?.prop_count || "0")} 项</span>
         <span>安装 ${escapeHtml(installStatus)} · ${escapeHtml(installPercent)}%</span>
         <span>应用 ${escapeHtml(applyStatus)}</span>
+        <span>重启 ${escapeHtml(rebootLabel)}</span>
         <span>冲突 ${conflictTotal} 项</span>
       </div>
       <div class="module-status-reboot">${escapeHtml(summary.message || rebootState.reason || "状态已汇总到 state.prop")}</div>
@@ -348,14 +488,11 @@ function createStatusCard() {
 
 function createAttentionSection() {
   const items = buildAttentionItems();
+  if (!items.length) return null;
   const section = createSection("需要关注", items.length ? `${items.length} 项` : "无异常置顶");
   section.classList.add(items.length ? "attention-section" : "attention-section", items.length ? "has-items" : "is-empty");
   const list = createElement("div", "attention-list");
-  if (!items.length) {
-    list.append(createElement("div", "attention-item ok", "当前没有从统一状态中发现需要置顶的问题。"));
-  } else {
-    for (const item of items) list.append(createElement("div", `attention-item ${item.level === "error" ? "error" : item.level === "info" ? "info" : "warn"}`, item.message));
-  }
+  for (const item of items) list.append(createElement("div", `attention-item ${item.level === "error" ? "error" : item.level === "info" ? "info" : "warn"}`, item.message));
   section.append(list);
   return section;
 }
@@ -366,13 +503,43 @@ function createSummaryBand() {
   summary.append(metric("设备", state.device?.["ro.product.model"] || "暂不可用"));
   summary.append(metric("规则体系", "规则驱动"));
   summary.append(metric("配置来源", sourceLabel(state.configSource)));
-  summary.append(metric("配置摘要", shortHash(state.configSource?.prop_hash)));
+  const configSummary = metric("配置摘要", shortHash(state.configSource?.prop_hash));
+  configSummary.classList.add("metric-button");
+  configSummary.tabIndex = 0;
+  configSummary.setAttribute("role", "button");
+  configSummary.addEventListener("click", showConfigSummaryDialog);
+  configSummary.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      showConfigSummaryDialog();
+    }
+  });
+  summary.append(configSummary);
   summary.append(metric("系统", state.device?.["ro.build.version.release"] || "暂不可用"));
   summary.append(metric("Root", info.root || "暂不可用"));
   summary.append(metric("安装进度", `${state.unifiedState?.["install.step"] || state.unifiedState?.["install.stage"] || "未知"} · ${state.unifiedState?.["install.progress"] || state.unifiedState?.["install.percent"] || "0"}%`));
   summary.append(metric("规则匹配", `${state.unifiedState?.["match.status"] || "unknown"} · ${state.unifiedState?.["match.matched_total"] || 0} 项`));
   summary.append(metric("最近应用", state.unifiedState?.["apply.updated_at"] || state.unifiedState?.["service.updated_at"] || state.configSource?.updated_at || "暂不可用"));
   return summary;
+}
+
+function showConfigSummaryDialog() {
+  const rows = [
+    ["配置来源", sourceLabel(state.configSource)],
+    ["生成状态", state.unifiedState?.["config.status"] || "unknown"],
+    ["生成原因", state.unifiedState?.["config.reason"] || state.configSource?.reason || "unknown"],
+    ["最终 prop 数", state.configSource?.prop_count || state.unifiedState?.["config.prop_count"] || "0"],
+    ["完整 Hash", state.configSource?.prop_hash || state.unifiedState?.["config.prop_hash"] || "暂不可用"],
+    ["匹配状态", `${state.unifiedState?.["match.status"] || "unknown"} · ${state.unifiedState?.["match.matched_total"] || 0} 项`],
+    ["抓取数量", state.unifiedState?.["match.captured_total"] || "0"],
+    ["默认数量", state.unifiedState?.["match.default_total"] || "0"],
+    ["未命中", state.unifiedState?.["match.unmatched_total"] || "0"],
+    ["更新时间", state.configSource?.updated_at || state.unifiedState?.["config.updated_at"] || "暂不可用"]
+  ];
+  showDialog("配置摘要", rows.map(([label, value]) => `${label}: ${value}`).join("\n"), null, {
+    className: "config-summary-dialog",
+    copyLabel: "复制摘要"
+  });
 }
 
 function shortHash(value) {
@@ -412,23 +579,28 @@ function createCardNote(text) {
 }
 
 function createRuleStateSection() {
-  const matchStatus = state.unifiedState?.["match.status"] || "pending";
-  const labels = { ok: "正常", partial: "部分匹配", fallback: "回退策略", warning: "警告", error: "异常", pending: "待匹配" };
-  const section = createSection("规则匹配", statusLabel(matchStatus, labels));
+  const rawStatus = state.unifiedState?.["match.status"] || "pending";
+  const matchStatus = ["partial", "fallback"].includes(rawStatus) ? "ok" : rawStatus;
+  const labels = { ok: "正常", warning: "警告", error: "异常", pending: "待匹配" };
+  const matchedTotal = state.unifiedState?.["match.matched_total"] || 0;
+  const section = createSection("规则匹配", `${statusLabel(matchStatus, labels)} · ${matchedTotal} 项`);
   section.classList.add("home-state-card", `state-${matchStatus}`);
   section.append(createMetricGrid([
-    ["命中", `${state.unifiedState?.["match.matched_total"] || 0} 项`],
-    ["回退", `${state.unifiedState?.["match.fallback_total"] || 0} 项`],
-    ["未命中", `${state.unifiedState?.["match.unmatched_total"] || 0} 项`]
+    ["命中", `${matchedTotal} 项`],
+    ["默认", `${state.unifiedState?.["match.default_total"] || 0} 项`],
+    ["规则", sourceLabel(state.configSource)]
   ]));
-  section.append(createCardNote(state.unifiedState?.["match.reason"] || state.configSource?.reason || "规则结果来自统一状态 state.prop。"));
+  section.append(createCardNote(["partial", "fallback"].includes(rawStatus)
+    ? "已使用设备可用证据完成匹配；未覆盖的项目保持保守默认值。"
+    : state.unifiedState?.["match.reason"] || state.configSource?.reason || "规则结果来自统一状态 state.prop。"));
   return section;
 }
 
 function createHealthSection() {
   const health = state.health || {};
-  const status = health.status || state.unifiedState?.["health.status"] || "warn";
-  const labels = { ok: "正常", warn: "警告", warning: "警告", changed: "变更", missing: "缺失", error: "异常" };
+  const rawStatus = health.status || state.unifiedState?.["health.status"] || "ok";
+  const status = rawStatus === "error" ? "error" : "ok";
+  const labels = { ok: "正常", error: "异常" };
   const section = createSection("健康状态", statusLabel(status, labels));
   section.classList.add("home-state-card", "health-section", `health-${status}`, `state-${status}`);
   section.append(createMetricGrid([
@@ -442,8 +614,10 @@ function createHealthSection() {
 
 function createModuleStateSection() {
   const rebootState = state.config.rebootState || {};
-  const applyStatus = state.unifiedState?.["apply.last_status"] || state.unifiedState?.["apply.status"] || state.unifiedState?.["service.status"] || rebootState.status || "pending";
-  const labels = { ok: "正常", applied: "已应用", settled: "已稳定", pending: "待应用", skipped: "已跳过", warning: "警告", mismatch: "未粘住", failed: "失败", error: "异常" };
+  const rawStatus = state.unifiedState?.["apply.last_status"] || state.unifiedState?.["apply.status"] || state.unifiedState?.["service.status"] || rebootState.status || "ok";
+  const failedTotal = Number(rebootState.serviceFailedTotal || state.unifiedState?.["apply.failed_total"] || 0);
+  const applyStatus = failedTotal ? "error" : rebootState.label === "待重启" || rawStatus === "pending" ? "pending" : "ok";
+  const labels = { ok: "正常", pending: "待重启", error: "异常" };
   const section = createSection("运行应用", statusLabel(applyStatus, labels));
   section.classList.add("home-state-card", `state-${applyStatus}`);
   section.append(createMetricGrid([
@@ -457,11 +631,13 @@ function createModuleStateSection() {
 
 function integrityLabel() {
   const status = state.unifiedState?.["integrity.status"] || "unknown";
+  const blockingMissing = Number(state.unifiedState?.["integrity.blocking_missing_total"] || 0);
+  const blockingChanged = Number(state.unifiedState?.["integrity.blocking_changed_total"] || 0);
   if (status === "ok") return "通过";
   if (status === "error") return "异常";
-  if (["warn", "warning"].includes(status)) return "警告";
-  if (status === "missing") return "缺失";
-  if (status === "changed") return "变更";
+  if (["warn", "warning"].includes(status)) return "已记录";
+  if (status === "missing") return blockingMissing ? "缺失" : "已记录";
+  if (status === "changed") return blockingChanged ? "变更" : "已记录";
   return "未检测";
 }
 
@@ -533,7 +709,7 @@ function renderCustom() {
 
   page.append(createRiskModePanel());
   const workbench = createElement("div", "custom-workbench", "");
-  workbench.append(createSaveSummary(), createConfigBackupPanel(), createCustomOptionsList(), createSaveActions());
+  workbench.append(createSaveSummary(), createCustomOptionsList());
   page.append(workbench);
 }
 
@@ -562,7 +738,7 @@ function createRiskModePanel() {
     selector.append(button);
   }
   const note = createElement("p", "risk-note", meta.description);
-  const status = createElement("div", "risk-status", `自定义 ${hasAcceptedCustomAgreement() ? "已解锁" : "未解锁"} · 危险模式 ${hasAcceptedAggressiveAgreement() ? "已解锁" : "未解锁"}`);
+  const status = createElement("div", "risk-status", `自定义 ${hasAcceptedCustomAgreement() ? "已确认" : "待确认"} · 危险模式 ${hasAcceptedAggressiveAgreement() ? "已确认" : "待确认"}`);
   const details = createElement("div", "mode-detail-grid");
   details.append(modeDetail("适合", meta.suitableFor));
   details.append(modeDetail("影响", meta.impact));
@@ -580,16 +756,18 @@ function modeDetail(label, text) {
 function setRiskMode(mode) {
   if (mode === "aggressive" && !hasAcceptedAggressiveAgreement()) {
     state.config.riskMode = "caution";
+    state.customDraftDirty = true;
     renderCustom();
     showAgreementDialog("aggressive");
     return;
   }
   state.config.riskMode = mode;
+  state.customDraftDirty = true;
   renderCustom();
 }
 
 function createSaveSummary() {
-  const section = createSection("保存摘要", "保存前确认");
+  const section = createSection("保存与生成", "保存前确认");
   section.classList.add("save-summary");
   const grid = createElement("div", "metric-grid compact");
   grid.append(metric("启用项", countEnabled(state.config, state.options)));
@@ -600,7 +778,9 @@ function createSaveSummary() {
   grid.append(metric("覆盖自动匹配", state.configSource?.source === "webui-custom" ? "已自定义" : "保存后会覆盖"));
   section.append(grid);
   const hint = createElement("p", "save-hint", "保存会重新生成 system.prop，并更新统一状态；通常需要重启后由 service 完成运行时应用验证。");
-  section.append(hint);
+  const actions = createElement("div", "save-action-row");
+  actions.append(createButton("保存并生成 system.prop", `primary-button ${state.config.riskMode || "safe"}`, saveCurrentConfig));
+  section.append(hint, actions);
   return section;
 }
 
@@ -760,26 +940,20 @@ function createOptionRow(category, item) {
   return row;
 }
 
-function createSaveActions() {
-  const actions = createElement("section", "sticky-actions main-save-actions");
-  actions.append(createButton("保存并生成 system.prop", `primary-button ${state.config.riskMode || "safe"}`, saveCurrentConfig));
-  return actions;
-}
-
 function createAgreementGate(scope) {
-  const section = createSection("风险协议", "进入自定义前必须完成");
+  const section = createSection("风险提示", "继续前请先确认");
   section.classList.add("agreement-gate");
-  section.append(createElement("p", "risk-note", "首页和诊断可直接查看；自定义配置、危险模式和保存高风险配置需要先完成风险告知确认。"));
-  section.append(createButton("阅读并解锁自定义配置", "primary-button", () => showAgreementDialog(scope)));
+  section.append(createElement("p", "risk-note", "首页和诊断可直接查看；调整配置前请先阅读风险提示。"));
+  section.append(createButton("阅读风险提示", "primary-button", () => showAgreementDialog(scope)));
   return section;
 }
 
 function agreementText(scope) {
   const modeText = scope === "aggressive" ? "危险模式" : "自定义配置";
   return [
-    "Dex2oat Lock 风险告知与使用确认",
+    "Dex2oat Lock 风险提示",
     "",
-    `你正在解锁 ${modeText}。本模块会生成并应用 ART、dexopt、runtime 相关系统属性，这些配置可能改变系统编译、应用安装、后台维护、启动优化和运行时行为。`,
+    `你正在开启 ${modeText}。本模块会生成并应用 ART、dexopt、runtime 相关系统属性，这些配置可能改变系统编译、应用安装、后台维护、启动优化和运行时行为。`,
     "自定义配置、规则修改、手动覆盖自动匹配结果或启用危险模式，可能导致性能异常、发热、耗电、应用兼容性问题、系统不稳定、启动异常、卡顿、闪退、功能异常，或与 ROM、Magisk/KernelSU/APatch、内核、其它模块和厂商实现产生冲突。",
     "作者无法验证所有设备、系统版本、ROM、Root 框架、内核和模块组合，也不保证任何自定义配置适用于你的具体环境。你应在理解配置含义和风险后再保存或启用。",
     "如果出现异常，应优先恢复默认配置、重新抓取匹配、禁用冲突模块、重启验证，必要时卸载模块并回滚。自定义配置、危险模式和手动覆盖自动匹配结果造成的后果，由使用者自行评估并承担。"
@@ -801,17 +975,17 @@ function showAgreementDialog(scope = "custom") {
   state.agreementReadyAt = Date.now() + RISK_WAIT_SECONDS * 1000;
   const dialog = createElement("div", "dialog agreement-dialog");
   dialog.innerHTML = `
-    <div class="dialog-panel agreement-panel">
-      <div class="section-title">
-        <h2>风险协议</h2>
+      <div class="dialog-panel agreement-panel">
+        <div class="section-title">
+        <h2>风险提示</h2>
         <div class="dialog-actions"><button class="text-button" data-action="close">关闭</button></div>
       </div>
       <pre>${escapeHtml(agreementText(scope))}</pre>
       <div class="agreement-controls">
         <div class="agreement-countdown" data-countdown></div>
         <label class="challenge-row">计算验证：<strong>${escapeHtml(state.agreementChallenge.prompt)}</strong><input type="number" inputmode="numeric" data-answer /></label>
-        <label class="agreement-check"><input type="checkbox" data-agree disabled /> 我已阅读并同意协议</label>
-        <button class="primary-button" data-confirm disabled>${scope === "aggressive" ? "解锁危险模式" : "解锁自定义配置"}</button>
+        <label class="agreement-check"><input type="checkbox" data-agree disabled /> 我已了解风险</label>
+        <button class="primary-button" data-confirm disabled>${scope === "aggressive" ? "进入危险模式" : "继续自定义"}</button>
       </div>
     </div>
   `;
@@ -821,7 +995,7 @@ function showAgreementDialog(scope = "custom") {
   const confirm = dialog.querySelector("[data-confirm]");
   const updateAgreementState = () => {
     const remaining = Math.max(0, Math.ceil((state.agreementReadyAt - Date.now()) / 1000));
-    countdown.textContent = remaining ? `请阅读协议，${remaining} 秒后可确认。` : "倒计时已结束，请完成计算验证。";
+    countdown.textContent = remaining ? `请阅读提示，${remaining} 秒后可确认。` : "请完成计算验证后继续。";
     const solved = Number(input.value) === state.agreementChallenge.answer;
     agree.disabled = remaining > 0 || !solved;
     confirm.disabled = !agree.checked || agree.disabled;
@@ -832,13 +1006,13 @@ function showAgreementDialog(scope = "custom") {
     acceptAgreement(scope);
     await persistWebConfig();
     clearInterval(state.agreementTimer);
-    dialog.remove();
+    closeDialog(dialog);
     renderPage();
-    setStatus(scope === "aggressive" ? "危险模式已解锁" : "自定义配置已解锁", "ok");
+    setStatus(scope === "aggressive" ? "危险模式已开启" : "自定义配置已开启", "ok");
   });
   dialog.querySelector('[data-action="close"]').addEventListener("click", () => {
     clearInterval(state.agreementTimer);
-    dialog.remove();
+    closeDialog(dialog);
   });
   state.agreementTimer = setInterval(updateAgreementState, 500);
   updateAgreementState();
@@ -882,15 +1056,15 @@ function renderAbout() {
   const finalPropCount = state.configSource?.prop_count || state.unifiedState?.["config.prop_count"] || "0";
   const status = currentSummary();
 
-  const overview = createSection("关于", `${state.meta.version} / ${state.meta.versionCode || "350"}`);
+  const overview = createSection("关于", `${state.meta.version} / ${state.meta.versionCode || "unknown"}`);
   overview.classList.add("about-section");
   const overviewGrid = createElement("div", "about-info-grid");
   overviewGrid.append(createAboutInfoCard("规则数量", `${ruleTotal} 项`, `${categoryTotal} 个分类`));
   overviewGrid.append(createAboutInfoCard("配置来源", sourceLabel(state.configSource), `最终 prop ${finalPropCount} 项`));
-  overviewGrid.append(createAboutInfoCard("Schema", state.options?.schemaVersion || "32", `Rules ${state.options?.rulesVersion || state.meta.version || "v3.5"}`));
+  overviewGrid.append(createAboutInfoCard("规则版本", state.options?.rulesVersion || state.meta.version || "unknown", `数据格式 ${state.options?.schemaVersion || "32"}`));
   overviewGrid.append(createAboutInfoCard("状态", status.title, status.message));
-  overviewGrid.append(createAboutInfoCard("架构", state.meta.architecture || "规则驱动 / 统一状态", "规则生成 + state.prop 汇总"));
-  overviewGrid.append(createAboutInfoCard("协议", "本地风险确认", "仅控制自定义和危险配置解锁"));
+  overviewGrid.append(createAboutInfoCard("工作方式", state.meta.architecture || "规则驱动 / 统一状态", "自动生成配置并汇总运行状态"));
+  overviewGrid.append(createAboutInfoCard("WebUI", "本地管理", "配置保存在设备本机"));
   overview.append(overviewGrid);
   overview.append(createElement("p", "risk-note", state.meta.description || "规则驱动生成 system.prop，并以统一状态模型汇总安装、匹配、应用、健康、冲突和完整性结果。"));
 
@@ -905,18 +1079,21 @@ function renderAbout() {
   pathList.append(createAboutPathItem("prop-lock.list", `${STATE_DIR}/prop-lock.list`, "运行时锁定快照"));
   paths.append(pathList);
 
+  const backup = createConfigBackupPanel();
+  backup.classList.add("about-section");
+
   const project = createSection("项目", "GitHub / License / Author");
   project.classList.add("about-section", "about-project-section");
   const projectGrid = createElement("div", "about-info-grid compact");
   projectGrid.append(createAboutInfoCard("作者", state.meta.author || "pakhozako", "维护与发布"));
   projectGrid.append(createAboutInfoCard("License", "GPL / Open", "遵循项目开源许可"));
-  projectGrid.append(createAboutInfoCard("版本", state.meta.version || "v3.5", `versionCode ${state.meta.versionCode || "350"}`));
+  projectGrid.append(createAboutInfoCard("版本", state.meta.version || "unknown", `versionCode ${state.meta.versionCode || "unknown"}`));
   project.append(projectGrid);
   const githubRow = createElement("div", "about-github-row");
   githubRow.append(createButton("Github项目地址", "wide-button about-github-button", () => openUrl(state.meta.githubUrl)));
   project.append(githubRow);
 
-  page.append(overview, paths, project);
+  page.append(overview, paths, backup, project);
 }
 
 function countOptionItems() {
@@ -1027,6 +1204,7 @@ function renderCategory(categoryId) {
 }
 
 function updateOption(id, patch) {
+  state.customDraftDirty = true;
   if (patch.enabled) {
     const current = state.options.categories.flatMap((category) => category.items).find((item) => item.id === id);
     if (current && current.prop) {
@@ -1047,23 +1225,125 @@ function updateOption(id, patch) {
 }
 
 async function refreshAll() {
-  setStatus("正在刷新设备信息...");
-  try {
-    state.unifiedState = await loadUnifiedState();
-    state.device = await loadDeviceState();
-    state.systemInfo = await readSystemInfo();
-    state.health = await loadHealthState();
-    state.configSource = await loadConfigSource();
-    state.config = await loadUserConfig(state.options);
-    renderPage();
-    setStatus("设备信息已刷新", "ok");
-  } catch (error) {
-    setStatus(`刷新失败：${error.message}`, "warn");
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    setStatus("正在刷新设备信息...");
+    try {
+      state.unifiedState = await loadUnifiedState();
+      state.device = await loadDeviceState();
+      state.systemInfo = await readSystemInfo();
+      state.health = await loadHealthState();
+      state.configSource = await loadConfigSource();
+      if (!(state.page === "custom" && state.customDraftDirty)) {
+        state.config = await loadUserConfig(state.options);
+      }
+      renderPage();
+      setStatus("设备信息已刷新", "ok");
+    } catch (error) {
+      setStatus(`刷新失败：${error.message}`, "warn");
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+function setupPullRefresh() {
+  if (pullRefreshBound) return;
+  pullRefreshBound = true;
+  document.addEventListener("touchstart", onPullRefreshStart, { passive: true });
+  document.addEventListener("touchmove", onPullRefreshMove, { passive: false });
+  document.addEventListener("touchend", onPullRefreshEnd, { passive: true });
+  document.addEventListener("touchcancel", onPullRefreshEnd, { passive: true });
+}
+
+function pageScrollTop() {
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+
+function canStartPullRefresh(event) {
+  const target = event.target;
+  const interactive = target?.closest?.("button,input,select,textarea,a,.dialog");
+  return !interactive && !pullRefreshState.refreshing && pageScrollTop() <= 0;
+}
+
+function onPullRefreshStart(event) {
+  if (!event.touches?.length || !canStartPullRefresh(event)) return;
+  pullRefreshState.tracking = true;
+  pullRefreshState.startY = event.touches[0].clientY;
+  pullRefreshState.distance = 0;
+  updatePullRefreshIndicator(0, "下拉刷新");
+}
+
+function onPullRefreshMove(event) {
+  if (!pullRefreshState.tracking || !event.touches?.length) return;
+  const delta = event.touches[0].clientY - pullRefreshState.startY;
+  if (delta <= 0 || pageScrollTop() > 0) {
+    resetPullRefreshIndicator();
+    return;
+  }
+  pullRefreshState.distance = Math.min(PULL_REFRESH_MAX, Math.round(delta * 0.55));
+  if (pullRefreshState.distance > 6) event.preventDefault();
+  updatePullRefreshIndicator(
+    pullRefreshState.distance,
+    pullRefreshState.distance >= PULL_REFRESH_THRESHOLD ? "松开刷新" : "下拉刷新"
+  );
+}
+
+function onPullRefreshEnd() {
+  if (!pullRefreshState.tracking) return;
+  const shouldRefresh = pullRefreshState.distance >= PULL_REFRESH_THRESHOLD;
+  pullRefreshState.tracking = false;
+  if (shouldRefresh) {
+    recordPullRefreshCombo();
+    triggerPullRefresh();
+  } else {
+    resetPullRefreshIndicator();
   }
 }
 
-async function refreshSystemInfo() {
-  state.systemInfo = await readSystemInfo();
+function updatePullRefreshIndicator(distance, label) {
+  const indicator = $("#pullRefreshIndicator");
+  if (!indicator) return;
+  const clamped = Math.max(0, Math.min(PULL_REFRESH_MAX, distance));
+  const eased = Math.round(PULL_REFRESH_MAX * (1 - Math.pow(1 - clamped / PULL_REFRESH_MAX, 2)));
+  const scale = 0.92 + (clamped / PULL_REFRESH_MAX) * 0.08;
+  indicator.style.transform = `translate3d(-50%, ${eased - 72}px, 0) scale(${scale.toFixed(3)})`;
+  indicator.style.setProperty("--pull-progress", String(clamped / PULL_REFRESH_MAX));
+  const spinner = indicator.querySelector(".pull-refresh-spinner");
+  if (spinner && !pullRefreshState.refreshing) {
+    spinner.style.transform = `rotate(${Math.round((clamped / PULL_REFRESH_MAX) * 180)}deg)`;
+  }
+  indicator.classList.toggle("is-visible", clamped > 8);
+  indicator.classList.toggle("is-ready", clamped >= PULL_REFRESH_THRESHOLD);
+  indicator.classList.toggle("is-refreshing", pullRefreshState.refreshing);
+  const text = $("#pullRefreshText");
+  if (text) text.textContent = label;
+}
+
+function resetPullRefreshIndicator() {
+  pullRefreshState.tracking = false;
+  pullRefreshState.distance = 0;
+  updatePullRefreshIndicator(0, "下拉刷新");
+}
+
+async function triggerPullRefresh() {
+  pullRefreshState.refreshing = true;
+  updatePullRefreshIndicator(72, "正在刷新");
+  await refreshAll();
+  setTimeout(() => {
+    pullRefreshState.refreshing = false;
+    resetPullRefreshIndicator();
+  }, 240);
+}
+
+function recordPullRefreshCombo() {
+  const now = Date.now();
+  pullRefreshComboCount = now - pullRefreshLastAt < PULL_REFRESH_COMBO_WINDOW_MS ? pullRefreshComboCount + 1 : 1;
+  pullRefreshLastAt = now;
+  if (pullRefreshComboCount < 3) return;
+  pullRefreshComboCount = 0;
+  setTimeout(showPullRefreshBonus, 180);
 }
 
 function exportableConfig() {
@@ -1111,7 +1391,8 @@ async function restoreConfigBackup() {
     restored.pendingSavedAt = 0;
     restored.pendingBootId = "";
     state.config = restored;
-    renderCustom();
+    state.customDraftDirty = true;
+    setPage("custom");
     setStatus("配置已恢复到工作台，确认后请保存并生成 system.prop", "warn");
   } catch (error) {
     setStatus(`恢复失败：${error.message}`, "warn");
@@ -1138,6 +1419,7 @@ async function saveCurrentConfig() {
   };
   try {
     state.config = await saveConfig(state.options, nextConfig);
+    state.customDraftDirty = false;
     state.unifiedState = await loadUnifiedState();
     state.configSource = await loadConfigSource();
     renderPage();
@@ -1511,8 +1793,7 @@ async function showDiagnosticsDialog(content) {
   const integrityState = parseDiagnosticSection(content, "--- integrity report ---");
   showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp, healthState, conflictState, unifiedState, integrityState), {
     copyLabel: "复制全部诊断信息",
-    savePath: `${STATE_DIR}/logs/webui-diagnostic.txt`,
-    pageSize: 12000
+    savePath: DIAGNOSTIC_EXPORT_PATH
   });
 }
 
@@ -1534,6 +1815,8 @@ function createDiagnosticSummary(applyLog, diagnosticState, rebootState, install
 
 function createUnifiedStateSummary(unifiedState) {
   const status = unifiedState["summary.status"] || "unknown";
+  const attentionTotal = Number(unifiedState["summary.attention_total"] || 0);
+  const alertTotal = Number(unifiedState["summary.attention_alert_total"] || 0);
   const section = createElement("section", "diagnostic-summary");
   const header = createElement("div", "diagnostic-summary-head");
   header.append(createElement("strong", "", "统一状态结论"));
@@ -1541,28 +1824,31 @@ function createUnifiedStateSummary(unifiedState) {
   section.append(header);
   const chips = createElement("div", "diagnostic-chip-row");
   chips.append(createDiagnosticChip("状态", status, status === "ok" ? "applied" : status === "error" ? "failed" : "mismatch"));
-  chips.append(createDiagnosticChip("关注项", unifiedState["summary.attention_total"] || 0, Number(unifiedState["summary.attention_total"] || 0) ? "mismatch" : "applied"));
+  chips.append(createDiagnosticChip(alertTotal ? "关注项" : "细节", attentionTotal, alertTotal ? "mismatch" : "applied"));
   chips.append(createDiagnosticChip("配置", unifiedState["config.source"] || "unknown", unifiedState["config.source"] ? "applied" : "mismatch"));
   chips.append(createDiagnosticChip("风险", unifiedState["risk.mode"] || "safe", unifiedState["risk.mode"] === "aggressive" ? "failed" : "applied"));
   section.append(chips);
   const attention = createElement("div", "diagnostic-problems");
-  const total = Number(unifiedState["summary.attention_total"] || 0);
-  for (let index = 1; index <= total; index += 1) {
+  for (let index = 1; index <= attentionTotal; index += 1) {
     const text = unifiedState[`summary.attention.${index}`];
-    if (text) attention.append(createElement("div", "diagnostic-problem mismatch", text));
+    const level = unifiedState[`summary.attention.${index}.level`] || String(text || "").split("|")[0] || "info";
+    const tone = level === "error" ? "failed" : level === "warning" || level === "warn" ? "mismatch" : "applied";
+    if (text) attention.append(createElement("div", `diagnostic-problem ${tone}`, text));
   }
-  if (total) section.append(attention);
+  if (attentionTotal) section.append(attention);
   return section;
 }
 
 function createRuleMatchSummary(unifiedState) {
+  const rawStatus = unifiedState["match.status"] || "unknown";
+  const statusTone = ["ok", "partial", "fallback"].includes(rawStatus) ? "applied" : rawStatus === "error" || rawStatus === "failed" ? "failed" : "mismatch";
   const section = createElement("section", "diagnostic-summary");
   const header = createElement("div", "diagnostic-summary-head");
   header.append(createElement("strong", "", "规则匹配"));
   header.append(createElement("span", "", `mode=${unifiedState["match.mode"] || "unknown"} updated=${unifiedState["match.updated_at"] || "unknown"}`));
   section.append(header);
   const chips = createElement("div", "diagnostic-chip-row");
-  chips.append(createDiagnosticChip("匹配状态", unifiedState["match.status"] || "unknown", unifiedState["match.status"] === "ok" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("匹配状态", rawStatus, statusTone));
   chips.append(createDiagnosticChip("抓取", unifiedState["match.captured_total"] || 0, "applied"));
   chips.append(createDiagnosticChip("命中", unifiedState["match.matched_total"] || 0, "applied"));
   chips.append(createDiagnosticChip("默认", unifiedState["match.default_total"] || 0, "matched"));
@@ -1571,32 +1857,40 @@ function createRuleMatchSummary(unifiedState) {
 }
 
 function createConfigGenerationSummary(unifiedState) {
+  const updatedAt = unifiedState["config.updated_at"] || "unknown";
+  const status = unifiedState["config.status"] || "unknown";
+  const statusTone = status === "ok" || status === "pending" ? "applied" : status === "error" || status === "failed" ? "failed" : "mismatch";
   const section = createElement("section", "diagnostic-summary");
   const header = createElement("div", "diagnostic-summary-head");
   header.append(createElement("strong", "", "配置生成"));
-  header.append(createElement("span", "", `source=${unifiedState["config.source"] || "unknown"} hash=${shortHash(unifiedState["config.prop_hash"])}`));
+  header.append(createElement("span", "", `source=${unifiedState["config.source"] || "unknown"} · updated=${updatedAt}`));
   section.append(header);
   const chips = createElement("div", "diagnostic-chip-row");
-  chips.append(createDiagnosticChip("生成状态", unifiedState["config.status"] || "unknown", unifiedState["config.status"] === "ok" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("生成状态", status, statusTone));
   chips.append(createDiagnosticChip("prop 数", unifiedState["config.prop_count"] || 0, "applied"));
   chips.append(createDiagnosticChip("来源", unifiedState["config.source"] || "unknown", "matched"));
-  chips.append(createDiagnosticChip("更新时间", unifiedState["config.updated_at"] || "unknown", "applied"));
+  chips.append(createDiagnosticChip("Hash", shortHash(unifiedState["config.prop_hash"]), "applied"));
   section.append(chips);
   return section;
 }
 
 function createIntegritySummary(integrityState, unifiedState) {
   const status = integrityState.status || unifiedState["integrity.status"] || "unknown";
+  const blockingMissing = Number(integrityState.blocking_missing_total || unifiedState["integrity.blocking_missing_total"] || 0);
+  const blockingChanged = Number(integrityState.blocking_changed_total || unifiedState["integrity.blocking_changed_total"] || 0);
+  const statusTone = status === "ok" || (["warning", "warn"].includes(status)) || (status === "missing" && !blockingMissing) || (status === "changed" && !blockingChanged)
+    ? "applied"
+    : status === "error" ? "failed" : "mismatch";
   const section = createElement("section", "diagnostic-summary");
   const header = createElement("div", "diagnostic-summary-head");
   header.append(createElement("strong", "", "完整性 / 防篡改"));
   header.append(createElement("span", "", `reason=${integrityState.reason || unifiedState["integrity.reason"] || "unknown"}`));
   section.append(header);
   const chips = createElement("div", "diagnostic-chip-row");
-  chips.append(createDiagnosticChip("状态", status, status === "ok" ? "applied" : status === "error" ? "failed" : "mismatch"));
+  chips.append(createDiagnosticChip("状态", status, statusTone));
   chips.append(createDiagnosticChip("检查", integrityState.checked_total || unifiedState["integrity.checked_total"] || 0, "applied"));
-  chips.append(createDiagnosticChip("缺失", integrityState.missing_total || unifiedState["integrity.missing_total"] || 0, Number(integrityState.missing_total || unifiedState["integrity.missing_total"] || 0) ? "failed" : "applied"));
-  chips.append(createDiagnosticChip("变更", integrityState.changed_total || unifiedState["integrity.changed_total"] || 0, Number(integrityState.changed_total || unifiedState["integrity.changed_total"] || 0) ? "failed" : "applied"));
+  chips.append(createDiagnosticChip("缺失", integrityState.missing_total || unifiedState["integrity.missing_total"] || 0, blockingMissing ? "failed" : "applied"));
+  chips.append(createDiagnosticChip("变更", integrityState.changed_total || unifiedState["integrity.changed_total"] || 0, blockingChanged ? "failed" : "applied"));
   section.append(chips);
   return section;
 }
@@ -1610,15 +1904,16 @@ function createConflictBanner(conflictState) {
 
 function createHealthLogSummary(healthState, conflictState) {
   const status = healthState.status || "unknown";
+  const statusTone = status === "error" ? "failed" : "applied";
   const section = createElement("section", "diagnostic-summary");
   const header = createElement("div", "diagnostic-summary-head");
   header.append(createElement("strong", "", "自愈监控"));
   header.append(createElement("span", "", `health=${status} conflict=${conflictState.conflict_total || 0}`));
   section.append(header);
   const chips = createElement("div", "diagnostic-chip-row");
-  chips.append(createDiagnosticChip("健康", status, status === "ok" ? "applied" : status === "error" ? "failed" : "mismatch"));
-  chips.append(createDiagnosticChip("文件", healthState.files_ok || "unknown", healthState.files_ok === "yes" ? "applied" : "mismatch"));
-  chips.append(createDiagnosticChip("属性", healthState.props_ok || "unknown", healthState.props_ok === "yes" ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("健康", status, statusTone));
+  chips.append(createDiagnosticChip("文件", healthState.files_ok || "unknown", healthState.files_ok === "no" && status === "error" ? "failed" : "applied"));
+  chips.append(createDiagnosticChip("属性", healthState.props_ok || "unknown", healthState.props_ok === "no" && status === "error" ? "failed" : "applied"));
   chips.append(createDiagnosticChip("冲突", conflictState.conflict_total || 0, Number(conflictState.conflict_total || 0) > 0 ? "failed" : "applied"));
   section.append(chips);
   return section;
@@ -1715,11 +2010,13 @@ function createRebootStateSummary(rebootState, passSummaries) {
   section.append(header);
 
   const chips = createElement("div", "diagnostic-chip-row");
-  chips.append(createDiagnosticChip("服务", rebootState.status || "未知", rebootState.status === "settled" ? "applied" : "mismatch"));
+  const serviceTone = rebootState.status === "error" ? "failed" : "applied";
+  const phaseTone = rebootState.phase === "settled" || !rebootState.phase ? "applied" : "matched";
+  chips.append(createDiagnosticChip("服务", rebootState.status || "未知", serviceTone));
   chips.append(createDiagnosticChip("健康", rebootState.health || "未知", rebootState.health === "problem" ? "failed" : "applied"));
-  chips.append(createDiagnosticChip("阶段", rebootState.phase || "未知", rebootState.phase === "settled" ? "applied" : "mismatch"));
-  chips.append(createDiagnosticChip("异常", `${rebootState.failedTotal || 0}/${rebootState.mismatchTotal || 0}`, rebootState.failedTotal || rebootState.mismatchTotal ? "failed" : "applied"));
-  chips.append(createDiagnosticChip("settled", rebootState.settledAt ? "已记录" : "缺失", rebootState.settledAt ? "applied" : "mismatch"));
+  chips.append(createDiagnosticChip("阶段", rebootState.phase || "未知", phaseTone));
+  chips.append(createDiagnosticChip("异常", `${rebootState.failedTotal || 0}/${rebootState.mismatchTotal || 0}`, rebootState.failedTotal ? "failed" : "applied"));
+  chips.append(createDiagnosticChip("settled", rebootState.settledAt ? "已记录" : "未记录", rebootState.settledAt ? "applied" : "matched"));
   section.append(chips);
 
   return section;
@@ -1896,16 +2193,21 @@ function createDiagnosticChip(label, value, tone) {
   return chip;
 }
 
+function closeDialog(dialog) {
+  if (!dialog || dialog.classList.contains("is-closing")) return;
+  dialog.classList.add("is-closing");
+  setTimeout(() => dialog.remove(), 220);
+}
+
 function showDialog(title, content, beforeContent, options = {}) {
   const dialog = createElement("div", "dialog");
+  if (options.className) dialog.classList.add(options.className);
   const saveButton = options.savePath ? '<button class="text-button" data-action="save">保存</button>' : "";
-  const pageButton = options.pageSize ? '<button class="text-button" data-action="prev">上一页</button><button class="text-button" data-action="next">下一页</button>' : "";
   dialog.innerHTML = `
     <div class="dialog-panel">
       <div class="section-title">
         <h2>${escapeHtml(title)}</h2>
         <div class="dialog-actions">
-          ${pageButton}
           ${saveButton}
           <button class="text-button" data-action="copy">${escapeHtml(options.copyLabel || "复制")}</button>
           <button class="text-button" data-action="close">关闭</button>
@@ -1918,27 +2220,12 @@ function showDialog(title, content, beforeContent, options = {}) {
     dialog.querySelector("pre").before(beforeContent);
   }
   const pre = dialog.querySelector("pre");
-  const pageSize = Number(options.pageSize || 0);
-  let pageIndex = 0;
-  const pages = pageSize > 0
-    ? String(content).match(new RegExp(`[\\s\\S]{1,${pageSize}}`, "g")) || [""]
-    : [content];
-  const renderDialogPage = () => {
-    pre.textContent = pages[pageIndex] || "";
-    dialog.querySelector('[data-action="prev"]')?.toggleAttribute("disabled", pageIndex === 0);
-    dialog.querySelector('[data-action="next"]')?.toggleAttribute("disabled", pageIndex >= pages.length - 1);
-  };
-  renderDialogPage();
-  dialog.querySelector('[data-action="close"]').addEventListener("click", () => dialog.remove());
+  pre.textContent = String(content || "");
+  dialog.querySelector('[data-action="close"]').addEventListener("click", () => closeDialog(dialog));
   dialog.querySelector('[data-action="copy"]').addEventListener("click", () => copyDialogContent(content, pre));
   dialog.querySelector('[data-action="save"]')?.addEventListener("click", () => saveDialogContent(content, options.savePath));
-  dialog.querySelector('[data-action="prev"]')?.addEventListener("click", () => {
-    pageIndex = Math.max(0, pageIndex - 1);
-    renderDialogPage();
-  });
-  dialog.querySelector('[data-action="next"]')?.addEventListener("click", () => {
-    pageIndex = Math.min(pages.length - 1, pageIndex + 1);
-    renderDialogPage();
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog && options.closeOnBackdrop === true) closeDialog(dialog);
   });
   document.body.append(dialog);
 }
@@ -2022,6 +2309,12 @@ async function start() {
   renderShell();
   setPage("home");
   await refreshAll();
+}
+
+try {
+  initTheme();
+} catch (error) {
+  console.warn(`[dex2oat] theme init failed: ${error.message}`);
 }
 
 start().catch((error) => {

@@ -18,6 +18,9 @@ MATCH_REPORT="$STATE_DIR/match-report.txt"
 PROP_LOCK_LIST="$STATE_DIR/prop-lock.list"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 TRIGGER_REMATCH="$STATE_DIR/trigger-rematch"
+SERVICE_LOCK_DIR="$STATE_DIR/.service.lock"
+SERVICE_LOCK_TIMEOUT=20
+SERVICE_LOCK_STALE_SECONDS=7200
 
 if [ -f "$MODDIR/core/state.sh" ]; then
   . "$MODDIR/core/state.sh"
@@ -45,6 +48,65 @@ log_msg() {
   rotate_log "$LOG_FILE"
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
 }
+
+service_lock_now() {
+  date '+%s' 2>/dev/null || printf '0\n'
+}
+
+service_lock_age() {
+  [ -f "$SERVICE_LOCK_DIR/created_at" ] || { printf '0\n'; return 0; }
+  LOCK_CREATED="$(cat "$SERVICE_LOCK_DIR/created_at" 2>/dev/null)"
+  LOCK_NOW="$(service_lock_now)"
+  case "$LOCK_CREATED:$LOCK_NOW" in
+    *[!0-9:]*|:*) printf '0\n' ;;
+    *) printf '%s\n' $((LOCK_NOW - LOCK_CREATED)) ;;
+  esac
+}
+
+service_lock_pid_alive() {
+  [ -f "$SERVICE_LOCK_DIR/pid" ] || return 1
+  LOCK_PID="$(cat "$SERVICE_LOCK_DIR/pid" 2>/dev/null)"
+  case "$LOCK_PID" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ -d "/proc/$LOCK_PID" ]
+}
+
+release_service_lock() {
+  if [ -f "$SERVICE_LOCK_DIR/pid" ] && [ "$(cat "$SERVICE_LOCK_DIR/pid" 2>/dev/null)" = "$$" ]; then
+    rm -f "$SERVICE_LOCK_DIR/pid" "$SERVICE_LOCK_DIR/created_at" 2>/dev/null || true
+    rmdir "$SERVICE_LOCK_DIR" 2>/dev/null || true
+  fi
+}
+
+acquire_service_lock() {
+  mkdir -p "$STATE_DIR" 2>/dev/null || true
+  LOCK_WAIT=0
+  while ! mkdir "$SERVICE_LOCK_DIR" 2>/dev/null; do
+    if ! service_lock_pid_alive; then
+      log_msg "Removing stale service lock because owner pid is gone"
+      rm -rf "$SERVICE_LOCK_DIR" 2>/dev/null || true
+      continue
+    fi
+    LOCK_AGE="$(service_lock_age)"
+    if [ "${LOCK_AGE:-0}" -gt "$SERVICE_LOCK_STALE_SECONDS" ] 2>/dev/null; then
+      log_msg "Removing stale service lock age=${LOCK_AGE}s"
+      rm -rf "$SERVICE_LOCK_DIR" 2>/dev/null || true
+      continue
+    fi
+    if [ "$LOCK_WAIT" -ge "$SERVICE_LOCK_TIMEOUT" ] 2>/dev/null; then
+      log_msg "Another service instance is running; skip duplicate invocation"
+      exit 0
+    fi
+    sleep 1
+    LOCK_WAIT=$((LOCK_WAIT + 1))
+  done
+  printf '%s\n' "$$" > "$SERVICE_LOCK_DIR/pid" 2>/dev/null || true
+  service_lock_now > "$SERVICE_LOCK_DIR/created_at" 2>/dev/null || true
+  trap 'release_service_lock' EXIT HUP INT TERM
+}
+
+acquire_service_lock
 
 restore_system_prop_from_backup() {
   [ -s "$SYSTEM_PROP_BAK" ] || return 1
@@ -164,13 +226,13 @@ write_service_state() {
 run_trigger_rematch() {
   [ -f "$TRIGGER_REMATCH" ] || return 0
 
-  OPTIONS_FILE="$MODDIR/webroot/data/options.json"
+  RULES_FILE="$MODDIR/webroot/data/rule-props.tsv"
   GENERATE_SCRIPT="$MODDIR/scripts/generate-props.sh"
   MODULE_VERSION="$(sed -n 's/^version=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
 
   log_msg "Trigger rematch detected: rule-driven version=$MODULE_VERSION"
-  sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "/storage/emulated/0/Download/dex2oat-captured-props.txt" || : > "$CAPTURED_PROPS"
-  if sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
+  sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "" || : > "$CAPTURED_PROPS"
+  if sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$RULES_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
     cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
     chmod 0600 "$SYSTEM_PROP_BAK" 2>/dev/null || true
     rm -f "$RUNTIME_PROP_FILE" "$RUNTIME_PROP_HASH_FILE" 2>/dev/null || true

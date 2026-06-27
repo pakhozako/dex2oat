@@ -1,6 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { listFiles, root, sha256Buffer } = require("./toolkit");
+const { stageReleaseTree } = require("./release");
 
 function normalizeModuleProp(buffer) {
   return `${buffer.toString("utf8")
@@ -12,16 +13,35 @@ function normalizeModuleProp(buffer) {
 }
 
 function includeInBaseline(relative) {
-  if (["README.md", "CHANGELOG.md", "update.json", ".gitattributes", ".gitignore", ".env.local", "build.config.json", "environment-report.md", "v3.5 自动化开发与构建报告.md"].includes(relative)) return false;
   if (relative === "core/integrity-baseline.prop") return false;
-  if (relative.startsWith("tools/") || relative.startsWith("webroot-src/") || relative.startsWith(".webui-src-temp/")) return false;
-  if (relative.startsWith("webroot/js/") || relative.startsWith("webroot/css/")) return false;
-  return true;
+  if (relative === "skip_mount") return false;
+  return new Set([
+    "service.sh",
+    "uninstall.sh",
+    "module.prop",
+    "core/common.sh",
+    "core/conflict-detect.sh",
+    "core/health-check.sh",
+    "core/integrity-check.sh",
+    "core/prop-lock.sh",
+    "core/state.sh",
+    "core/statectl.sh",
+    "core/webui-save.sh",
+    "scripts/capture-props.sh",
+    "scripts/generate-props.sh",
+    "webroot/index.html",
+    "webroot/assets/dex2oat-ui.protected.css",
+    "webroot/assets/dex2oat-ui.protected.js",
+    "webroot/data/rule-props.tsv"
+  ]).has(relative);
 }
 
-async function generateIntegrityBaseline() {
-  const files = (await listFiles(root))
-    .map((file) => ({ file, relative: path.relative(root, file).replace(/\\/g, "/") }))
+async function generateIntegrityBaseline(options = {}) {
+  const staging = options.staging || path.join(root, "temp", "integrity-baseline-staging");
+  await stageReleaseTree(staging);
+
+  const files = (await listFiles(staging))
+    .map((file) => ({ file, relative: path.relative(staging, file).replace(/\\/g, "/") }))
     .filter(({ relative }) => includeInBaseline(relative));
 
   const rows = [];
@@ -36,7 +56,7 @@ async function generateIntegrityBaseline() {
   rows.sort();
   const baselinePath = path.join(root, "core", "integrity-baseline.prop");
   await fs.writeFile(baselinePath, `${rows.join("\n")}\n`, "utf8");
-  return { baselinePath, files: rows.length };
+  return { baselinePath, staging, files: rows.length };
 }
 
 module.exports = {

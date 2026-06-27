@@ -1,6 +1,6 @@
 {
   "schemaVersion": 32,
-  "rulesVersion": "v3.5",
+  "rulesVersion": "v3.6",
   "schema": {
     "itemFields": [
       "key",
@@ -63,403 +63,6 @@
             "skip": "跳过后台编译",
             "speed-profile": "画像优化",
             "verify": "仅校验"
-          }
-        },
-        {
-          "id": "pm_boot_after_ota",
-          "label": "OTA 后编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.boot-after-ota。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.boot-after-ota",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_mainline",
-          "label": "Mainline 更新后编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.boot-after-mainline-update。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.boot-after-mainline-update",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_install",
-          "label": "安装时编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.install",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_install_bulk",
-          "label": "批量安装编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.install-bulk",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_install_bulk_downgraded",
-          "label": "批量安装降级包策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-downgraded。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.install-bulk-downgraded",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_install_bulk_secondary",
-          "label": "批量安装 secondary dex",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-secondary。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.install-bulk-secondary",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_install_bulk_secondary_downgraded",
-          "label": "批量降级 secondary dex",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-secondary-downgraded。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.install-bulk-secondary-downgraded",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_install_fast",
-          "label": "快速安装路径策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-fast。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.install-fast",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_post_boot",
-          "label": "开机后编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.post-boot。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.post-boot",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_first_boot",
-          "label": "首次开机编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.first-boot。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.first-boot",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_shared",
-          "label": "共享库编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.shared。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：速度优化（speed）。",
-          "prop": "pm.dexopt.shared",
-          "defaultEnabled": true,
-          "defaultValue": "speed",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_inactive",
-          "label": "闲置 App 编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.inactive。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
-          "prop": "pm.dexopt.inactive",
-          "defaultEnabled": true,
-          "defaultValue": "verify",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_ab_ota",
-          "label": "A/B OTA 编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.ab-ota。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.ab-ota",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_cmdline",
-          "label": "手动触发编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.cmdline。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.cmdline",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_first_use",
-          "label": "首次使用编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.first-use。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.first-use",
-          "defaultEnabled": true,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "priority": 320,
-          "fallback": "keep-disabled-unless-captured-or-enabled",
-          "match": {
-            "source": "six-device-capture-logs",
-            "anyOf": [
-              "pm.dexopt.first-use"
-            ],
-            "reason": "Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile."
-          },
-          "propOutput": {
-            "key": "pm.dexopt.first-use",
-            "value": "speed-profile",
-            "action": "enable"
-          },
-          "explain": {
-            "title": "First-use dexopt policy",
-            "reason": "Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile.",
-            "confidence": "medium"
-          },
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_dexopt_baseline",
-          "label": "基线编译策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.baseline。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.baseline",
-          "defaultEnabled": false,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "priority": 330,
-          "fallback": "keep-disabled-unless-captured-or-enabled",
-          "match": {
-            "source": "six-device-capture-logs",
-            "anyOf": [
-              "pm.dexopt.baseline"
-            ],
-            "reason": "Observed in one v3.2 capture log as speed-profile."
-          },
-          "propOutput": {
-            "key": "pm.dexopt.baseline",
-            "value": "speed-profile",
-            "action": "keep"
-          },
-          "explain": {
-            "title": "Baseline dexopt policy",
-            "reason": "Observed in one v3.2 capture log as speed-profile.",
-            "confidence": "low"
-          },
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
-          }
-        },
-        {
-          "id": "pm_install_create_dm",
-          "label": "安装元数据生成策略",
-          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-create-dm。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
-          "prop": "pm.dexopt.install-create-dm",
-          "defaultEnabled": false,
-          "defaultValue": "speed-profile",
-          "values": [
-            "verify",
-            "speed-profile",
-            "speed",
-            "everything"
-          ],
-          "priority": 330,
-          "fallback": "keep-disabled-unless-captured-or-enabled",
-          "match": {
-            "source": "six-device-capture-logs",
-            "anyOf": [
-              "pm.dexopt.install-create-dm"
-            ],
-            "reason": "Observed in one Xiaomi v3.2 capture log as speed-profile."
-          },
-          "propOutput": {
-            "key": "pm.dexopt.install-create-dm",
-            "value": "speed-profile",
-            "action": "keep"
-          },
-          "explain": {
-            "title": "Install create-dm policy",
-            "reason": "Observed in one Xiaomi v3.2 capture log as speed-profile.",
-            "confidence": "low"
-          },
-          "valueLabels": {
-            "verify": "仅校验",
-            "speed-profile": "画像优化",
-            "speed": "速度优化",
-            "everything": "全量 AOT"
           }
         },
         {
@@ -1086,6 +689,403 @@
       "tone": "caution",
       "description": "进阶配置，涉及全局 dex2oat、线程调度、JIT、profile 和厂商私有优化，建议逐项确认后启用。",
       "items": [
+        {
+          "id": "pm_boot_after_ota",
+          "label": "OTA 后编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.boot-after-ota。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.boot-after-ota",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_mainline",
+          "label": "Mainline 更新后编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.boot-after-mainline-update。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.boot-after-mainline-update",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_install",
+          "label": "安装时编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.install",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_install_bulk",
+          "label": "批量安装编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.install-bulk",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_install_bulk_downgraded",
+          "label": "批量安装降级包策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-downgraded。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.install-bulk-downgraded",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_install_bulk_secondary",
+          "label": "批量安装 secondary dex",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-secondary。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.install-bulk-secondary",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_install_bulk_secondary_downgraded",
+          "label": "批量降级 secondary dex",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-bulk-secondary-downgraded。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.install-bulk-secondary-downgraded",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_install_fast",
+          "label": "快速安装路径策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-fast。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.install-fast",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_post_boot",
+          "label": "开机后编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.post-boot。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.post-boot",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_first_boot",
+          "label": "首次开机编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.first-boot。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.first-boot",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_shared",
+          "label": "共享库编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.shared。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：速度优化（speed）。",
+          "prop": "pm.dexopt.shared",
+          "defaultEnabled": false,
+          "defaultValue": "speed",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_inactive",
+          "label": "闲置 App 编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.inactive。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：仅校验（verify）。",
+          "prop": "pm.dexopt.inactive",
+          "defaultEnabled": false,
+          "defaultValue": "verify",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_ab_ota",
+          "label": "A/B OTA 编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.ab-ota。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.ab-ota",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_cmdline",
+          "label": "手动触发编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.cmdline。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.cmdline",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_first_use",
+          "label": "首次使用编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.first-use。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.first-use",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "priority": 320,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "pm.dexopt.first-use"
+            ],
+            "reason": "Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile."
+          },
+          "propOutput": {
+            "key": "pm.dexopt.first-use",
+            "value": "speed-profile",
+            "action": "enable"
+          },
+          "explain": {
+            "title": "First-use dexopt policy",
+            "reason": "Observed in both Xiaomi v3.2 logs as pm.dexopt.first-use=speed-profile.",
+            "confidence": "medium"
+          },
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_dexopt_baseline",
+          "label": "基线编译策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.baseline。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.baseline",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "pm.dexopt.baseline"
+            ],
+            "reason": "Observed in one v3.2 capture log as speed-profile."
+          },
+          "propOutput": {
+            "key": "pm.dexopt.baseline",
+            "value": "speed-profile",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Baseline dexopt policy",
+            "reason": "Observed in one v3.2 capture log as speed-profile.",
+            "confidence": "low"
+          },
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
+        {
+          "id": "pm_install_create_dm",
+          "label": "安装元数据生成策略",
+          "description": "作用：调整系统包管理器 dexopt 策略中的 pm.dexopt.install-create-dm。可选值：仅校验（verify）、画像优化（speed-profile）、速度优化（speed）、全量 AOT（everything）。默认值：画像优化（speed-profile）。",
+          "prop": "pm.dexopt.install-create-dm",
+          "defaultEnabled": false,
+          "defaultValue": "speed-profile",
+          "values": [
+            "verify",
+            "speed-profile",
+            "speed",
+            "everything"
+          ],
+          "priority": 330,
+          "fallback": "keep-disabled-unless-captured-or-enabled",
+          "match": {
+            "source": "six-device-capture-logs",
+            "anyOf": [
+              "pm.dexopt.install-create-dm"
+            ],
+            "reason": "Observed in one Xiaomi v3.2 capture log as speed-profile."
+          },
+          "propOutput": {
+            "key": "pm.dexopt.install-create-dm",
+            "value": "speed-profile",
+            "action": "keep"
+          },
+          "explain": {
+            "title": "Install create-dm policy",
+            "reason": "Observed in one Xiaomi v3.2 capture log as speed-profile.",
+            "confidence": "low"
+          },
+          "valueLabels": {
+            "verify": "仅校验",
+            "speed-profile": "画像优化",
+            "speed": "速度优化",
+            "everything": "全量 AOT"
+          }
+        },
         {
           "id": "dex2oat_filter",
           "label": "默认 dex2oat 编译过滤器",
@@ -3610,13 +3610,13 @@
     {
       "prop": "pm.dexopt.boot-after-ota",
       "owner": "pm_boot_after_ota",
-      "ownerRisk": "safe",
+      "ownerRisk": "caution",
       "reason": "auto-owner-prefers-lowest-risk-non-aggressive-rule",
       "candidates": [
         {
           "id": "pm_boot_after_ota",
-          "risk": "safe",
-          "defaultEnabled": true
+          "risk": "caution",
+          "defaultEnabled": false
         },
         {
           "id": "force_ota_everything",
@@ -3628,13 +3628,13 @@
     {
       "prop": "pm.dexopt.install",
       "owner": "pm_install",
-      "ownerRisk": "safe",
+      "ownerRisk": "caution",
       "reason": "auto-owner-prefers-lowest-risk-non-aggressive-rule",
       "candidates": [
         {
           "id": "pm_install",
-          "risk": "safe",
-          "defaultEnabled": true
+          "risk": "caution",
+          "defaultEnabled": false
         },
         {
           "id": "force_install_everything",
@@ -3646,13 +3646,13 @@
     {
       "prop": "pm.dexopt.cmdline",
       "owner": "pm_cmdline",
-      "ownerRisk": "safe",
+      "ownerRisk": "caution",
       "reason": "auto-owner-prefers-lowest-risk-non-aggressive-rule",
       "candidates": [
         {
           "id": "pm_cmdline",
-          "risk": "safe",
-          "defaultEnabled": true
+          "risk": "caution",
+          "defaultEnabled": false
         },
         {
           "id": "force_cmdline_everything",

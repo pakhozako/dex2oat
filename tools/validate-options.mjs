@@ -9,6 +9,14 @@ const ids = new Map();
 const props = new Map();
 const propEntries = new Map();
 
+function isValidPropKey(prop) {
+  return /^[A-Za-z0-9_.-]+\.[A-Za-z0-9_.-]+$/.test(String(prop || ""));
+}
+
+function isValidPropValue(value) {
+  return /^[A-Za-z0-9_.,:/@%+*-]*$/.test(String(value ?? ""));
+}
+
 function riskRank(risk) {
   return { safe: 1, caution: 2, aggressive: 3 }[risk] || 9;
 }
@@ -20,8 +28,16 @@ for (const category of options.categories || []) {
   for (const item of category.items || []) {
     if (!item.id) errors.push(`missing id in ${category.id}`);
     if (!item.prop) errors.push(`missing prop for ${item.id}`);
+    if (item.prop && !isValidPropKey(item.prop)) {
+      errors.push(`invalid prop key for ${item.id}: ${item.prop}`);
+    }
     if (!Array.isArray(item.values) || !item.values.includes(item.defaultValue)) {
       errors.push(`defaultValue not present in values: ${item.id}`);
+    }
+    for (const value of item.values || []) {
+      if (!isValidPropValue(value)) {
+        errors.push(`invalid value for ${item.id}: ${value}`);
+      }
     }
     if (category.id === "aggressive" && item.defaultEnabled) {
       warnings.push(`aggressive defaultEnabled normalized off for auto rules: ${item.id}`);

@@ -17,8 +17,7 @@ DEVICE_FILE="$STATE_DIR/device.prop"
 CAPTURED_PROPS="$STATE_DIR/captured-props.txt"
 MATCHED_PROPS="$STATE_DIR/matched-props.txt"
 MATCH_REPORT="$STATE_DIR/match-report.txt"
-CAPTURE_EXPORT=/storage/emulated/0/Download/dex2oat-captured-props.txt
-OPTIONS_FILE="$MODPATH/webroot/data/options.json"
+RULES_FILE="$MODPATH/webroot/data/rule-props.tsv"
 INSTALL_STARTED=0
 BACKUP_READY=0
 STATE_CREATED=0
@@ -26,6 +25,7 @@ INSTALL_SOURCE=auto-rules
 MATCHED_TOTAL=0
 INSTALL_PROGRESS_PERCENT=0
 INSTALL_PROGRESS_STAGE=init
+INSTALL_TOTAL_STAGES=15
 
 if ! command -v ui_print >/dev/null 2>&1; then
   ui_print() { printf '%s\n' "$*"; }
@@ -63,14 +63,14 @@ install_progress_bar() {
   case "$BAR_PERCENT" in ''|*[!0-9]*) BAR_PERCENT=0 ;; esac
   [ "$BAR_PERCENT" -lt 0 ] 2>/dev/null && BAR_PERCENT=0
   [ "$BAR_PERCENT" -gt 100 ] 2>/dev/null && BAR_PERCENT=100
-  BAR_FILLED=$((BAR_PERCENT / 5))
+  BAR_FILLED=$((BAR_PERCENT / 4))
   BAR_INDEX=0
   BAR_TEXT=""
-  while [ "$BAR_INDEX" -lt 20 ]; do
+  while [ "$BAR_INDEX" -lt 25 ]; do
     if [ "$BAR_INDEX" -lt "$BAR_FILLED" ]; then
-      BAR_TEXT="${BAR_TEXT}#"
+      BAR_TEXT="${BAR_TEXT}▰"
     else
-      BAR_TEXT="${BAR_TEXT}-"
+      BAR_TEXT="${BAR_TEXT}▱"
     fi
     BAR_INDEX=$((BAR_INDEX + 1))
   done
@@ -145,74 +145,113 @@ install_stage_title() {
 
 install_stage_detail() {
   case "$1" in
-    init) ui_print "  -> 建立安装上下文，准备状态写入" ;;
-    environment) ui_print "  -> 读取模块版本、Root 环境和安装路径" ;;
-    prepare) ui_print "  -> 创建日志、备份和状态目录" ;;
-    device) ui_print "  -> 记录设备型号、系统版本和 Root 框架" ;;
-    backup) ui_print "  -> 备份当前 system.prop 与原始属性状态" ;;
-    capture) ui_print "  -> 抓取 ART / dexopt / runtime 相关属性" ;;
-    match) ui_print "  -> 读取 options.json，匹配当前设备规则" ;;
-    system_prop) ui_print "  -> 写入 system.prop，并生成匹配摘要" ;;
-    lock) ui_print "  -> 生成运行时锁定快照，便于开机校验" ;;
-    conflict) ui_print "  -> 扫描可能冲突的模块和属性写入" ;;
-    health) ui_print "  -> 初始化健康检查摘要，供 WebUI 展示" ;;
-    integrity) ui_print "  -> 校验核心脚本和受保护 WebUI 资源" ;;
-    permissions) ui_print "  -> 设置脚本、WebUI 和状态文件权限" ;;
-    state) ui_print "  -> 写入最终安装状态和 WebUI 进度" ;;
-    complete) ui_print "  -> 可以重启后进入 WebUI 查看运行状态" ;;
-    failed) ui_print "  -> 已写入失败状态，可查看日志定位原因" ;;
-  esac
-}
-
-install_stage_code_hint() {
-  case "$1" in
-    init) ui_print "  code: install.state=running progress=1" ;;
-    environment) ui_print "  code: version=$(sed -n 's/^version=//p' "$MODPATH/module.prop" 2>/dev/null | head -n 1)" ;;
-    prepare) ui_print "  code: mkdir -p $STATE_DIR $BACKUP_DIR $LOG_DIR" ;;
-    device) ui_print "  code: getprop ro.product.model / ro.build.version.release" ;;
-    backup) ui_print "  code: backup -> $ORIGINAL_PROPS" ;;
-    capture) ui_print "  $ getprop | grep -E 'dexopt|dex2oat|dalvik|runtime'" ;;
-    match) ui_print "  $ sh scripts/generate-props.sh --rules webroot/data/options.json" ;;
-    system_prop) ui_print "  $ write: $PROP_FILE" ;;
-    lock) ui_print "  code: prop-lock.list + system.prop.bak" ;;
-    conflict) ui_print "  $ sh core/conflict-detect.sh" ;;
-    health) ui_print "  $ sh core/health-check.sh" ;;
-    integrity) ui_print "  $ sh core/integrity-check.sh" ;;
-    permissions) ui_print "  code: chmod scripts/core/webroot" ;;
-    state) ui_print "  code: state.prop <- install.status=done" ;;
-    complete) ui_print "  code: reboot 后 WebUI 会继续读取 state.prop" ;;
+    init) printf '建立安装上下文，准备状态写入' ;;
+    environment) printf '读取模块版本、Root 环境和安装路径' ;;
+    prepare) printf '创建日志、备份和状态目录' ;;
+    device) printf '记录设备型号、系统版本和 Root 框架' ;;
+    backup) printf '备份当前 system.prop 与原始属性状态' ;;
+    capture) printf '抓取 ART / dexopt / runtime 相关属性' ;;
+    match) printf '读取规则表，匹配当前设备' ;;
+    system_prop) printf '写入 system.prop，并生成匹配摘要' ;;
+    lock) printf '生成运行时锁定快照，便于开机校验' ;;
+    conflict) printf '扫描可能冲突的模块和属性写入' ;;
+    health) printf '初始化健康检查摘要，供 WebUI 展示' ;;
+    integrity) printf '校验核心脚本和受保护 WebUI 资源' ;;
+    permissions) printf '设置脚本、WebUI 和状态文件权限' ;;
+    state) printf '写入最终安装状态和 WebUI 进度' ;;
+    complete) printf '可以重启后进入 WebUI 查看运行状态' ;;
+    failed) printf '已写入失败状态，可查看日志定位原因' ;;
+    *) printf '%s' "$1" ;;
   esac
 }
 
 install_stage_wait_hint() {
   case "$1" in
-    capture) ui_print "  wait: 正在读取设备属性，低端设备可能需要几秒" ;;
-    match) ui_print "  wait: 正在匹配规则并生成输出，不是卡住" ;;
-    conflict) ui_print "  wait: 正在扫描其它模块，最多等待 8 秒" ;;
-    health) ui_print "  wait: 正在汇总健康状态，稍后会写入 WebUI 首页" ;;
-    integrity) ui_print "  wait: 正在核对核心文件和受保护 WebUI" ;;
-    permissions) ui_print "  wait: 正在整理权限，避免 WebUI 或脚本不可读" ;;
-    *) ui_print "  wait: 阶段处理中，请保持安装窗口打开" ;;
+    capture) printf '读取设备属性，低端设备可能需要几秒' ;;
+    match) printf '匹配规则并生成输出' ;;
+    conflict) printf '扫描其它模块，最多等待 8 秒' ;;
+    health) printf '汇总健康状态，稍后写入 WebUI 首页' ;;
+    integrity) printf '核对核心文件和受保护 WebUI' ;;
+    permissions) printf '整理权限，避免 WebUI 或脚本不可读' ;;
+    *) printf '阶段处理中，请保持安装窗口打开' ;;
+  esac
+}
+
+install_spinner_frame() {
+  SPINNER_STEP="$1"
+  case "$SPINNER_STEP" in ''|*[!0-9]*) SPINNER_STEP=0 ;; esac
+  case $((SPINNER_STEP % 4)) in
+    0) printf '◐' ;;
+    1) printf '◓' ;;
+    2) printf '◑' ;;
+    *) printf '◒' ;;
   esac
 }
 
 install_motion_line() {
-  case $((INSTALL_PROGRESS_PERCENT % 4)) in
-    0) MOTION='.' ;;
-    1) MOTION='..' ;;
-    2) MOTION='...' ;;
-    *) MOTION='....' ;;
-  esac
-  ui_print "  live: ${MOTION} 仍在执行，下一阶段会自动继续"
+  install_spinner_frame "$INSTALL_PROGRESS_PERCENT"
+}
+
+install_progress_flow() {
+  FLOW_PERCENT="$1"
+  FLOW_STATUS="$2"
+  case "$FLOW_PERCENT" in ''|*[!0-9]*) FLOW_PERCENT=0 ;; esac
+  [ "$FLOW_PERCENT" -lt 0 ] 2>/dev/null && FLOW_PERCENT=0
+  [ "$FLOW_PERCENT" -gt 100 ] 2>/dev/null && FLOW_PERCENT=100
+  FLOW_ACTIVE=$((FLOW_PERCENT / 8))
+  [ "$FLOW_ACTIVE" -gt 12 ] 2>/dev/null && FLOW_ACTIVE=12
+  FLOW_INDEX=0
+  FLOW_TEXT=""
+  while [ "$FLOW_INDEX" -lt 13 ]; do
+    if [ "$FLOW_STATUS" = "failed" ]; then
+      if [ "$FLOW_INDEX" -lt "$FLOW_ACTIVE" ]; then
+        FLOW_TEXT="${FLOW_TEXT}◆"
+      elif [ "$FLOW_INDEX" -eq "$FLOW_ACTIVE" ] 2>/dev/null; then
+        FLOW_TEXT="${FLOW_TEXT}×"
+      else
+        FLOW_TEXT="${FLOW_TEXT}·"
+      fi
+    elif [ "$FLOW_STATUS" = "running" ]; then
+      if [ "$FLOW_INDEX" -lt "$FLOW_ACTIVE" ]; then
+        FLOW_TEXT="${FLOW_TEXT}◆"
+      elif [ "$FLOW_INDEX" -eq "$FLOW_ACTIVE" ] 2>/dev/null; then
+        FLOW_TEXT="${FLOW_TEXT}◉"
+      else
+        FLOW_TEXT="${FLOW_TEXT}·"
+      fi
+    else
+      if [ "$FLOW_INDEX" -le "$FLOW_ACTIVE" ] 2>/dev/null; then
+        FLOW_TEXT="${FLOW_TEXT}◆"
+      else
+        FLOW_TEXT="${FLOW_TEXT}·"
+      fi
+    fi
+    FLOW_INDEX=$((FLOW_INDEX + 1))
+  done
+  printf '%s' "$FLOW_TEXT"
 }
 
 install_banner() {
   ui_print " " 
-  ui_print "+--------------------------------------"
-  ui_print "| Dex2oat Lock ${MODULE_VERSION:-v3.5}"
-  ui_print "| Rule-driven ART / dexopt tuning"
-  ui_print "| Protected WebUI + unified state"
-  ui_print "+--------------------------------------"
+  ui_print "╭──────────────────────────────────────╮"
+  ui_print "│ Dex2oat Lock ${MODULE_VERSION:-v3.6}"
+  ui_print "│ Rule-driven ART / dexopt tuning"
+  ui_print "│ Protected WebUI + unified state"
+  ui_print "╰──────────────────────────────────────╯"
+}
+
+install_purpose_prompt() {
+  ui_print " "
+  ui_print "╭─ 模块作用"
+  ui_print "│ 根据设备属性生成 ART / dexopt 配置。"
+  ui_print "│ 目标是减少后台编译负载，并统一展示运行状态。"
+  ui_print "│ 安装后重启生效，可在模块 WebUI 查看和调整配置。"
+  ui_print "│"
+  ui_print "│ 确认是否安装：音量上继续，音量下取消。"
+  ui_print "╰─ 无响应将默认继续安装"
+  chooseport_once 8
+  [ "$?" = "1" ] && return 1
+  return 0
 }
 
 install_progress() {
@@ -224,14 +263,24 @@ install_progress() {
   INSTALL_PROGRESS_LABEL="$(install_stage_label "$INSTALL_PROGRESS_STAGE")"
   INSTALL_PROGRESS_INDEX="$(install_stage_index "$INSTALL_PROGRESS_STAGE")"
   INSTALL_PROGRESS_TITLE="$(install_stage_title "$INSTALL_PROGRESS_STAGE")"
+  INSTALL_PROGRESS_DETAIL="$(install_stage_detail "$INSTALL_PROGRESS_STAGE")"
+  INSTALL_PROGRESS_FLOW="$(install_progress_flow "$INSTALL_PROGRESS_PERCENT" "$INSTALL_PROGRESS_STATUS")"
+  if [ "$INSTALL_PROGRESS_STATUS" = "running" ]; then
+    INSTALL_PROGRESS_MARK="$(install_motion_line)"
+    INSTALL_PROGRESS_HINT="$(install_stage_wait_hint "$INSTALL_PROGRESS_STAGE")"
+  elif [ "$INSTALL_PROGRESS_STATUS" = "failed" ]; then
+    INSTALL_PROGRESS_MARK="✕"
+    INSTALL_PROGRESS_HINT="$INSTALL_PROGRESS_DETAIL"
+  else
+    INSTALL_PROGRESS_MARK="✓"
+    INSTALL_PROGRESS_HINT="$INSTALL_PROGRESS_DETAIL"
+  fi
   ui_print " " 
-  ui_print "[${INSTALL_PROGRESS_INDEX}/15] $INSTALL_PROGRESS_TITLE"
-  ui_print "[$INSTALL_PROGRESS_LABEL] [$INSTALL_PROGRESS_BAR] ${INSTALL_PROGRESS_PERCENT}%"
-  ui_print "  now: $INSTALL_PROGRESS_MESSAGE"
-  install_stage_detail "$INSTALL_PROGRESS_STAGE"
-  install_stage_code_hint "$INSTALL_PROGRESS_STAGE"
-  [ "$INSTALL_PROGRESS_STATUS" = "running" ] && install_stage_wait_hint "$INSTALL_PROGRESS_STAGE"
-  [ "$INSTALL_PROGRESS_STATUS" = "running" ] && install_motion_line
+  ui_print "╭─ ${INSTALL_PROGRESS_INDEX}/${INSTALL_TOTAL_STAGES}  $INSTALL_PROGRESS_TITLE"
+  ui_print "│ ${INSTALL_PROGRESS_MARK} $INSTALL_PROGRESS_MESSAGE"
+  ui_print "│ ${INSTALL_PROGRESS_BAR}  ${INSTALL_PROGRESS_PERCENT}% · ${INSTALL_PROGRESS_LABEL}"
+  ui_print "│ flow ${INSTALL_PROGRESS_FLOW}"
+  ui_print "╰─ $INSTALL_PROGRESS_HINT"
   if [ "$INSTALL_STARTED" = "1" ]; then
     rotate_log "$INSTALL_LOG"
     printf '%s [%s%%] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$INSTALL_PROGRESS_PERCENT" "$INSTALL_PROGRESS_MESSAGE" >> "$INSTALL_LOG"
@@ -276,8 +325,8 @@ run_optional_install_check() {
     if [ "$CHECK_ELAPSED" -gt 0 ] && [ $((CHECK_ELAPSED % 3)) -eq 0 ] 2>/dev/null; then
       CHECK_LEFT=$((CHECK_TIMEOUT - CHECK_ELAPSED))
       [ "$CHECK_LEFT" -lt 0 ] 2>/dev/null && CHECK_LEFT=0
-      ui_print "  wait: $CHECK_NAME 仍在执行，已等待 ${CHECK_ELAPSED}s，最多还等 ${CHECK_LEFT}s"
-      ui_print "  code: optional-check=$CHECK_NAME timeout=${CHECK_TIMEOUT}s"
+      CHECK_MARK="$(install_spinner_frame "$CHECK_ELAPSED")"
+      ui_print "  ${CHECK_MARK} $CHECK_NAME ${CHECK_ELAPSED}s/${CHECK_TIMEOUT}s，剩余约 ${CHECK_LEFT}s"
     fi
     sleep 1
     CHECK_ELAPSED=$((CHECK_ELAPSED + 1))
@@ -469,7 +518,7 @@ append_install_log() {
 
 backup_original_props() {
   : > "$ORIGINAL_PROPS" || fail_install "Failed to create original-props.conf"
-  awk '/"prop"[[:space:]]*:/ { line=$0; sub(/^.*"prop"[[:space:]]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line); print line }' "$OPTIONS_FILE" 2>/dev/null | sort -u | while IFS= read -r PROP_KEY; do
+  awk -F "$(printf '\t')" 'NR > 1 && $3 != "" { print $3 }' "$RULES_FILE" 2>/dev/null | sort -u | while IFS= read -r PROP_KEY; do
     [ -z "$PROP_KEY" ] && continue
     if is_managed_prop "$PROP_KEY" && ! grep -F -q "$PROP_KEY=" "$ORIGINAL_PROPS" && ! grep -F -q "@unset:$PROP_KEY" "$ORIGINAL_PROPS"; then
       CURRENT_VALUE="$(getprop "$PROP_KEY")"
@@ -492,10 +541,10 @@ run_dex2oat_match() {
   [ -f "$GENERATE_SCRIPT" ] || return 11
   chmod 0755 "$CAPTURE_SCRIPT" "$GENERATE_SCRIPT" 2>/dev/null || true
 
-  sh "$CAPTURE_SCRIPT" "$CAPTURED_PROPS" "$CAPTURE_EXPORT" || : > "$CAPTURED_PROPS"
+  sh "$CAPTURE_SCRIPT" "$CAPTURED_PROPS" "" || : > "$CAPTURED_PROPS"
   install_progress 42 match "规则匹配并生成配置" running
   command -v state_update >/dev/null 2>&1 && state_update "config.status=pending" "config.reason=generating-system-prop" || true
-  sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$OPTIONS_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS" || return $?
+  sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$RULES_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS" || return $?
 
   MATCHED_TOTAL="$(sed -n 's/^matched_total=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)"
   [ -n "$MATCHED_TOTAL" ] || MATCHED_TOTAL=0
@@ -548,6 +597,7 @@ MODULE_VERSION="$(sed -n 's/^version=//p' "$MODPATH/module.prop" 2>/dev/null | h
 [ -n "$MODULE_VERSION" ] || MODULE_VERSION=unknown
 
 install_banner
+install_purpose_prompt || abort "Installation cancelled by user"
 install_progress 1 init "初始化安装流程" running
 
 if [ -f "$MODPATH/core/state.sh" ]; then
@@ -559,7 +609,8 @@ mkdir -p "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" || fail_install "Failed to create
 STATE_CREATED=1
 INSTALL_STARTED=1
 touch "$INSTALL_LOG" || fail_install "Failed to create install.log"
-[ -f "$OPTIONS_FILE" ] || fail_install "options.json not found"
+rm -f /storage/emulated/0/Download/dex2oat-captured-props.txt 2>/dev/null || true
+[ -f "$RULES_FILE" ] || fail_install "rule-props.tsv not found"
 command -v state_update >/dev/null 2>&1 && state_update \
   "integrity.status=pending" \
   "integrity.reason=install-integrity-check-pending" \

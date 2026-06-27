@@ -7,6 +7,70 @@ let kernelSuApiLoaded = false;
 let callbackIndex = 0;
 const EXEC_TIMEOUT_MS = 15000;
 const callbackRegistry = new Map();
+const EXPORT_DIR = "/storage/emulated/0/Download";
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const ALLOWED_EXPORT_PATHS = new Set([
+  `${EXPORT_DIR}/dex2oat-lock-config-backup.json`,
+  `${EXPORT_DIR}/dex2oat-lock-diagnostic.txt`
+]);
+
+function normalizeWritePath(path) {
+  return String(path || "").replace(/\/+/g, "/");
+}
+
+function isAuthorizedWritePath(path) {
+  const normalized = normalizeWritePath(path);
+  if (!normalized.startsWith("/") || normalized.includes("/../") || normalized.endsWith("/..")) return false;
+  if (normalized === STATE_DIR || normalized.startsWith(`${STATE_DIR}/`)) return true;
+  if (ALLOWED_EXPORT_PATHS.has(normalized)) return true;
+  return false;
+}
+
+function encodeUtf8Bytes(value) {
+  const text = String(value);
+  if (typeof TextEncoder === "function") {
+    return new TextEncoder().encode(text);
+  }
+
+  const bytes = [];
+  for (let i = 0; i < text.length; i++) {
+    let code = text.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        code = 0x10000 + ((code - 0xd800) << 10) + (next - 0xdc00);
+        i += 1;
+      }
+    }
+
+    if (code <= 0x7f) {
+      bytes.push(code);
+    } else if (code <= 0x7ff) {
+      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+    } else if (code <= 0xffff) {
+      bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    } else {
+      bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    }
+  }
+  return bytes;
+}
+
+function encodeBase64Binary(binary) {
+  if (typeof btoa === "function") return btoa(binary);
+  let output = "";
+  let index = 0;
+  while (index < binary.length) {
+    const first = binary.charCodeAt(index++) & 0xff;
+    const second = index < binary.length ? binary.charCodeAt(index++) & 0xff : NaN;
+    const third = index < binary.length ? binary.charCodeAt(index++) & 0xff : NaN;
+    output += BASE64_ALPHABET[first >> 2];
+    output += BASE64_ALPHABET[((first & 0x03) << 4) | ((second || 0) >> 4)];
+    output += second !== second ? "=" : BASE64_ALPHABET[((second & 0x0f) << 2) | ((third || 0) >> 6)];
+    output += third !== third ? "=" : BASE64_ALPHABET[third & 0x3f];
+  }
+  return output;
+}
 
 function normalizeExecResult(result) {
   if (result == null) {
@@ -124,7 +188,15 @@ export async function readText(path) {
 }
 
 export async function writeBase64(path, content) {
-  const bytes = new TextEncoder().encode(content);
+  const safePath = normalizeWritePath(path);
+  if (!isAuthorizedWritePath(safePath)) {
+    return {
+      code: 126,
+      stdout: "",
+      stderr: `Unauthorized WebUI write path: ${path}`
+    };
+  }
+  const bytes = encodeUtf8Bytes(content);
   const bytesPerChunk = 6144;
   const base64Chunks = [];
   for (let i = 0; i < bytes.length; i += bytesPerChunk) {
@@ -132,12 +204,12 @@ export async function writeBase64(path, content) {
     for (let j = i; j < i + bytesPerChunk && j < bytes.length; j++) {
       chunk += String.fromCharCode(bytes[j]);
     }
-    base64Chunks.push(btoa(chunk));
+    base64Chunks.push(encodeBase64Binary(chunk));
   }
-  const quotedPath = shellQuote(path);
-  const dirCmd = `mkdir -p ${shellQuote(path.replace(/\/[^/]*$/, ""))}`;
-  const tempPath = `${path}.b64.tmp`;
-  const outputTempPath = `${path}.write.tmp`;
+  const quotedPath = shellQuote(safePath);
+  const dirCmd = `mkdir -p ${shellQuote(safePath.replace(/\/[^/]*$/, ""))}`;
+  const tempPath = `${safePath}.b64.tmp`;
+  const outputTempPath = `${safePath}.write.tmp`;
   const quotedTempPath = shellQuote(tempPath);
   const quotedOutputTempPath = shellQuote(outputTempPath);
   const appendCommands = base64Chunks.map((chunk) => `printf '%s' ${shellQuote(chunk)} >> ${quotedTempPath}`);

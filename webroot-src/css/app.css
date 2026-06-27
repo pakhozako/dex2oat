@@ -1,27 +1,38 @@
+/* M3 tokens 已在 m3-tokens.css / m3-theme.css 中定义，以下做别名映射 */
 :root {
-  color-scheme: light dark;
-  --accent-color: #1a73e8;
-  --accent-strong: #1a73e8;
-  --accent-soft: rgba(26, 115, 232, 0.1);
-  --accent-tonal: #e8f0fe;
-  --text-primary: #202124;
-  --text-secondary: #5f6368;
-  --text-tertiary: #80868b;
-  --bg-color: #f8fafd;
-  --surface-color: #ffffff;
-  --surface-elevated: #ffffff;
-  --surface-muted: #f1f3f4;
-  --surface-container: #f8fafd;
-  --border-default: #dadce0;
-  --safe: #34a853;
-  --caution: #fbbc04;
-  --aggressive: #ea4335;
-  --info: #1a73e8;
-  --radius-sm: 8px;
-  --radius-md: 8px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
-  --radius-full: 999px;
+  /* 颜色映射到 M3 token */
+  --accent-color: var(--md-sys-color-primary);
+  --accent-strong: var(--md-sys-color-primary);
+  --accent-soft: var(--md-sys-color-primary-container);
+  --accent-tonal: var(--md-sys-color-primary-container);
+  --text-primary: var(--md-sys-color-on-surface);
+  --text-secondary: var(--md-sys-color-on-surface-variant);
+  --text-tertiary: var(--md-sys-color-outline);
+  --bg-color: var(--md-sys-color-surface);
+  --surface-color: var(--md-sys-color-surface);
+  --surface-elevated: var(--md-sys-color-surface-container-low);
+  --surface-muted: var(--md-sys-color-surface-container);
+  --surface-container: var(--md-sys-color-surface-container);
+  --border-default: var(--md-sys-color-outline-variant);
+  --safe: var(--md-sys-color-primary);
+  --safe-container: var(--md-sys-color-primary-container);
+  --safe-on-container: var(--md-sys-color-on-primary-container);
+  --caution: var(--md-sys-color-tertiary);
+  --caution-container: var(--md-sys-color-tertiary-container);
+  --caution-on-container: var(--md-sys-color-on-tertiary-container);
+  --aggressive: var(--md-sys-color-error);
+  --aggressive-container: var(--md-sys-color-error-container);
+  --aggressive-on-container: var(--md-sys-color-on-error-container);
+  --info: var(--md-sys-color-primary);
+
+  /* 形状映射到 M3 scale */
+  --radius-sm: var(--md-sys-shape-small);
+  --radius-md: var(--md-sys-shape-medium);
+  --radius-lg: var(--md-sys-shape-large);
+  --radius-xl: var(--md-sys-shape-extra-large);
+  --radius-full: var(--md-sys-shape-full);
+
+  /* 间距保留 */
   --space-3: 3px;
   --space-4: 4px;
   --space-6: 6px;
@@ -31,38 +42,17 @@
   --space-14: 14px;
   --space-16: 16px;
   --space-20: 20px;
-  --motion-fast: 180ms;
-  --motion-normal: 280ms;
-  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-emphasized: cubic-bezier(0.2, 0.82, 0.2, 1);
-  --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.16), 0 2px 6px rgba(60, 64, 67, 0.08);
-  --shadow-soft: 0 1px 2px rgba(60, 64, 67, 0.12);
+
+  /* 动效映射到 M3 */
+  --motion-fast: var(--md-sys-motion-duration-short4);
+  --motion-normal: var(--md-sys-motion-duration-medium2);
+  --ease-standard: var(--md-sys-motion-easing-standard);
+  --ease-emphasized: var(--md-sys-motion-easing-emphasized);
+  --shadow-card: var(--md-sys-elevation-2);
+  --shadow-soft: var(--md-sys-elevation-1);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text-primary: rgba(255, 255, 255, 0.92);
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --text-tertiary: rgba(255, 255, 255, 0.48);
-    --bg-color: #101418;
-    --surface-color: #1f1f1f;
-    --surface-elevated: #1f1f1f;
-    --surface-muted: rgba(255, 255, 255, 0.055);
-    --surface-container: #191c20;
-    --border-default: rgba(232, 234, 237, 0.14);
-    --accent-color: #8ab4f8;
-    --accent-strong: #8ab4f8;
-    --accent-soft: rgba(138, 180, 248, 0.16);
-    --accent-tonal: rgba(138, 180, 248, 0.16);
-    --safe: #81c995;
-    --caution: #fdd663;
-    --aggressive: #f28b82;
-    --info: #8ab4f8;
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.22);
-    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.26);
-  }
-}
 
 * {
   box-sizing: border-box;
@@ -221,6 +211,60 @@ button {
   gap: var(--space-8);
 }
 
+.pull-refresh-indicator {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  z-index: 9;
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-14);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  background: var(--md-sys-color-surface-container-high);
+  box-shadow: var(--shadow-card);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-50%, -72px, 0);
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-normal) var(--ease-emphasized);
+}
+
+.pull-refresh-indicator.is-visible,
+.pull-refresh-indicator.is-refreshing {
+  opacity: 1;
+}
+
+.pull-refresh-indicator.is-ready,
+.pull-refresh-indicator.is-refreshing {
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+}
+
+.pull-refresh-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--md-sys-color-outline-variant);
+  border-top-color: var(--md-sys-color-primary);
+  border-radius: var(--radius-full);
+}
+
+.pull-refresh-indicator.is-refreshing .pull-refresh-spinner {
+  animation: pull-refresh-spin 840ms linear infinite;
+}
+
+@keyframes pull-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Buttons */
 .icon-button,
 .text-button,
@@ -252,6 +296,19 @@ button {
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 16px;
+}
+
+.icon-button:focus-visible,
+.text-button:focus-visible,
+.wide-button:focus-visible,
+.primary-button:focus-visible,
+.risk-mode-button:focus-visible,
+.filter-chip:focus-visible,
+.bottom-nav button:focus-visible,
+.action-card:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
 }
 
 /* Page container */
@@ -742,13 +799,9 @@ button {
   }
 }
 
-.main-save-actions {
-  position: static;
-  padding: var(--space-8);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--surface-elevated);
-  box-shadow: var(--shadow-card);
+.save-action-row {
+  display: grid;
+  margin-top: var(--space-10);
 }
 
 /* Option list */
@@ -1543,7 +1596,6 @@ body {
 .option-row,
 .dialog-panel,
 .module-status-card,
-.main-save-actions,
 .diagnostic-summary {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -1637,6 +1689,19 @@ body {
   min-height: 58px;
   padding: 10px;
   text-align: left;
+}
+
+.metric-button {
+  cursor: pointer;
+}
+
+.metric-button:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.metric-button:active {
+  transform: scale(0.98);
 }
 
 .metric-label,
@@ -1987,6 +2052,303 @@ select {
   }
 }
 
+/* v3.6 RC Material 3 motion refinement */
+.pull-refresh-indicator {
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-normal) var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+.pull-refresh-indicator.is-ready,
+.pull-refresh-indicator.is-refreshing {
+  box-shadow: var(--md-sys-elevation-3);
+}
+
+.pull-refresh-spinner {
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.bottom-nav button {
+  isolation: isolate;
+}
+
+.bottom-nav button::before {
+  position: absolute;
+  inset: 4px 8px;
+  z-index: 0;
+  border-radius: var(--radius-full);
+  background: var(--md-sys-color-secondary-container);
+  content: "";
+  opacity: 0;
+  transform: scaleX(0.72);
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+.bottom-nav button.active::before {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.bottom-nav button.active {
+  background: transparent;
+}
+
+.bottom-nav button:active,
+.icon-button:active,
+.text-button:active,
+.wide-button:active,
+.primary-button:active,
+.risk-mode-button:active,
+.filter-chip:active,
+.action-card:active {
+  transform: scale(0.96);
+}
+
+#page > * {
+  animation: dex-list-enter var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+#page > *:nth-child(2) {
+  animation-delay: 24ms;
+}
+
+#page > *:nth-child(3) {
+  animation-delay: 48ms;
+}
+
+#page > *:nth-child(4) {
+  animation-delay: 72ms;
+}
+
+body.bonus-pulse .brand-logo {
+  animation: dex-bonus-logo 900ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+body.bonus-pulse .module-status-card {
+  animation: dex-bonus-surface 900ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+@keyframes dex-list-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dex-bonus-logo {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes dex-bonus-surface {
+  0% {
+    box-shadow: var(--shadow-card);
+  }
+  45% {
+    box-shadow: var(--md-sys-elevation-4);
+  }
+  100% {
+    box-shadow: var(--shadow-card);
+  }
+}
+
+/* RC Material motion layer */
+html,
+body,
+.app-shell,
+.topbar,
+.bottom-nav,
+.section,
+.profile-header,
+.module-status-card,
+.metric,
+.option-row,
+.action-card,
+.dialog-panel,
+.mode-detail-card,
+.about-info-card,
+.about-path-item {
+  transition:
+    background-color var(--motion-normal) var(--ease-standard),
+    border-color var(--motion-normal) var(--ease-standard),
+    color var(--motion-normal) var(--ease-standard),
+    box-shadow var(--motion-normal) var(--ease-standard);
+}
+
+#page.is-transitioning {
+  animation: dex-fade-through var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+.section,
+.profile-header,
+.module-status-card,
+.option-row,
+.action-card,
+.metric,
+.mode-detail-card,
+.about-info-card,
+.about-path-item {
+  will-change: transform, opacity;
+}
+
+.section:hover,
+.profile-header:hover,
+.module-status-card:hover,
+.option-row:hover,
+.action-card:hover,
+.about-info-card:hover,
+.about-path-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+
+.icon-button,
+.text-button,
+.wide-button,
+.primary-button,
+.risk-mode-button,
+.filter-chip,
+.bottom-nav button,
+.action-card {
+  position: relative;
+  overflow: hidden;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.icon-button::after,
+.text-button::after,
+.wide-button::after,
+.primary-button::after,
+.risk-mode-button::after,
+.filter-chip::after,
+.bottom-nav button::after,
+.action-card::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md-sys-motion-duration-short3) var(--ease-standard);
+}
+
+.action-card > *,
+.bottom-nav button > *,
+.icon-button > *,
+.text-button > *,
+.wide-button > *,
+.primary-button > *,
+.risk-mode-button > *,
+.filter-chip > * {
+  position: relative;
+  z-index: 1;
+}
+
+.icon-button:hover::after,
+.text-button:hover::after,
+.wide-button:hover::after,
+.primary-button:hover::after,
+.risk-mode-button:hover::after,
+.filter-chip:hover::after,
+.bottom-nav button:hover::after,
+.action-card:hover::after {
+  opacity: var(--md-sys-state-hover-opacity);
+}
+
+.icon-button:active::after,
+.text-button:active::after,
+.wide-button:active::after,
+.primary-button:active::after,
+.risk-mode-button:active::after,
+.filter-chip:active::after,
+.bottom-nav button:active::after,
+.action-card:active::after {
+  opacity: var(--md-sys-state-pressed-opacity);
+}
+
+.dialog {
+  animation: dex-fade-in var(--md-sys-motion-duration-medium2) var(--ease-standard);
+}
+
+.dialog-panel {
+  animation: dex-scale-in var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized-decelerate);
+  transform-origin: center;
+}
+
+.bottom-nav button.active {
+  transform: translateY(-1px);
+}
+
+.switch span,
+.switch span::after {
+  transition:
+    background-color var(--motion-normal) var(--ease-standard),
+    border-color var(--motion-normal) var(--ease-standard),
+    box-shadow var(--motion-normal) var(--ease-standard),
+    transform var(--motion-normal) var(--ease-standard);
+}
+
+.switch input:focus-visible + span {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+@keyframes dex-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dex-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dex-fade-through {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .app-shell {
   width: min(100%, 540px);
   padding: 74px 12px 104px;
@@ -1999,9 +2361,9 @@ select {
   padding: 0 12px;
   border-top: 0;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--surface-elevated);
   background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(14px);
 }
 
 .brand-logo {
@@ -2223,9 +2585,16 @@ select {
   width: min(calc(100% - 24px), 360px);
   padding: 5px;
   border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
   background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(14px);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .topbar,
+  .bottom-nav {
+    backdrop-filter: blur(14px);
+  }
 }
 
 .bottom-nav button {
@@ -2420,7 +2789,6 @@ body {
 .option-row,
 .dialog-panel,
 .module-status-card,
-.main-save-actions,
 .diagnostic-summary {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -2650,6 +3018,210 @@ select {
   border-radius: var(--radius-full);
   color: var(--text-secondary);
   font-weight: 650;
+}
+
+/* v3.6 device feedback refinements */
+.bottom-nav button .nav-label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottom-nav button.active {
+  color: var(--md-sys-color-on-secondary-container);
+  background: transparent;
+}
+
+.bottom-nav button.active::before {
+  background: var(--md-sys-color-secondary-container);
+}
+
+.dialog {
+  animation: dex-dialog-scrim-in var(--md-sys-motion-duration-short4) var(--ease-standard) both;
+}
+
+.dialog-panel {
+  animation: dex-dialog-panel-in var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate) both;
+  backface-visibility: hidden;
+  transform-origin: center;
+  will-change: opacity, transform;
+}
+
+.dialog.is-closing {
+  pointer-events: none;
+  animation: dex-dialog-scrim-out var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized-accelerate) both;
+}
+
+.dialog.is-closing .dialog-panel {
+  animation: dex-dialog-panel-out var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized-accelerate) both;
+}
+
+.confirm-dialog .dialog-panel {
+  width: min(420px, 100%);
+  padding: 18px;
+}
+
+.confirm-dialog .section-title {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.confirm-dialog .section-title h2 {
+  margin: 0;
+}
+
+.confirm-dialog .dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.confirm-dialog .dialog-actions button {
+  width: 100%;
+  min-width: 0;
+}
+
+.confirm-dialog .risk-note {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-body-medium);
+  line-height: 1.6;
+}
+
+.bonus-dialog .dialog-panel {
+  width: min(520px, 100%);
+}
+
+.bonus-dialog-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 14px;
+  align-items: start;
+  margin: 0 0 12px;
+}
+
+.bonus-dialog-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  align-self: center;
+}
+
+.bonus-dialog-copy strong {
+  color: var(--md-sys-color-on-surface);
+  font: var(--md-sys-typescale-title-medium);
+}
+
+.bonus-dialog-copy span {
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-body-small);
+}
+
+.bonus-art {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--md-sys-shape-medium);
+  object-fit: cover;
+  box-shadow: var(--md-sys-elevation-2);
+}
+
+.bonus-dialog pre {
+  max-height: 58vh;
+  color: var(--md-sys-color-on-surface);
+  font: var(--md-sys-typescale-body-medium);
+  line-height: 1.8;
+}
+
+.option-row {
+  grid-template-columns: minmax(0, 1fr) auto minmax(112px, 168px);
+  align-items: center;
+}
+
+.option-copy,
+.option-copy h3,
+.option-copy p,
+.option-copy code,
+.action-card strong,
+.action-card span,
+.card-note,
+.risk-note,
+.save-hint {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.option-copy p {
+  display: block;
+  max-height: none;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.option-row select {
+  width: 100%;
+  min-width: 112px;
+  max-width: 168px;
+}
+
+.option-row .switch {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 520px) {
+  .option-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .option-row select {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+
+  .confirm-dialog .dialog-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes dex-dialog-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dex-dialog-scrim-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes dex-dialog-panel-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes dex-dialog-panel-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.985);
+  }
 }
 
 .about-info-grid {

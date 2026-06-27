@@ -32,7 +32,7 @@ normalize_module_prop() {
 
 hash_file() {
   TARGET="$1"
-  [ -s "$TARGET" ] || { printf 'missing'; return 0; }
+  [ -f "$TARGET" ] || { printf 'missing'; return 0; }
   if command -v sha256sum >/dev/null 2>&1; then
     case "$TARGET" in
       */module.prop) normalize_module_prop "$TARGET" | sha256sum 2>/dev/null | awk '{print $1}' ;; 
@@ -48,28 +48,28 @@ hash_file() {
   fi
 }
 
-is_refresh_safe_missing_path() {
+is_integrity_key_path() {
   case "$1" in
-    core/integrity-baseline.prop)
+    service.sh|uninstall.sh|module.prop|\
+core/common.sh|core/conflict-detect.sh|core/health-check.sh|core/integrity-check.sh|\
+core/prop-lock.sh|core/state.sh|core/statectl.sh|core/webui-save.sh|\
+scripts/capture-props.sh|scripts/generate-props.sh|webroot/index.html|\
+webroot/assets/dex2oat-ui.protected.css|webroot/assets/dex2oat-ui.protected.js|\
+webroot/data/rule-props.tsv)
       return 0
-      ;;
-    README.md|CHANGELOG.md|update.json|docs/*|tools/*|webroot/css/*|webroot/js/*)
-      return 0
-      ;;
-    webroot/assets/*)
-      [ -d "$MODDIR/webroot/assets" ] && return 0
       ;;
   esac
   return 1
 }
 
+is_refresh_safe_missing_path() {
+  is_integrity_key_path "$1" && return 1
+  return 0
+}
+
 is_refresh_safe_changed_path() {
-  case "$1" in
-    webroot/index.html|webroot/data/app-meta.json|webroot/assets/*)
-      return 0
-      ;;
-  esac
-  return 1
+  is_integrity_key_path "$1" && return 1
+  return 0
 }
 
 scan_baseline() {
@@ -198,18 +198,21 @@ elif [ ! -s "$BASELINE_FILE" ]; then
 elif [ "$BASELINE_REFRESHED" = "failed" ]; then
   STATUS=error
   REASON=baseline-refresh-failed
-elif [ "$MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
+elif [ "$BLOCKING_MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
   STATUS=missing
   REASON=missing-files
-elif [ "$RUNTIME_MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
-  STATUS=warning
-  REASON=runtime-evidence-not-ready
-elif [ "$CHANGED_TOTAL" -gt 0 ] 2>/dev/null; then
+elif [ "$BLOCKING_CHANGED_TOTAL" -gt 0 ] 2>/dev/null; then
   STATUS=changed
   REASON=hash-mismatch
+elif [ "$RUNTIME_MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
+  STATUS=ok
+  REASON=runtime-evidence-not-ready
 elif [ "$RUNTIME_WARNING_TOTAL" -gt 0 ] 2>/dev/null; then
-  STATUS=warning
+  STATUS=ok
   REASON=runtime-structure-warning
+elif [ "$MISSING_TOTAL" -gt 0 ] 2>/dev/null || [ "$CHANGED_TOTAL" -gt 0 ] 2>/dev/null; then
+  STATUS=ok
+  REASON=passed-with-non-key-drift
 elif [ "$BASELINE_REFRESHED" = "yes" ]; then
   STATUS=ok
   REASON=baseline-refreshed
