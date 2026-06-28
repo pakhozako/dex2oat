@@ -10,7 +10,10 @@ const { root, run } = require("./toolkit");
 const { validateAll } = require("./validate");
 const { syncVersion } = require("./version");
 
-const reportPath = path.join(root, "v3.6 自动化开发与构建报告.md");
+function buildReportPath(version) {
+  const label = version?.version || "unknown";
+  return path.join(root, `${label} 自动化开发与构建报告.md`);
+}
 
 async function maybeNpmInstall() {
   try {
@@ -45,6 +48,7 @@ function formatJson(value) {
 }
 
 async function writeBuildReport({ status, steps, environment, version, validation, webui, integrity, release, source, error }) {
+  const reportPath = buildReportPath(version);
   const outputFiles = [];
   for (const item of [release, source]) {
     if (!item) continue;
@@ -52,7 +56,7 @@ async function writeBuildReport({ status, steps, environment, version, validatio
   }
 
   const content = [
-    "# v3.6 自动化开发与构建报告",
+    `# ${version?.version || "unknown"} 自动化开发与构建报告`,
     "",
     `- 构建状态：${status}`,
     `- 构建时间：${new Date().toISOString()}`,
@@ -138,6 +142,7 @@ async function build() {
   const steps = [];
   let environment;
   let version;
+  let reportPath;
   let validation;
   let webui;
   let integrity;
@@ -156,6 +161,7 @@ async function build() {
     pushStep(steps, "Clean", "ok");
 
     version = await syncVersion();
+    reportPath = buildReportPath(version);
     pushStep(steps, "Version Sync", "ok", version);
 
     validation = await validateAll(environment);
@@ -190,11 +196,15 @@ module.exports = {
 };
 
 if (require.main === module) {
+  let lastReportPath = buildReportPath();
   build()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
+    .then((result) => {
+      lastReportPath = result.reportPath || lastReportPath;
+      console.log(JSON.stringify(result, null, 2));
+    })
     .catch((error) => {
       console.error(error.stack || error.message);
-      console.error(`Report: ${reportPath}`);
+      console.error(`Report: ${lastReportPath}`);
       process.exit(1);
     });
 }

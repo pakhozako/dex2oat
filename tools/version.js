@@ -13,7 +13,7 @@ function moduleProp(version) {
     `version=${version.version}`,
     `versionCode=${version.versionCode}`,
     `author=${version.author}`,
-    `description=${version.description} | 🟩 OK`,
+    `description=${version.description} | 🟩 正常`,
     `updateJson=${version.updateJson}`,
     ""
   ].join("\n");

@@ -5,22 +5,28 @@ export function $(selector, root = document) {
 export function createElement(tag, className, text) {
   const element = document.createElement(tag);
   if (className) element.className = className;
-  if (text != null) element.textContent = text;
+  if (text != null) element.textContent = safeText(text);
   return element;
 }
 
 export function metric(label, value) {
   const node = createElement("div", "metric");
-  node.append(createElement("span", "metric-label", label));
-  node.append(createElement("strong", "metric-value", value));
+  node.append(createElement("span", "metric-label", safeText(label, "项目")));
+  node.append(createElement("strong", "metric-value", safeText(value)));
   return node;
 }
 
 export function setStatus(message, tone = "neutral") {
   const target = $("#statusMessage");
   if (!target) return;
-  target.textContent = message;
+  target.textContent = safeText(message, "设备已刷新");
   target.dataset.tone = tone;
+}
+
+function safeText(value, fallback = "暂不可用") {
+  const text = String(value ?? "").trim();
+  if (!text || /^(null|undefined|nan)$/i.test(text)) return fallback;
+  return text;
 }
 
 export function showConfirm(message) {

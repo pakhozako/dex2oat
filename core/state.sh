@@ -3,7 +3,7 @@
 STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 STATE_FILE=${STATE_FILE:-$STATE_DIR/state.prop}
 STATE_SCHEMA_VERSION=32
-STATE_BASE_DESCRIPTION="Rule-driven dexopt tuning and unified state monitor"
+STATE_BASE_DESCRIPTION="规则驱动 ART / dexopt 调优与状态监控"
 
 if [ -n "$MODPATH" ] && [ -f "$MODPATH/core/common.sh" ]; then
   . "$MODPATH/core/common.sh"
@@ -297,9 +297,9 @@ state_write_module_summary() {
   SUMMARY_STATUS_VALUE="$(state_get summary.status)"
   SUMMARY_REASON_VALUE="$(state_summary_reason)"
   case "$SUMMARY_STATUS_VALUE" in
-    error) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟥 Error ($SUMMARY_REASON_VALUE)" ;;
-    warning) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟨 Warning ($SUMMARY_REASON_VALUE)" ;;
-    *) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟩 OK" ;;
+    error) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟥 异常 ($SUMMARY_REASON_VALUE)" ;;
+    warning) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟨 关注 ($SUMMARY_REASON_VALUE)" ;;
+    *) DESCRIPTION_VALUE="$STATE_BASE_DESCRIPTION | 🟩 正常" ;;
   esac
 
   CURRENT_DESCRIPTION="$(sed -n 's/^description=//p' "$MODULE_PROP_TARGET" 2>/dev/null | head -n 1)"

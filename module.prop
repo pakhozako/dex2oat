@@ -1,7 +1,7 @@
 id=dex2oat-lock
 name=Dex2oat Lock
-version=v3.6
-versionCode=360
+version=v3.7
+versionCode=370
 author=pakhozako
-description=Rule-driven dexopt tuning and unified state monitor | 🟩 OK
+description=规则驱动 ART / dexopt 调优与状态监控 | 🟩 正常
 updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json

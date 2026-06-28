@@ -221,6 +221,52 @@ export function mergeConfig(base, incoming) {
   return merged;
 }
 
+function optionIndex(options) {
+  const index = new Map();
+  for (const category of options.categories || []) {
+    for (const item of category.items || []) {
+      index.set(item.id, item);
+    }
+  }
+  return index;
+}
+
+export function normalizeConfig(options, config) {
+  const fallback = buildDefaultConfig(options);
+  const next = mergeConfig(fallback, config || {});
+  const index = optionIndex(options);
+
+  next.profile = String(next.profile || next.riskMode || "safe");
+  if (!["safe", "caution", "aggressive"].includes(next.riskMode)) next.riskMode = "safe";
+  if (!next.riskAgreement || typeof next.riskAgreement !== "object") {
+    next.riskAgreement = fallback.riskAgreement;
+  }
+
+  for (const id of Object.keys(next.items)) {
+    const item = index.get(id);
+    if (!item) {
+      delete next.items[id];
+      continue;
+    }
+    const value = String(next.items[id]?.value ?? item.defaultValue);
+    next.items[id] = {
+      enabled: Boolean(next.items[id]?.enabled),
+      value: item.values?.includes(value) ? value : item.defaultValue
+    };
+  }
+
+  for (const [id, item] of index.entries()) {
+    if (!next.items[id]) {
+      next.items[id] = {
+        enabled: Boolean(item.defaultEnabled),
+        value: item.defaultValue
+      };
+    }
+  }
+
+  return next;
+}
+
 function scopedConfig(options, config) {
   const next = clone(config);
   if (next.riskMode === "aggressive" && !next.riskAgreement?.aggressiveUnlocked) {
@@ -246,7 +292,7 @@ function scopedConfig(options, config) {
 }
 
 export function applySystemPropState(options, config, systemProp) {
-  const next = clone(config);
+  const next = normalizeConfig(options, config);
   const entries = parseKeyValueLines(systemProp, false);
   const propBestEntry = new Map();
 
@@ -258,6 +304,7 @@ export function applySystemPropState(options, config, systemProp) {
   }
 
   for (const category of options.categories) {
+    if (!riskAllowed(category.id, next)) continue;
     for (const item of category.items) {
       const itemState = next.items[item.id];
       if (!itemState) continue;
@@ -548,7 +595,10 @@ function ensureOk(result, action) {
 }
 
 export async function saveConfig(options, config) {
-  const nextConfig = scopedConfig(options, config);
+  const nextConfig = normalizeConfig(options, config);
+  if (nextConfig.riskMode === "aggressive" && !nextConfig.riskAgreement?.aggressiveUnlocked) {
+    nextConfig.riskMode = "caution";
+  }
   const bootId = await readBootId();
   delete nextConfig.rebootState;
   nextConfig.pendingReboot = true;

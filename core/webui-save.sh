@@ -33,6 +33,8 @@ validate_stage() {
   [ -s "$STAGE_DIR/prop-lock.list" ] || fail "missing-staged-prop-lock"
   grep -q -E '^[A-Za-z0-9_.-]+=' "$STAGE_DIR/system.prop" 2>/dev/null || fail "invalid-system-prop"
   grep -q '[{}]' "$STAGE_DIR/config.json" 2>/dev/null || fail "invalid-config-json"
+  grep -q '"items"[[:space:]]*:' "$STAGE_DIR/config.json" 2>/dev/null || fail "invalid-config-items"
+  grep -q -E '"riskMode"[[:space:]]*:[[:space:]]*"(safe|caution|aggressive)"' "$STAGE_DIR/config.json" 2>/dev/null || fail "invalid-config-risk-mode"
 }
 
 apply_stage() {

@@ -10,9 +10,17 @@ const callbackRegistry = new Map();
 const EXPORT_DIR = "/storage/emulated/0/Download";
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const ALLOWED_EXPORT_PATHS = new Set([
-  `${EXPORT_DIR}/dex2oat-lock-config-backup.json`,
-  `${EXPORT_DIR}/dex2oat-lock-diagnostic.txt`
+  `${EXPORT_DIR}/dex2oat-lock-config-backup.json`
 ]);
+
+async function loadKernelSuApi() {
+  try {
+    const dynamicImport = Function("name", "return import(name)");
+    return await dynamicImport("kernelsu");
+  } catch {
+    return null;
+  }
+}
 
 function normalizeWritePath(path) {
   return String(path || "").replace(/\/+/g, "/");
@@ -92,11 +100,7 @@ export async function exec(command) {
   try {
     if (!kernelSuApiLoaded) {
       kernelSuApiLoaded = true;
-      try {
-        kernelSuApi = await import("kernelsu");
-      } catch {
-        kernelSuApi = null;
-      }
+      kernelSuApi = await loadKernelSuApi();
     }
 
     if (kernelSuApi && typeof kernelSuApi.exec === "function") {

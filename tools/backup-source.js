@@ -21,8 +21,6 @@ const skip = [
   "build.config.json",
   "environment-report.md",
   "工具路径清单.md",
-  "v3.5 自动化开发与构建报告.md",
-  "v3.6 自动化开发与构建报告.md",
   "发布版",
   "源码版"
 ];
@@ -36,11 +34,12 @@ async function backupSource(options = {}) {
   const shaPath = path.join(versionDir, `Dex2oat-Lock-${version.version}-source.sha256`);
   const manifestPath = path.join(versionDir, `Dex2oat-Lock-${version.version}-source-manifest.json`);
   const hashTool = options.hashTool || detectHashTool();
+  const sourceSkip = [...skip, `${version.version} 自动化开发与构建报告.md`];
 
   await ensureDir(versionDir);
-  await copyTree(root, sourceTree, { skip, allowedRemoveRoot: versionDir });
+  await copyTree(root, sourceTree, { skip: sourceSkip, allowedRemoveRoot: versionDir });
   await fs.rm(zipPath, { force: true });
-  const zip = await createZipFromDirectory(sourceTree, zipPath, { skip });
+  const zip = await createZipFromDirectory(sourceTree, zipPath, { skip: sourceSkip });
   const sha256 = await writeSha256(zipPath, shaPath, hashTool);
   const manifest = await createManifest({
     baseDir: sourceTree,

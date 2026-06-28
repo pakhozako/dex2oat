@@ -56,15 +56,31 @@ function protectBuffer(name, buffer, mime) {
   };
 }
 
+function protectedScriptLoader(name, source) {
+  const payload = protectBuffer(name, Buffer.from(source, "utf8"), "application/javascript;charset=utf-8");
+  return [
+    `/* ${version.name} ${version.version} protected loader. */`,
+    "(function(p){",
+    "function m(s,i,n){return (Math.imul((s^(i+0x9e3779b9)^n),1664525)+1013904223)>>>0}",
+    "function d(p){var a=p.c.slice().reverse(),r=(+p.r||0)%a.length;if(p.v>=2&&a.length)a.unshift.apply(a,a.splice(a.length-r,r));var b=atob(a.join('')),o=new Uint8Array(p.l),n=p.n||'data',s=(p.s^p.l^n.charCodeAt(0))>>>0;for(var i=0;i<p.l;i++){var c=n.charCodeAt(i%n.length);s=m(s,i,c);var k=(s^(s>>>8)^(s>>>16)^(p.s>>>((i&3)*8)))&255;o[p.l-1-i]=b.charCodeAt(i)^k}var t='',z=32768;for(i=0;i<o.length;i+=z)t+=String.fromCharCode.apply(null,o.subarray(i,i+z));try{return decodeURIComponent(escape(t))}catch(e){return t}}",
+    "try{(0,eval)(d(p))}catch(e){setTimeout(function(){throw e},0)}})",
+    `(${JSON.stringify(payload)});\n`
+  ].join("");
+}
+
 async function buildProtectedData(optionsJson) {
   const appMeta = await readFile(path.join(srcRoot, "data", "app-meta.json"));
   const lyrics = await readFile(path.join(srcRoot, "data", "easter-lyrics.txt"));
   const cover = await readFile(path.join(srcRoot, "data", "easter-cover.jpg"));
+  const homeLogo = await readFile(path.join(srcRoot, "data", "home-logo.jpg"));
+  const htmlIcon = await readFile(path.join(srcRoot, "data", "html-icon.jpg"));
   return {
     a: protectBuffer("a", appMeta, "application/json"),
     o: protectBuffer("o", Buffer.from(optionsJson, "utf8"), "application/json"),
     l: protectBuffer("l", lyrics, "text/plain;charset=utf-8"),
-    c: protectBuffer("c", cover, "image/jpeg")
+    c: protectBuffer("c", cover, "image/jpeg"),
+    g: protectBuffer("g", homeLogo, "image/jpeg"),
+    h: protectBuffer("h", htmlIcon, "image/jpeg")
   };
 }
 
@@ -216,7 +232,7 @@ async function syncMetadata() {
     `version=${version.version}`,
     `versionCode=${version.versionCode}`,
     `author=${version.author}`,
-    `description=${version.description} | 🟩 OK`,
+    `description=${version.description} | 🟩 正常`,
     `updateJson=${version.updateJson}`,
     ""
   ].join("\n");
@@ -342,10 +358,11 @@ async function buildJs(protectedData) {
   const protectedDataScript = `globalThis.__DEX2OAT_WEBUI_DATA=${JSON.stringify(protectedData)};\n`;
   const banner = `/* ${version.name} ${version.version} protected bundle. Built from webroot-src. */\n`;
   const bundled = `${banner}${protectedDataScript}${chunks.join("\n").trimEnd()}\n`;
+  const protectedBundle = protectedScriptLoader("ui", bundled);
   const assetName = "dex2oat-ui.protected.js";
   await mkdir(path.join(outRoot, "assets"), { recursive: true });
-  await writeFile(path.join(outRoot, "assets", assetName), bundled, "utf8");
-  return { assetName, hash: sha256(bundled), content: bundled };
+  await writeFile(path.join(outRoot, "assets", assetName), protectedBundle, "utf8");
+  return { assetName, hash: sha256(protectedBundle), content: protectedBundle };
 }
 
 async function buildCss() {
@@ -386,8 +403,10 @@ async function writeIndex(jsAsset, cssAsset) {
   <body>
     <div id="app" class="app-shell">
       <main class="boot-screen">
+        <img class="boot-logo-image" alt="" />
         <h1>${version.name}</h1>
-        <p>&#27491;&#22312;&#21152;&#36733; WebUI...</p>
+        <p class="boot-lyric">等不到最浪漫的歌 等不到最寂静的海</p>
+        <p>&#27491;&#22312;&#21516;&#27493;&#35774;&#22791;&#29366;&#24577;&#19982;&#37197;&#32622;&#32531;&#23384;...</p>
       </main>
     </div>
     <script charset="utf-8" src="./assets/${jsAsset}"></script>

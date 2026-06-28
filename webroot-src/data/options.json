@@ -1,6 +1,6 @@
 {
   "schemaVersion": 32,
-  "rulesVersion": "v3.6",
+  "rulesVersion": "v3.7",
   "schema": {
     "itemFields": [
       "key",
@@ -3019,7 +3019,7 @@
       "id": "aggressive",
       "title": "危险",
       "tone": "aggressive",
-      "description": "高风险配置，可能明显影响安装耗时、发热、功耗、兼容性和系统稳定性。",
+      "description": "?????????????????????????????????",
       "items": [
         {
           "id": "force_install_everything",
