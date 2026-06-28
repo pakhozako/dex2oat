@@ -93,3 +93,14 @@ PowerShell 5 默认执行策略可能拦截 `npm.ps1`，因此 Windows 环境优
 - 备份旧云端 JSON 到服务器 `backups/deploy-*`。
 - 校验远端 ZIP SHA256 与本地 release 一致。
 - 保持云端首页为发布镜像和模块通信说明，不展示公开用户统计面板。
+
+发布同步完成后可用运维入口复核服务器状态：
+
+```powershell
+$env:DEX2OAT_CLOUD_PASSWORD = "<server password>"
+npm.cmd run cloud:ops -- status
+npm.cmd run cloud:ops -- health
+Remove-Item Env:\DEX2OAT_CLOUD_PASSWORD
+```
+
+`cloud:ops` 只检查 `/root/codex-managed/dex2oat-lock` 托管目录、Dex2oat 相关 systemd 服务、公开 API、健康日志和发布 ZIP 哈希，不应修改服务器无关目录或服务。

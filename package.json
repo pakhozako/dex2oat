@@ -9,7 +9,8 @@
     "build:webui": "node tools/build-webui.mjs",
     "release": "node tools/release.js",
     "cloud:check": "python tools/deploy-cloud-release.py check",
-    "cloud:deploy": "python tools/deploy-cloud-release.py deploy"
+    "cloud:deploy": "python tools/deploy-cloud-release.py deploy",
+    "cloud:ops": "python tools/cloud-ops.py"
   },
   "devDependencies": {
     "@material/web": "^2.4.1",

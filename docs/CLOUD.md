@@ -75,8 +75,45 @@ Use server scripts:
 - `scripts/backup-cloud-data.sh`
 - `scripts/refresh-public-index.sh`
 - local `tools/deploy-cloud-release.py` for release ZIP/API synchronization
+- local `tools/cloud-ops.py` for managed workspace inspection and health checks
+- `dex2oat-cloud-health.timer` periodically runs the managed health check and
+  updates `logs/health-check.latest.txt`
 
 Future cloud rule delivery must validate schema version, rule version, SHA256 and compatibility before any module-side use.
+
+## Local Operations
+
+The local operations helper never stores credentials. Use a temporary
+`DEX2OAT_CLOUD_PASSWORD` environment variable or SSH key authentication.
+
+```powershell
+$env:DEX2OAT_CLOUD_PASSWORD = "<server password>"
+npm.cmd run cloud:ops -- status
+npm.cmd run cloud:ops -- health
+npm.cmd run cloud:ops -- logs
+npm.cmd run cloud:ops -- backups
+npm.cmd run cloud:ops -- inventory
+Remove-Item Env:\DEX2OAT_CLOUD_PASSWORD
+```
+
+Command scope:
+
+- `status`: services, disk usage, public endpoint reachability and basic files.
+- `health`: runs the remote managed health check and verifies current ZIP hash.
+- `logs`: tails managed health/backup logs and Dex2oat service journals.
+- `backups`: lists managed cloud backups and release mirrors.
+- `inventory`: lists managed files, scripts, listener ports and resources.
+
+These commands must stay inside `/root/codex-managed/dex2oat-lock`. They must
+not alter unrelated server services, firewall rules, SSH configuration, or other
+tenant/application directories.
+
+The managed systemd units are:
+
+- `dex2oat-cloud.service`: public release mirror and module communication API.
+- `dex2oat-admin.service`: internal DevOps admin service.
+- `dex2oat-cloud-backup.timer`: scheduled managed data backup.
+- `dex2oat-cloud-health.timer`: scheduled managed health check.
 
 ## Security Hardening
 
