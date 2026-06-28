@@ -1,0 +1,16 @@
+{
+  "id": "dex2oat-lock",
+  "name": "Dex2oat Lock",
+  "version": "v3.9",
+  "versionCode": 390,
+  "author": "pakhozako",
+  "githubUrl": "https://github.com/pakhozako/dex2oat",
+  "cloudBaseUrl": "http://154.219.110.62:18080",
+  "updateJson": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json",
+  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/v3.9/Dex2oat-Lock-v3.9-release.zip",
+  "changelog": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/CHANGELOG.md",
+  "schemaVersion": 32,
+  "rulesVersion": "v3.9",
+  "description": "规则驱动 ART / dexopt 调优与状态监控",
+  "architecture": "规则驱动 / 统一状态"
+}

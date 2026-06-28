@@ -1,0 +1,10 @@
+{
+  "moduleName": "Dex2oat Lock",
+  "version": "v3.9",
+  "versionCode": 390,
+  "author": "pakhozako",
+  "githubUrl": "https://github.com/pakhozako/dex2oat",
+  "cloudBaseUrl": "http://154.219.110.62:18080",
+  "architecture": "规则驱动 / 统一状态",
+  "description": "Dex2oat Lock 是一个基于规则库生成 ART / dex2oat 配置并通过统一状态展示运行健康度的模块。"
+}

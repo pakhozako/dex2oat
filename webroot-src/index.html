@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Dex2oat Lock</title>
+    <style>
+      :root { color-scheme: light dark; --boot-surface: #fffbfe; --boot-surface-low: #f7f2fa; --boot-surface-high: rgba(236, 230, 240, .62); --boot-on-surface: #1d1b20; --boot-on-variant: #49454f; --boot-primary-container: #eaddff; --boot-shadow: rgba(29, 27, 32, .10); }
+      @media (prefers-color-scheme: dark) { :root { --boot-surface: #141218; --boot-surface-low: #1d1b20; --boot-surface-high: rgba(43, 41, 48, .62); --boot-on-surface: #e6e0e9; --boot-on-variant: #cac4d0; --boot-primary-container: #4f378b; --boot-shadow: rgba(0, 0, 0, .24); } }
+      html, body { min-height: 100%; margin: 0; background: var(--boot-surface); color: var(--boot-on-surface); font-family: Roboto, "Noto Sans SC", "HarmonyOS Sans SC", "MiSans", system-ui, sans-serif; }
+      .app-shell.is-booting { min-height: 100vh; padding: 0; overflow: hidden; }
+      .boot-screen { position: fixed; inset: 0; z-index: 80; display: grid; min-height: 100vh; place-items: center; padding: 24px 20px; overflow: hidden; background: linear-gradient(135deg, rgba(234, 221, 255, .18), transparent 44%), linear-gradient(180deg, var(--boot-surface-low), var(--boot-surface)); color: var(--boot-on-surface); text-align: center; backdrop-filter: blur(20px) saturate(1.08); }
+      .boot-card { width: min(100%, 320px); display: grid; justify-items: center; gap: 22px; padding: 30px 24px 28px; border-radius: 28px; background: var(--boot-surface-high); box-shadow: 0 6px 18px var(--boot-shadow); backdrop-filter: blur(18px) saturate(1.08); }
+      .boot-logo-stage { width: 104px; height: 104px; display: grid; place-items: center; }
+      .boot-logo-image { width: 88px; height: 88px; object-fit: cover; border-radius: 26px; background: var(--boot-primary-container); box-shadow: 0 2px 6px var(--boot-shadow); transform-origin: center center; }
+      .boot-copy { display: grid; gap: 22px; }
+      .boot-screen h1 { margin: 0; color: var(--boot-on-surface); font: 500 28px/36px system-ui, sans-serif; letter-spacing: 0; }
+      .boot-screen p { max-width: 260px; margin: 0; color: var(--boot-on-variant); font: 400 14px/20px system-ui, sans-serif; letter-spacing: 0; }
+      .boot-lyric { color: var(--boot-on-surface); opacity: .72; font-weight: 500; }
+      .boot-status-text { display: inline-flex; justify-content: center; white-space: nowrap; opacity: .78; }
+      .boot-status-dots { display: inline-block; width: 3ch; overflow: hidden; text-align: left; }
+      .boot-status-dots::after { content: "..."; animation: bootDots 1.6s steps(4, end) infinite; }
+      @keyframes bootDots { 0%, 24.99% { width: 0; } 25%, 49.99% { width: 1ch; } 50%, 74.99% { width: 2ch; } 75%, 100% { width: 3ch; } }
+    </style>
+    <link rel="stylesheet" href="./css/m3-tokens.css" />
+    <link rel="stylesheet" href="./css/m3-theme.css" />
+    <link rel="stylesheet" href="./css/m3-components.css" />
+    <link rel="stylesheet" href="./css/m3-utils.css" />
+    <link rel="stylesheet" href="./css/app.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell is-booting">
+      <main class="boot-screen" id="bootScreen" aria-live="polite">
+        <section class="boot-card" aria-label="Dex2oat Lock 正在启动">
+          <div class="boot-logo-stage">
+            <img class="boot-logo-image" src="./data/html-icon.jpg" alt="" />
+          </div>
+          <div class="boot-copy">
+            <h1>Dex2oat Lock</h1>
+            <p class="boot-lyric">等不到最浪漫的歌 等不到最寂静的海</p>
+            <p class="boot-status-text"><span>正在同步设备状态与配置缓存</span><span class="boot-status-dots" aria-hidden="true"></span></p>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" charset="utf-8" src="./js/app.js"></script>
+  </body>
+</html>

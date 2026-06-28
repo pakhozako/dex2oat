@@ -4,10 +4,9 @@ dist/
 release/
 cache/
 .cache/
+__pycache__/
+*.pyc
 
-docs/
-tools/
-webroot-src/
 backups/
 reports/
 temp/
@@ -15,6 +14,8 @@ releases/*
 webroot/**/*.br
 webroot/**/*.gz
 webroot/**/*.map
+webroot-src/data/easter-cover.jpg
+webroot-src/data/easter-lyrics.txt
 
 发布版/
 源码版/
