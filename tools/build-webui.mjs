@@ -134,8 +134,16 @@ async function minifyJs(source) {
   return result.code;
 }
 
+function obfuscatorSeed(source) {
+  const hash = sha256(`${version.version}:${version.versionCode}:obfuscator:${sha256(source)}`);
+  return parseInt(hash.slice(0, 8), 16) >>> 0;
+}
+
 function obfuscateJs(source) {
-  return JavaScriptObfuscator.obfuscate(source, OBFUSCATOR_OPTIONS).getObfuscatedCode();
+  return JavaScriptObfuscator.obfuscate(source, {
+    ...OBFUSCATOR_OPTIONS,
+    seed: obfuscatorSeed(source)
+  }).getObfuscatedCode();
 }
 
 async function minifyCssWithPostcss(css) {
