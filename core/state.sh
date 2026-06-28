@@ -163,6 +163,8 @@ state_collect_attention() {
   INSTALL_STATUS="$(state_get install.status)"
   LIFECYCLE_STATUS="$(state_get lifecycle.status)"
   RESTORE_STATUS="$(state_get restore.status)"
+  INTEGRITY_BLOCKING_MISSING="$(state_num integrity.blocking_missing_total)"
+  INTEGRITY_BLOCKING_CHANGED="$(state_num integrity.blocking_changed_total)"
   CONFIG_SOURCE="$(state_get config.source)"
   CONFLICT_TOTAL="$(state_num conflict.total)"
   APPLY_FAILED="$(state_num apply.failed_total)"
@@ -329,8 +331,17 @@ state_recompute_summary() {
   [ -f "$STATE_FILE" ] || return 0
 
   state_clear_attention_keys
+  STATE_ATTENTION_TMP="$STATE_DIR/state-attention.tmp"
   ATTENTION_TOTAL="$(state_collect_attention)"
-  ALERT_TOTAL="${STATE_ATTENTION_ALERT_INDEX:-0}"
+  ALERT_TOTAL=0
+  if [ -s "$STATE_ATTENTION_TMP" ]; then
+    ALERT_TOTAL="$(awk -F= '
+      /^summary\.attention\.[0-9]+\.level=/ {
+        if ($2 !~ /^(info|note|debug)$/) count++
+      }
+      END { print count + 0 }
+    ' "$STATE_ATTENTION_TMP" 2>/dev/null)"
+  fi
   SUMMARY_STATUS=ok
   SUMMARY_TITLE="Status OK"
   SUMMARY_MESSAGE="No blocking issue was found in the unified state."
@@ -344,6 +355,8 @@ state_recompute_summary() {
   INSTALL_STATUS="$(state_get install.status)"
   LIFECYCLE_STATUS="$(state_get lifecycle.status)"
   RESTORE_STATUS="$(state_get restore.status)"
+  INTEGRITY_BLOCKING_MISSING="$(state_num integrity.blocking_missing_total)"
+  INTEGRITY_BLOCKING_CHANGED="$(state_num integrity.blocking_changed_total)"
 
   if [ "$INSTALL_STATUS" = "failed" ] || [ "$LIFECYCLE_STATUS" = "failed" ] || [ "$SERVICE_STATUS" = "error" ] || [ "$APPLY_STATUS" = "error" ] || [ "$INTEGRITY_STATUS" = "error" ] || [ "$CONFIG_STATUS" = "error" ] || [ "$CONFIG_STATUS" = "failed" ] || [ "$MATCH_STATUS" = "error" ] || [ "$MATCH_STATUS" = "failed" ]; then
     SUMMARY_STATUS=error
@@ -361,6 +374,14 @@ state_recompute_summary() {
     SUMMARY_STATUS=warning
     SUMMARY_TITLE="Warnings Present"
     SUMMARY_MESSAGE="The module is usable, but one or more diagnostics need attention."
+  elif [ "$INTEGRITY_STATUS" = "missing" ] && [ "${INTEGRITY_BLOCKING_MISSING:-0}" -gt 0 ] 2>/dev/null; then
+    SUMMARY_STATUS=warning
+    SUMMARY_TITLE="Warnings Present"
+    SUMMARY_MESSAGE="One or more protected module files are missing."
+  elif [ "$INTEGRITY_STATUS" = "changed" ] && [ "${INTEGRITY_BLOCKING_CHANGED:-0}" -gt 0 ] 2>/dev/null; then
+    SUMMARY_STATUS=warning
+    SUMMARY_TITLE="Warnings Present"
+    SUMMARY_MESSAGE="One or more protected module files were changed."
   fi
 
   state_update \

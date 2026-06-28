@@ -17,7 +17,9 @@ DEVICE_FILE="$STATE_DIR/device.prop"
 CAPTURED_PROPS="$STATE_DIR/captured-props.txt"
 MATCHED_PROPS="$STATE_DIR/matched-props.txt"
 MATCH_REPORT="$STATE_DIR/match-report.txt"
-RULES_FILE="$MODPATH/webroot/data/rule-props.tsv"
+PROTECTED_RULES_FILE="$MODPATH/webroot/data/rule-props.pack"
+RULES_FILE="$STATE_DIR/rule-props.tsv"
+RULES_DECODE_SCRIPT="$MODPATH/scripts/decode-rules.sh"
 INSTALL_STARTED=0
 BACKUP_READY=0
 STATE_CREATED=0
@@ -516,6 +518,16 @@ append_install_log() {
   } >> "$INSTALL_LOG" 2>/dev/null || true
 }
 
+prepare_runtime_rules() {
+  [ -f "$RULES_DECODE_SCRIPT" ] || return 1
+  [ -s "$PROTECTED_RULES_FILE" ] || return 1
+  chmod 0755 "$RULES_DECODE_SCRIPT" 2>/dev/null || true
+  sh "$RULES_DECODE_SCRIPT" "$PROTECTED_RULES_FILE" "$RULES_FILE" || return 1
+  [ -s "$RULES_FILE" ] || return 1
+  chmod 0600 "$RULES_FILE" 2>/dev/null || true
+  return 0
+}
+
 backup_original_props() {
   : > "$ORIGINAL_PROPS" || fail_install "Failed to create original-props.conf"
   awk -F "$(printf '\t')" 'NR > 1 && $3 != "" { print $3 }' "$RULES_FILE" 2>/dev/null | sort -u | while IFS= read -r PROP_KEY; do
@@ -610,7 +622,7 @@ STATE_CREATED=1
 INSTALL_STARTED=1
 touch "$INSTALL_LOG" || fail_install "Failed to create install.log"
 rm -f /storage/emulated/0/Download/dex2oat-captured-props.txt 2>/dev/null || true
-[ -f "$RULES_FILE" ] || fail_install "rule-props.tsv not found"
+prepare_runtime_rules || fail_install "protected rules unavailable"
 command -v state_update >/dev/null 2>&1 && state_update \
   "integrity.status=pending" \
   "integrity.reason=install-integrity-check-pending" \

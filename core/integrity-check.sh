@@ -53,9 +53,9 @@ is_integrity_key_path() {
     service.sh|uninstall.sh|module.prop|\
 core/common.sh|core/conflict-detect.sh|core/health-check.sh|core/integrity-check.sh|\
 core/prop-lock.sh|core/state.sh|core/statectl.sh|core/webui-save.sh|\
-scripts/capture-props.sh|scripts/generate-props.sh|webroot/index.html|\
+scripts/capture-props.sh|scripts/decode-rules.sh|scripts/generate-props.sh|webroot/index.html|\
 webroot/assets/dex2oat-ui.protected.css|webroot/assets/dex2oat-ui.protected.js|\
-webroot/data/rule-props.tsv)
+webroot/data/rule-props.pack)
       return 0
       ;;
   esac

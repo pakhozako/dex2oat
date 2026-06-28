@@ -18,6 +18,9 @@ MATCH_REPORT="$STATE_DIR/match-report.txt"
 PROP_LOCK_LIST="$STATE_DIR/prop-lock.list"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
 TRIGGER_REMATCH="$STATE_DIR/trigger-rematch"
+PROTECTED_RULES_FILE="$MODDIR/webroot/data/rule-props.pack"
+RULES_FILE="$STATE_DIR/rule-props.tsv"
+RULES_DECODE_SCRIPT="$MODDIR/scripts/decode-rules.sh"
 SERVICE_LOCK_DIR="$STATE_DIR/.service.lock"
 SERVICE_LOCK_TIMEOUT=20
 SERVICE_LOCK_STALE_SECONDS=7200
@@ -47,6 +50,16 @@ rotate_log() {
 log_msg() {
   rotate_log "$LOG_FILE"
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
+}
+
+prepare_runtime_rules() {
+  [ -f "$RULES_DECODE_SCRIPT" ] || return 1
+  [ -s "$PROTECTED_RULES_FILE" ] || return 1
+  chmod 0755 "$RULES_DECODE_SCRIPT" 2>/dev/null || true
+  sh "$RULES_DECODE_SCRIPT" "$PROTECTED_RULES_FILE" "$RULES_FILE" || return 1
+  [ -s "$RULES_FILE" ] || return 1
+  chmod 0600 "$RULES_FILE" 2>/dev/null || true
+  return 0
 }
 
 service_lock_now() {
@@ -226,11 +239,17 @@ write_service_state() {
 run_trigger_rematch() {
   [ -f "$TRIGGER_REMATCH" ] || return 0
 
-  RULES_FILE="$MODDIR/webroot/data/rule-props.tsv"
   GENERATE_SCRIPT="$MODDIR/scripts/generate-props.sh"
   MODULE_VERSION="$(sed -n 's/^version=//p' "$MODDIR/module.prop" 2>/dev/null | head -n 1)"
 
   log_msg "Trigger rematch detected: rule-driven version=$MODULE_VERSION"
+  if ! prepare_runtime_rules; then
+    command -v state_update >/dev/null 2>&1 && state_update "match.status=failed" "match.reason=rules_decode_failed" "match.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+    command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
+    log_msg "Trigger rematch failed; protected rules unavailable"
+    rm -f "$TRIGGER_REMATCH" 2>/dev/null
+    return 0
+  fi
   sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "" || : > "$CAPTURED_PROPS"
   if sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$RULES_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
     cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true

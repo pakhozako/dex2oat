@@ -46,8 +46,11 @@ cleanup_state_files() {
   rm -f "$STATE_DIR/config-source.prop" 2>/dev/null
   rm -f "$STATE_DIR/state.prop" 2>/dev/null
   rm -f "$STATE_DIR/device.prop" 2>/dev/null
+  rm -f "$STATE_DIR/install-progress.prop" 2>/dev/null
+  rm -f "$STATE_DIR/install-state.prop" 2>/dev/null
   rm -f "$STATE_DIR/original-props.conf" 2>/dev/null
   rm -f "$STATE_DIR/matched-props.txt" 2>/dev/null
+  rm -f "$STATE_DIR/rule-props.tsv" "$STATE_DIR/rule-seen-props.txt" 2>/dev/null
   rm -f "$STATE_DIR/system.prop.bak" 2>/dev/null
   rm -f "$STATE_DIR/trigger-rematch" 2>/dev/null
   rm -f "$STATE_DIR/captured-keys.txt" 2>/dev/null
@@ -61,7 +64,8 @@ cleanup_state_files() {
   rm -f "$STATE_DIR/conflict-report.tmp" 2>/dev/null
   rm -f "$STATE_DIR/integrity-report.txt" 2>/dev/null
   rm -f "$STATE_DIR/prop-lock.list" 2>/dev/null
-  rm -rf "$STATE_DIR/backup" "$STATE_DIR/logs" "$STATE_DIR"/stage-* "$STATE_DIR"/rollback.* "$STATE_DIR"/.state.lock "$STATE_DIR"/.webui-save.lock 2>/dev/null
+  rm -f "$STATE_DIR"/.*-status.* 2>/dev/null
+  rm -rf "$STATE_DIR/backup" "$STATE_DIR/logs" "$STATE_DIR"/stage-* "$STATE_DIR"/rollback.* "$STATE_DIR"/.state.lock "$STATE_DIR"/.webui-save.lock "$STATE_DIR"/.service.lock 2>/dev/null
   trim_archive_file "$STATE_DIR/captured-props.txt"
   trim_archive_file "$STATE_DIR/match-report.txt"
   trim_archive_file "$STATE_DIR/install.log"

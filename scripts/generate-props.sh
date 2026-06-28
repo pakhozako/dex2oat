@@ -24,8 +24,16 @@ case "$RULE_SOURCE" in
   rule-props.tsv|*/rule-props.tsv)
     BUILT_RULES_FILE="$RULE_SOURCE"
     ;;
-  */) BUILT_RULES_FILE="${RULE_SOURCE%/}/rule-props.tsv" ;;
-  *) BUILT_RULES_FILE="$RULE_SOURCE/rule-props.tsv" ;;
+  *)
+    if [ -f "$RULE_SOURCE" ]; then
+      BUILT_RULES_FILE="$RULE_SOURCE"
+    else
+      case "$RULE_SOURCE" in
+        */) BUILT_RULES_FILE="${RULE_SOURCE%/}/rule-props.tsv" ;;
+        *) BUILT_RULES_FILE="$RULE_SOURCE/rule-props.tsv" ;;
+      esac
+    fi
+    ;;
 esac
 TMP_OUTPUT="$OUTPUT_FILE.tmp"
 TMP_MATCHED="$MATCHED_FILE.tmp"
@@ -131,6 +139,27 @@ dalvik.vm.bg-dex2oat-threads)
   return 1
 }
 
+should_force_default_when_captured() {
+  case "$1" in
+    dalvik.vm.dex2oat-threads|dalvik.vm.default-dex2oat-cpu-set|\
+dalvik.vm.dex2oat-cpu-set|dalvik.vm.boot-dex2oat-cpu-set|\
+dalvik.vm.background-dex2oat-cpu-set|dalvik.vm.image-dex2oat-cpu-set|\
+dalvik.vm.bg-dex2oat-threads|dalvik.vm.boot-dex2oat-threads|\
+dalvik.vm.image-dex2oat-threads|dalvik.vm.dex2oat-Xms|dalvik.vm.dex2oat-Xmx|\
+dalvik.vm.image-dex2oat-Xms|dalvik.vm.image-dex2oat-Xmx|\
+pm.dexopt.boot-after-ota.concurrency|dalvik.vm.usap_pool_size_max|\
+dalvik.vm.usap_pool_size_min|dalvik.vm.usap_refill_threshold|\
+ro.vendor.dex2oat-aggressive-cpu-set|ro.vendor.dex2oat-aggressive-threads|\
+dalvik.vm.dex2oat64.enabled|persist.device_config.runtime_native.usap_pool_enabled|\
+dalvik.vm.usejitprofiles|persist.device_config.runtime_native_boot.use_generational_gc|\
+persist.device_config.runtime_native.metrics.write-to-statsd)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 : > "$VALUES_FILE" || exit 1
 if [ -s "$CAPTURED_FILE" ]; then
   awk '
@@ -152,7 +181,9 @@ if [ -s "$CAPTURED_FILE" ]; then
 fi
 
 [ -s "$BUILT_RULES_FILE" ] || exit 1
-cp "$BUILT_RULES_FILE" "$RULES_FILE" || exit 1
+if [ "$BUILT_RULES_FILE" != "$RULES_FILE" ]; then
+  cp "$BUILT_RULES_FILE" "$RULES_FILE" || exit 1
+fi
 
 [ -s "$RULES_FILE" ] || exit 1
 
@@ -183,7 +214,8 @@ SEEN_PROPS="$STATE_DIR/rule-seen-props.txt"
 : > "$SEEN_PROPS" || exit 1
 
 FIRST_RULE=1
-while IFS="$(printf '\t')" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RULE_DEFAULT RULE_RISK RULE_OWNER RULE_OWNER_REASON RULE_EXPLAIN_TITLE RULE_EXPLAIN_REASON RULE_CONFIDENCE RULE_VALUES || [ -n "$RULE_PROP" ]; do
+RULE_FIELD_SEP="$(printf '\034')"
+while IFS="$RULE_FIELD_SEP" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RULE_DEFAULT RULE_RISK RULE_OWNER RULE_OWNER_REASON RULE_EXPLAIN_TITLE RULE_EXPLAIN_REASON RULE_CONFIDENCE RULE_VALUES || [ -n "$RULE_PROP" ]; do
   if [ "$FIRST_RULE" = "1" ]; then
     FIRST_RULE=0
     [ "$RULE_ID" = "id" ] && continue
@@ -229,6 +261,9 @@ while IFS="$(printf '\t')" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RUL
     elif should_promote_to_everything "$CAPTURED_VALUE" "$RULE_PROP" "$RULE_VALUES" "$RULE_RISK"; then
       FINAL_VALUE=everything
       FINAL_SOURCE=captured-promoted
+    elif should_force_default_when_captured "$RULE_PROP"; then
+      FINAL_VALUE="$RULE_DEFAULT"
+      FINAL_SOURCE=captured-default
     else
       FINAL_VALUE="$CAPTURED_VALUE"
       FINAL_SOURCE=captured
@@ -251,7 +286,18 @@ while IFS="$(printf '\t')" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RUL
     printf '# prop.action=disable prop.key=%s prop.value=%s\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
     printf '# %s=%s\n\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
   fi
-done < "$RULES_FILE"
+done <<EOF
+$(awk -v sep="$RULE_FIELD_SEP" '
+  BEGIN { FS = "\t" }
+  {
+    for (field = 1; field <= 12; field++) {
+      value = $field
+      gsub(sep, " ", value)
+      printf "%s%s", value, field < 12 ? sep : "\n"
+    }
+  }
+' "$RULES_FILE" 2>/dev/null)
+EOF
 
 [ -s "$TMP_OUTPUT" ] || exit 1
 

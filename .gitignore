@@ -12,6 +12,9 @@ backups/
 reports/
 temp/
 releases/*
+webroot/**/*.br
+webroot/**/*.gz
+webroot/**/*.map
 
 发布版/
 源码版/
