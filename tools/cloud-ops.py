@@ -178,10 +178,33 @@ free -h
     return remote_command(args, script, timeout=90)
 
 
+def command_worker(args) -> str:
+    script = r"""
+printf '%s\n' '--- worker dirs ---'
+mkdir -p "$BASE/worker/jobs" "$BASE/worker/logs" "$BASE/worker/artifacts" "$BASE/worker/repos"
+find "$BASE/worker" -maxdepth 2 -type d | sort
+printf '%s\n' '--- latest worker logs ---'
+find "$BASE/worker/logs" -maxdepth 1 -type f -printf '%TY-%Tm-%Td %TH:%TM %9s %p\n' 2>/dev/null | sort | tail -30
+printf '%s\n' '--- worker env ---'
+"$BASE/scripts/run-worker-task.sh" worker-env-check sh -lc '. "$0"; node -v; npm -v; python3 --version; git --version; df -h "$DEX2OAT_WORKER"' "$BASE/scripts/remote-env.sh" 2>/dev/null || true
+tail -n 80 "$BASE/worker/logs"/worker-env-check-*.log 2>/dev/null | tail -80 || true
+"""
+    return remote_command(args, script, timeout=90)
+
+
+def command_worker_selfcheck(args) -> str:
+    script = r"""
+mkdir -p "$BASE/worker/jobs" "$BASE/worker/logs" "$BASE/worker/artifacts" "$BASE/worker/repos"
+"$BASE/scripts/run-worker-task.sh" worker-selfcheck sh -lc '. "$0"; node -v; npm -v; python3 --version; git --version; free -h; df -h "$DEX2OAT_WORKER"' "$BASE/scripts/remote-env.sh"
+tail -n 120 "$BASE/worker/logs"/worker-selfcheck-*.log 2>/dev/null | tail -120
+"""
+    return remote_command(args, script, timeout=90)
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     version = load_json(VERSION_FILE)
     parser = argparse.ArgumentParser(description="Inspect the managed Dex2oat-Lock cloud workspace.")
-    parser.add_argument("command", choices=("status", "health", "logs", "backups", "inventory"), nargs="?", default="status")
+    parser.add_argument("command", choices=("status", "health", "logs", "backups", "inventory", "worker", "worker-selfcheck"), nargs="?", default="status")
     parser.add_argument("--host", default=os.environ.get("DEX2OAT_CLOUD_HOST") or "154.219.110.62")
     parser.add_argument("--port", type=int, default=int(os.environ.get("DEX2OAT_CLOUD_SSH_PORT") or "22"))
     parser.add_argument("--user", default=os.environ.get("DEX2OAT_CLOUD_USER") or "root")
@@ -205,6 +228,10 @@ def main(argv: list[str]) -> int:
         print(command_backups(args), end="")
     elif args.command == "inventory":
         print(command_inventory(args), end="")
+    elif args.command == "worker":
+        print(command_worker(args), end="")
+    elif args.command == "worker-selfcheck":
+        print(command_worker_selfcheck(args), end="")
     return 0
 
 

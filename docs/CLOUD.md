@@ -93,6 +93,8 @@ npm.cmd run cloud:ops -- health
 npm.cmd run cloud:ops -- logs
 npm.cmd run cloud:ops -- backups
 npm.cmd run cloud:ops -- inventory
+npm.cmd run cloud:ops -- worker
+npm.cmd run cloud:ops -- worker-selfcheck
 Remove-Item Env:\DEX2OAT_CLOUD_PASSWORD
 ```
 
@@ -103,6 +105,8 @@ Command scope:
 - `logs`: tails managed health/backup logs and Dex2oat service journals.
 - `backups`: lists managed cloud backups and release mirrors.
 - `inventory`: lists managed files, scripts, listener ports and resources.
+- `worker`: lists remote worker directories, logs and development tool versions.
+- `worker-selfcheck`: records a lightweight remote worker environment check.
 
 These commands must stay inside `/root/codex-managed/dex2oat-lock`. They must
 not alter unrelated server services, firewall rules, SSH configuration, or other
@@ -114,6 +118,11 @@ The managed systemd units are:
 - `dex2oat-admin.service`: internal DevOps admin service.
 - `dex2oat-cloud-backup.timer`: scheduled managed data backup.
 - `dex2oat-cloud-health.timer`: scheduled managed health check.
+
+The worker area is `/root/codex-managed/dex2oat-lock/worker`. It is intended for
+heavy validation, static scans and WebUI/browser checks that should not consume
+local desktop resources. It must remain SSH-only; do not expose a public command
+execution API.
 
 ## Security Hardening
 
