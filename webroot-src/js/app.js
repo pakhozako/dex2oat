@@ -881,7 +881,6 @@ function createBackgroundPanel() {
   section.append(actions);
   section.append(createCardOpacityControl());
   section.append(createCardBlurControl());
-  section.append(createElement("p", "save-hint", "背景图会压缩后保存在当前 WebView 本地；透明度和模糊只作用于内容卡片背景，文字保持清晰。"));
   return section;
 }
 
@@ -972,7 +971,7 @@ function setTelemetryEnabled(enabled) {
 }
 
 function createTelemetryPanel() {
-  const section = createSection("模块通信", "可关闭");
+  const section = createSection("模块通信", "");
   section.classList.add("about-section", "telemetry-panel");
   const row = createElement("div", "telemetry-toggle-row");
   const copy = createElement("div", "telemetry-copy");
@@ -1007,7 +1006,7 @@ function createTelemetryPanel() {
   evidenceCopy.append(createElement("strong", "", "上传规则证据"));
   evidenceCopy.append(createElement("span", "", "手动上传脱敏后的 ART / dexopt / ROM 属性样本，用于扩展规则库；不会上传完整日志、应用列表或个人标识。"));
   evidence.append(evidenceCopy, createButton("上传规则证据", "wide-button", submitRuleEvidence));
-  section.append(row, actions, evidence, createElement("p", "save-hint", "模块通信保持可控；规则证据仅在你手动确认后上传。"));
+  section.append(row, actions, evidence);
   return section;
 }
 
@@ -2775,6 +2774,7 @@ async function showDiagnosticsDialog(content) {
   const unifiedState = parseDiagnosticSection(content, "--- unified state ---");
   const integrityState = parseDiagnosticSection(content, "--- integrity report ---");
   showDialog("诊断输出", content, createDiagnosticSummary(applyLog, diagnosticState, rebootState, installState, uninstallState, originalPropsContent, currentSystemProp, healthState, conflictState, unifiedState, integrityState), {
+    className: "diagnostic-dialog",
     copyLabel: "复制诊断",
     savePath: DIAGNOSTIC_EXPORT_PATH
   });

@@ -612,17 +612,22 @@ export async function saveConfig(options, config) {
   const stageDir = `${STATE_DIR}/stage-webui-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   const configSource = `source=webui-custom\nupdated_at=${formatTimestamp(new Date())}\nversion=webui\nmatched_total=0\nreason=manual-save\n`;
 
-  ensureOk(await exec(`rm -rf ${shellQuote(stageDir)} && mkdir -p ${shellQuote(stageDir)}`), "create staging directory");
-  const writeResults = await Promise.all([
-    writeBase64(`${stageDir}/system.prop`, systemProp),
-    writeBase64(`${stageDir}/prop-lock.list`, propLockList),
-    writeBase64(`${stageDir}/config.json`, configJson),
-    writeBase64(`${stageDir}/config-source.prop`, configSource),
-    writeBase64(`${stageDir}/risk-mode`, `${nextConfig.riskMode || "safe"}\n`)
-  ]);
-  ["stage system.prop", "stage prop-lock.list", "stage WebUI config", "stage config source", "stage risk mode"]
-    .forEach((action, index) => ensureOk(writeResults[index], action));
-  ensureOk(await exec(`sh ${shellQuote(`${MODULE_DIR}/core/webui-save.sh`)} ${shellQuote(MODULE_DIR)} ${shellQuote(stageDir)}`), "commit staged config");
+  try {
+    ensureOk(await exec(`rm -rf ${shellQuote(stageDir)} && mkdir -p ${shellQuote(stageDir)}`), "create staging directory");
+    const writeResults = await Promise.all([
+      writeBase64(`${stageDir}/system.prop`, systemProp),
+      writeBase64(`${stageDir}/prop-lock.list`, propLockList),
+      writeBase64(`${stageDir}/config.json`, configJson),
+      writeBase64(`${stageDir}/config-source.prop`, configSource),
+      writeBase64(`${stageDir}/risk-mode`, `${nextConfig.riskMode || "safe"}\n`)
+    ]);
+    ["stage system.prop", "stage prop-lock.list", "stage WebUI config", "stage config source", "stage risk mode"]
+      .forEach((action, index) => ensureOk(writeResults[index], action));
+    ensureOk(await exec(`sh ${shellQuote(`${MODULE_DIR}/core/webui-save.sh`)} ${shellQuote(MODULE_DIR)} ${shellQuote(stageDir)}`), "commit staged config");
+  } catch (error) {
+    await exec(`rm -rf ${shellQuote(stageDir)}`);
+    throw error;
+  }
 
   nextConfig.rebootState = buildRebootState(nextConfig, bootId, {});
   return nextConfig;

@@ -13,6 +13,10 @@ const ALLOWED_EXPORT_PATHS = new Set([
   `${EXPORT_DIR}/dex2oat-lock-config-backup.json`
 ]);
 
+function uniqueWriteSuffix() {
+  return `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+}
+
 async function loadKernelSuApi() {
   try {
     const dynamicImport = Function("name", "return import(name)");
@@ -212,8 +216,9 @@ export async function writeBase64(path, content) {
   }
   const quotedPath = shellQuote(safePath);
   const dirCmd = `mkdir -p ${shellQuote(safePath.replace(/\/[^/]*$/, ""))}`;
-  const tempPath = `${safePath}.b64.tmp`;
-  const outputTempPath = `${safePath}.write.tmp`;
+  const tempSuffix = uniqueWriteSuffix();
+  const tempPath = `${safePath}.${tempSuffix}.b64.tmp`;
+  const outputTempPath = `${safePath}.${tempSuffix}.write.tmp`;
   const quotedTempPath = shellQuote(tempPath);
   const quotedOutputTempPath = shellQuote(outputTempPath);
   const appendCommands = base64Chunks.map((chunk) => `printf '%s' ${shellQuote(chunk)} >> ${quotedTempPath}`);
