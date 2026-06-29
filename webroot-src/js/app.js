@@ -47,6 +47,8 @@ const CARD_DEFAULT_BLUR = 0;
 const BOOT_SCREEN_MIN_MS = 3000;
 const BOOT_EXIT_MS = 680;
 const TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const CLOUD_REQUEST_TIMEOUT_MS = 12000;
+const CLOUD_EVIDENCE_TIMEOUT_MS = 20000;
 const RULE_EVIDENCE_MAX_PROPS = 420;
 const RULE_EVIDENCE_ALLOWED_PREFIXES = [
   "dalvik.",
@@ -280,6 +282,11 @@ function friendlySummaryTitle(title, status) {
   const value = String(title || "").trim();
   const normalized = value.toLowerCase().replace(/\s+/g, "-");
   const map = {
+    "状态正常": "Dex2oat-Lock",
+    "需要关注": "需要关注",
+    "需要处理": "需要处理",
+    "安装中": "安装中",
+    "恢复中": "恢复中",
     "status-ok": "Dex2oat-Lock",
     "passed": "Dex2oat-Lock",
     "warnings-present": "需要关注",
@@ -303,6 +310,9 @@ function friendlySummaryTitle(title, status) {
 function friendlySummaryMessage(message, status) {
   const value = String(message || "").trim();
   if (!hasDisplayValue(value)) return "";
+  if (value === "当前没有发现需要处理的问题。") return "";
+  if (value === "模块可用，诊断中有少量细节可查看。") return value;
+  if (value === "安装流程正在写入进度和最终状态。") return value;
   if (/no blocking issue/i.test(value)) return "";
   if (/warnings present|diagnostics need attention/i.test(value)) return "模块可用，诊断中有少量细节可查看。";
   if (/installer is still writing/i.test(value)) return "安装流程正在写入最终状态。";
@@ -1015,6 +1025,42 @@ function ruleEvidenceEndpoint() {
   return base ? `${base}/api/rule-evidence` : "";
 }
 
+function fetchWithTimeout(url, options = {}, timeoutMs = CLOUD_REQUEST_TIMEOUT_MS) {
+  if (typeof fetch !== "function") return Promise.reject(new Error("当前 WebView 不支持网络请求"));
+
+  let timer = null;
+  let controller = null;
+  const requestOptions = { ...options };
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      if (controller) {
+        try {
+          controller.abort();
+        } catch {
+          // Older WebView hosts may expose a partial AbortController.
+        }
+      }
+      reject(new Error("网络请求超时"));
+    }, timeoutMs);
+  });
+
+  if (typeof AbortController === "function") {
+    controller = new AbortController();
+    requestOptions.signal = controller.signal;
+  }
+
+  return Promise.race([fetch(url, requestOptions), timeoutPromise]).then(
+    (response) => {
+      if (timer) clearTimeout(timer);
+      return response;
+    },
+    (error) => {
+      if (timer) clearTimeout(timer);
+      throw error;
+    }
+  );
+}
+
 function shouldSubmitTelemetry(force = false) {
   if (!isTelemetryEnabled()) return false;
   if (force) return true;
@@ -1185,11 +1231,11 @@ async function submitTelemetry(options = {}) {
   telemetryInFlight = (async () => {
     try {
       if (userVisible) setStatus("正在同步模块通信...");
-      const response = await fetch(endpoint, {
+      const response = await fetchWithTimeout(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildTelemetryPayload())
-      });
+      }, CLOUD_REQUEST_TIMEOUT_MS);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       try {
         globalThis.localStorage?.setItem(TELEMETRY_LAST_SENT_STORAGE_KEY, String(Date.now()));
@@ -1237,11 +1283,11 @@ async function submitRuleEvidence() {
       }
 
       setStatus(`正在上传 ${payload.capturedTotal} 项规则证据...`);
-      const response = await fetch(endpoint, {
+      const response = await fetchWithTimeout(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
-      });
+      }, CLOUD_EVIDENCE_TIMEOUT_MS);
       const text = await response.text();
       let data = {};
       try {
@@ -3160,20 +3206,33 @@ function showDialog(title, content, beforeContent, options = {}) {
   pre.textContent = String(content || "");
   dialog.querySelector('[data-action="close"]').addEventListener("click", () => closeDialog(dialog));
   dialog.querySelector('[data-action="copy"]').addEventListener("click", () => copyDialogContent(content, pre));
-  dialog.querySelector('[data-action="save"]')?.addEventListener("click", () => saveDialogContent(content, options.savePath));
+  dialog.querySelector('[data-action="save"]')?.addEventListener("click", (event) => saveDialogContent(content, options.savePath, event.currentTarget));
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog && options.closeOnBackdrop === true) closeDialog(dialog);
   });
   document.body.append(dialog);
 }
 
-async function saveDialogContent(content, savePath) {
-  const result = await writeBase64(savePath, content);
-
-  if (result.code === 0) {
-    setStatus(`已保存到 ${savePath}`, "ok");
-  } else {
-    setStatus(`保存失败：${result.stderr || result.stdout || result.code}`, "warn");
+async function saveDialogContent(content, savePath, button = null) {
+  if (button?.disabled) return;
+  if (button) {
+    button.disabled = true;
+    button.classList.add("is-busy");
+  }
+  try {
+    const result = await writeBase64(savePath, content);
+    if (result.code === 0) {
+      setStatus(`已保存到 ${savePath}`, "ok");
+    } else {
+      setStatus(`保存失败：${result.stderr || result.stdout || result.code}`, "warn");
+    }
+  } catch (error) {
+    setStatus(`保存失败：${error.message || error}`, "warn");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove("is-busy");
+    }
   }
 }
 

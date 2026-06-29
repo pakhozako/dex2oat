@@ -343,8 +343,8 @@ state_recompute_summary() {
     ' "$STATE_ATTENTION_TMP" 2>/dev/null)"
   fi
   SUMMARY_STATUS=ok
-  SUMMARY_TITLE="Status OK"
-  SUMMARY_MESSAGE="No blocking issue was found in the unified state."
+  SUMMARY_TITLE="状态正常"
+  SUMMARY_MESSAGE="当前没有发现需要处理的问题。"
 
   MATCH_STATUS="$(state_get match.status)"
   CONFIG_STATUS="$(state_get config.status)"
@@ -360,28 +360,28 @@ state_recompute_summary() {
 
   if [ "$INSTALL_STATUS" = "failed" ] || [ "$LIFECYCLE_STATUS" = "failed" ] || [ "$SERVICE_STATUS" = "error" ] || [ "$APPLY_STATUS" = "error" ] || [ "$INTEGRITY_STATUS" = "error" ] || [ "$CONFIG_STATUS" = "error" ] || [ "$CONFIG_STATUS" = "failed" ] || [ "$MATCH_STATUS" = "error" ] || [ "$MATCH_STATUS" = "failed" ]; then
     SUMMARY_STATUS=error
-    SUMMARY_TITLE="Action Required"
-    SUMMARY_MESSAGE="A blocking install, match, config, apply, service, or integrity problem is present."
+    SUMMARY_TITLE="需要处理"
+    SUMMARY_MESSAGE="安装、匹配、配置、应用、服务或完整性存在需要处理的问题。"
   elif [ "$INSTALL_STATUS" = "running" ] || [ "$LIFECYCLE_STATUS" = "running" ]; then
     SUMMARY_STATUS=pending
-    SUMMARY_TITLE="Install In Progress"
-    SUMMARY_MESSAGE="The installer is still writing progress and final state."
+    SUMMARY_TITLE="安装中"
+    SUMMARY_MESSAGE="安装流程正在写入进度和最终状态。"
   elif [ "$RESTORE_STATUS" = "recovery" ]; then
     SUMMARY_STATUS=recovery
-    SUMMARY_TITLE="Recovery In Progress"
-    SUMMARY_MESSAGE="The module is trying to recover a required runtime file."
+    SUMMARY_TITLE="恢复中"
+    SUMMARY_MESSAGE="模块正在尝试恢复必要的运行文件。"
   elif [ "${ALERT_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
     SUMMARY_STATUS=warning
-    SUMMARY_TITLE="Warnings Present"
-    SUMMARY_MESSAGE="The module is usable, but one or more diagnostics need attention."
+    SUMMARY_TITLE="需要关注"
+    SUMMARY_MESSAGE="模块可用，诊断中有少量细节可查看。"
   elif [ "$INTEGRITY_STATUS" = "missing" ] && [ "${INTEGRITY_BLOCKING_MISSING:-0}" -gt 0 ] 2>/dev/null; then
     SUMMARY_STATUS=warning
-    SUMMARY_TITLE="Warnings Present"
-    SUMMARY_MESSAGE="One or more protected module files are missing."
+    SUMMARY_TITLE="需要关注"
+    SUMMARY_MESSAGE="一个或多个受保护模块文件缺失。"
   elif [ "$INTEGRITY_STATUS" = "changed" ] && [ "${INTEGRITY_BLOCKING_CHANGED:-0}" -gt 0 ] 2>/dev/null; then
     SUMMARY_STATUS=warning
-    SUMMARY_TITLE="Warnings Present"
-    SUMMARY_MESSAGE="One or more protected module files were changed."
+    SUMMARY_TITLE="需要关注"
+    SUMMARY_MESSAGE="一个或多个受保护模块文件发生变化。"
   fi
 
   state_update \

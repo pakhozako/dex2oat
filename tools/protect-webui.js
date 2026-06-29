@@ -1,7 +1,7 @@
 const { run } = require("./toolkit");
 
 async function protectWebui() {
-  const result = run(process.execPath, ["tools/build-webui.mjs"], { timeout: 120000 });
+  const result = run(process.execPath, ["tools/build-webui.mjs"], { timeout: 600000 });
   if (result.status !== 0) {
     throw new Error(`WebUI protect failed:\n${result.stdout}\n${result.stderr}`.trim());
   }
