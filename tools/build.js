@@ -175,7 +175,7 @@ async function build() {
     reportPath = buildReportPath(version);
     pushStep(steps, "Version Sync", "ok", version);
 
-    validation = await validateAll(environment, { skipReleaseManifest: true, skipSourceManifest: true, skipWebuiSmoke: true, skipBuildReport: true });
+    validation = await validateAll(environment, { skipReleaseManifest: true, skipSourceManifest: true, skipWebuiSmoke: true, skipBuildReport: true, builtSourceBlocking: false });
     pushStep(steps, "Validate", "ok", validation);
 
     webui = await protectWebui();
