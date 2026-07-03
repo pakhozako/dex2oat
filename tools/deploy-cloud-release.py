@@ -352,13 +352,19 @@ def http_json(url: str) -> dict:
 def validate_public_supporters(data: dict, version: dict) -> dict:
     if not isinstance(data, dict) or not data.get("ok"):
         raise RuntimeError("Public supporters directory is not ok")
-    if data.get("version") != version.get("version"):
-        raise RuntimeError(f"Public supporters directory version {data.get('version')} != {version.get('version')}")
     warnings = []
+    if data.get("version") != version.get("version"):
+        # Code pool version may intentionally differ from the release version
+        # when the pool is reused across releases. Warn, do not fail.
+        warnings.append(
+            f"supporter pool {data.get('version')}/{data.get('versionCode')} "
+            f"!= release {version.get('version')}/{version.get('versionCode')}; "
+            "confirm reuse or rotate explicitly"
+        )
     if data.get("versionCode") is None:
         warnings.append("public supporters directory has no versionCode; next deploy will add it")
     elif int(data.get("versionCode") or 0) != int(version.get("versionCode") or 0):
-        raise RuntimeError(
+        warnings.append(
             "Public supporters directory versionCode "
             f"{data.get('versionCode')} != {version.get('versionCode')}"
         )
