@@ -2,7 +2,12 @@
 
 MODDIR="$1"
 [ -n "$MODDIR" ] || MODDIR=${0%/*}/..
-
+# Optional: preferred ID passed by the caller (e.g. a pre-existing
+# localStorage-based telemetry ID from a previous module version).
+# Used ONLY when no supporter-install-id file exists yet, to preserve
+# redemption-code bindings that were established before this script
+# was introduced.
+PREFERRED_ID="$2"
 STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 CONFIG_LOCK_DIR="$STATE_DIR/.config.lock"
 INSTALL_ID_FILE="$STATE_DIR/supporter-install-id"
@@ -47,8 +52,16 @@ run_locked() {
     INSTALL_ID="$(sanitize_install_id "$(cat "$INSTALL_ID_FILE" 2>/dev/null)")"
   fi
   if ! install_id_valid "$INSTALL_ID"; then
-    INSTALL_ID="$(sanitize_install_id "$(generate_install_id)")"
-    install_id_valid "$INSTALL_ID" || fail_json "generate-install-id"
+    # If a valid preferred ID was passed by the caller (v4.5 migration:
+    # localStorage telemetry ID), adopt it rather than generating a new
+    # random UUID. This preserves existing server-side code bindings.
+    CANDIDATE="$(sanitize_install_id "$PREFERRED_ID")"
+    if install_id_valid "$CANDIDATE"; then
+      INSTALL_ID="$CANDIDATE"
+    else
+      INSTALL_ID="$(sanitize_install_id "$(generate_install_id)")"
+      install_id_valid "$INSTALL_ID" || fail_json "generate-install-id"
+    fi
     TMP_FILE="$INSTALL_ID_FILE.tmp.$$"
     printf '%s\n' "$INSTALL_ID" > "$TMP_FILE" 2>/dev/null || fail_json "write-install-id"
     mv -f "$TMP_FILE" "$INSTALL_ID_FILE" 2>/dev/null || {
