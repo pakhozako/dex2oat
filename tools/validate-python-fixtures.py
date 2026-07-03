@@ -51,7 +51,8 @@ def validate_deploy_cloud_release() -> None:
         raise AssertionError("cloud release ZIP URL mismatch was not detected")
 
     local = tool.local_release_expectation(tool.load_json(tool.VERSION_FILE))
-    if not local or local.get("version") != "v4.5" or not local.get("sha256"):
+    current_version = tool.load_json(tool.VERSION_FILE).get("version")
+    if not local or local.get("version") != current_version or not local.get("sha256"):
         raise AssertionError("local release expectation did not read the current built release")
 
     supporters = {
