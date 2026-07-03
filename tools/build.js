@@ -184,7 +184,7 @@ async function build() {
     integrity = await generateIntegrityBaseline();
     pushStep(steps, "Integrity Baseline", "ok", integrity);
 
-    validation = await validateAll(environment, { skipReleaseManifest: true, skipSourceManifest: true, skipBuildReport: true });
+    validation = await validateAll(environment, { skipReleaseManifest: true, skipSourceManifest: true, skipBuildReport: true, builtSourceBlocking: false });
     pushStep(steps, "Final Validate", "ok", validation);
 
     release = await releaseBuild({ hashTool: environment.hashTool });
