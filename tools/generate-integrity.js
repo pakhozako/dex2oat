@@ -38,8 +38,6 @@ function includeInBaseline(relative) {
     "webroot/assets/dex2oat-ui.protected.css",
     "webroot/assets/dex2oat-ui.protected.js",
     "webroot/css/skin-badges.css",
-    "webroot/css/theme-founder-qingmu.css",
-    "webroot/css/theme-memorial-amber.css",
     "webroot/data/rule-props.pack"
   ]).has(relative);
 }

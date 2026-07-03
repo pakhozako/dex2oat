@@ -1,7 +1,7 @@
 #!/system/bin/sh
 
 MODDIR=${0%/*}
-STATE_DIR=/data/adb/dex2oat-lock
+STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 LOG_DIR="$STATE_DIR/logs"
 LOG_FILE="$STATE_DIR/service.log"
 SERVICE_STATE="$STATE_DIR/service-state.prop"

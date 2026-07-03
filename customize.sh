@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-STATE_DIR=/data/adb/dex2oat-lock
+STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 BACKUP_DIR="$STATE_DIR/backup"
 LOG_DIR="$STATE_DIR/logs"
 INSTALL_LOG="$STATE_DIR/install.log"

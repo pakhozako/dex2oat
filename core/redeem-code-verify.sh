@@ -9,8 +9,12 @@ STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 ENDPOINT=${DEX2OAT_SUPPORTER_VERIFY_URL:-https://cloud.154-219-110-62.sslip.io/api/supporter/verify}
 RESPONSE_FILE="$STATE_DIR/redeem-response.$$"
 SCOPE_LOG="$STATE_DIR/supporter-scope.log"
+CURL_ERR_FILE="$STATE_DIR/redeem-curl.$$.err"
 
 [ -f "$MODDIR/core/common.sh" ] && . "$MODDIR/core/common.sh"
+
+# Ensure RESPONSE_FILE and curl error temp are cleaned up on all exit paths.
+trap 'rm -f "$RESPONSE_FILE" "$CURL_ERR_FILE" 2>/dev/null || true' EXIT HUP INT TERM
 
 fail_json() {
   ERROR="$1"
@@ -185,7 +189,7 @@ HTTP_CODE="$(curl -sS --ssl-reqd \
   -o "$RESPONSE_FILE" \
   -w '%{http_code}' \
   --data "$PAYLOAD" \
-  "$ENDPOINT" 2>"$STATE_DIR/redeem-curl.$$.err" \
+  "$ENDPOINT" 2>"$CURL_ERR_FILE" \
   || curl -sS \
     --connect-timeout 8 \
     --max-time 10 \
@@ -195,10 +199,10 @@ HTTP_CODE="$(curl -sS --ssl-reqd \
     -o "$RESPONSE_FILE" \
     -w '%{http_code}' \
     --data "$PAYLOAD" \
-    "$ENDPOINT" 2>>"$STATE_DIR/redeem-curl.$$.err")"
+    "$ENDPOINT" 2>>"$CURL_ERR_FILE")"
 CURL_CODE=$?
-CURL_ERR="$(cat "$STATE_DIR/redeem-curl.$$.err" 2>/dev/null)"
-rm -f "$STATE_DIR/redeem-curl.$$.err" 2>/dev/null || true
+CURL_ERR="$(cat "$CURL_ERR_FILE" 2>/dev/null)"
+rm -f "$CURL_ERR_FILE" 2>/dev/null || true
 
 if [ "$CURL_CODE" -ne 0 ]; then
   fail_json "network" "${CURL_ERR:-网络请求失败}"
