@@ -23,10 +23,59 @@ export function setStatus(message, tone = "neutral") {
   target.dataset.tone = tone;
 }
 
+let toastTimer = null;
+let toastCloseTimer = null;
+let toastSequence = 0;
+
 function safeText(value, fallback = "暂不可用") {
   const text = String(value ?? "").trim();
   if (!text || /^(null|undefined|nan)$/i.test(text)) return fallback;
   return text;
+}
+
+export function showToast(message, tone = "neutral") {
+  const text = safeText(message, "已同步");
+  if (!document.body) return;
+  const sequence = ++toastSequence;
+
+  let host = $("#toastLayer");
+  if (!host) {
+    host = createElement("div", "toast-layer");
+    host.id = "toastLayer";
+    host.setAttribute("aria-live", "polite");
+    host.setAttribute("aria-atomic", "true");
+    document.body.append(host);
+  }
+
+  let toast = $(".toast", host);
+  if (!toast) {
+    toast = createElement("div", "toast");
+    host.append(toast);
+  }
+
+  toast.dataset.tone = tone;
+  toast.textContent = text;
+  toast.classList.remove("is-closing");
+  requestAnimationFrame(() => {
+    if (sequence !== toastSequence) return;
+    toast.classList.add("is-visible");
+  });
+
+  if (toastTimer) clearTimeout(toastTimer);
+  if (toastCloseTimer) clearTimeout(toastCloseTimer);
+  toastTimer = setTimeout(() => closeToast(host, toast, sequence), 1800);
+}
+
+function closeToast(host, toast, sequence) {
+  if (!host || !toast || sequence !== toastSequence) return;
+  toast.classList.add("is-closing");
+  toast.classList.remove("is-visible");
+  if (toastCloseTimer) clearTimeout(toastCloseTimer);
+  toastCloseTimer = setTimeout(() => {
+    if (sequence !== toastSequence) return;
+    toast.remove();
+    if (!host.querySelector(".toast")) host.remove();
+  }, 220);
 }
 
 export function showConfirm(message) {

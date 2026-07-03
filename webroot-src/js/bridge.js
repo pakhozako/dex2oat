@@ -12,6 +12,10 @@ const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 const ALLOWED_EXPORT_PATHS = new Set([
   `${EXPORT_DIR}/dex2oat-lock-config-backup.json`
 ]);
+const ALLOWED_STATE_WRITE_PATHS = new Set([
+  `${STATE_DIR}/trigger-rematch`,
+  `${STATE_DIR}/dex2oat-lock-diagnostic.txt`
+]);
 
 function uniqueWriteSuffix() {
   return `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
@@ -33,7 +37,8 @@ function normalizeWritePath(path) {
 function isAuthorizedWritePath(path) {
   const normalized = normalizeWritePath(path);
   if (!normalized.startsWith("/") || normalized.includes("/../") || normalized.endsWith("/..")) return false;
-  if (normalized === STATE_DIR || normalized.startsWith(`${STATE_DIR}/`)) return true;
+  if (/^\/data\/adb\/dex2oat-lock\/stage-webui-[A-Za-z0-9.-]+\/(system\.prop|prop-lock\.list|config\.json|config-source\.prop|risk-mode)$/.test(normalized)) return true;
+  if (ALLOWED_STATE_WRITE_PATHS.has(normalized)) return true;
   if (ALLOWED_EXPORT_PATHS.has(normalized)) return true;
   return false;
 }

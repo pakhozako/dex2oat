@@ -28,14 +28,20 @@ export function createBrandPillMarkup({
   showPower = false,
   powerButtonId = "brandPillPower",
   powerLabel = "重启设备",
-  powerTitle = "重启"
+  powerTitle = "重启",
+  logoSrc = ""
 } = {}) {
   const classes = ["brand-pill", className].filter(Boolean).join(" ");
   const idAttr = id ? ` id="${escapeHtml(id)}"` : "";
   const logoTag = interactiveLogo ? "button" : "span";
+  const initialLogo = String(logoSrc || "");
+  const logoClass = ["brand-logo", "brand-pill-logo", initialLogo ? "has-image" : ""].filter(Boolean).join(" ");
   const logoAttrs = interactiveLogo
     ? ` type="button" aria-label="${escapeHtml(name)}"`
     : ` aria-hidden="true"`;
+  const imageAttrs = initialLogo
+    ? ` src="${escapeHtml(initialLogo)}" loading="eager" decoding="async"`
+    : " hidden";
   const refreshMarkup = showRefresh ? `
           <button class="brand-pill-refresh icon-button" id="${escapeHtml(refreshButtonId)}" type="button" title="${escapeHtml(refreshTitle)}" aria-label="${escapeHtml(refreshLabel)}">
             <span class="refresh-icon" aria-hidden="true"></span>
@@ -49,9 +55,9 @@ export function createBrandPillMarkup({
         <span class="brand-pill-actions">${refreshMarkup}${powerMarkup}</span>` : "";
   return `
       <div class="${classes}"${idAttr} data-brand-pill>
-        <${logoTag} class="brand-logo brand-pill-logo"${logoAttrs}>
+        <${logoTag} class="${logoClass}"${logoAttrs}>
           <span class="brand-logo-mark" aria-hidden="true"></span>
-          <img class="brand-pill-logo-image" alt="" hidden />
+          <img class="brand-pill-logo-image" alt=""${imageAttrs} />
         </${logoTag}>
         <span class="brand-pill-text">
           <span class="brand-pill-name topbar-title">${escapeHtml(name)}</span>
@@ -84,11 +90,29 @@ export function applyBrandPillLogo(root, value) {
     return;
   }
   const source = String(value);
-  logo.classList.add("has-image");
   if (image) {
+    image.loading = "eager";
+    image.decoding = "async";
+    if (image.getAttribute("src") === source && image.complete && image.naturalWidth > 0) {
+      image.hidden = false;
+      logo.classList.add("has-image");
+      return;
+    }
+    image.onload = () => {
+      if (image.getAttribute("src") !== source) return;
+      image.hidden = false;
+      logo.classList.add("has-image");
+    };
+    image.onerror = () => {
+      if (image.getAttribute("src") !== source) return;
+      image.hidden = true;
+      image.removeAttribute("src");
+      logo.classList.remove("has-image");
+    };
     image.src = source;
-    image.hidden = false;
+    if (image.complete && image.naturalWidth > 0) image.onload();
   } else {
+    logo.classList.add("has-image");
     logo.style.backgroundImage = `url("${source.replace(/"/g, '\\"')}")`;
   }
 }

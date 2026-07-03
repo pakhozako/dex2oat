@@ -3,6 +3,7 @@ export const MATERIAL_YOU_THEMES = [
   { id: "blue", label: "Material You Blue", seed: "#0061a4", neutralHue: 255 },
   { id: "green", label: "Material You Green", seed: "#386a20", neutralHue: 140 },
   { id: "cyan", label: "Material You Cyan", seed: "#006874", neutralHue: 210 },
+  { id: "red", label: "Material You Red", seed: "#ba1a1a", neutralHue: 20 },
   { id: "orange", label: "Material You Orange", seed: "#9a4600", neutralHue: 38 },
   { id: "pink", label: "Material You Pink", seed: "#984061", neutralHue: 350 },
   { id: "white", label: "Material You White", seed: "#fefbff", swatch: "#ffffff", neutralHue: 255, neutral: true }
