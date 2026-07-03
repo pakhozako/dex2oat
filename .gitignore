@@ -1,4 +1,5 @@
 ﻿.webui-src-temp/
+.codex/
 node_modules/
 dist/
 release/
@@ -10,12 +11,19 @@ __pycache__/
 backups/
 reports/
 temp/
+KernelSU-ref/
 releases/*
 webroot/**/*.br
 webroot/**/*.gz
 webroot/**/*.map
 webroot-src/data/easter-cover.jpg
 webroot-src/data/easter-lyrics.txt
+webroot-src/data/supporter-redeem-codes.private.json
+deploy/cloud/supporters.private.json
+deploy/cloud/supporters.private*.json
+构建/supporter-redeem-codes-v*.txt
+构建/supporter-redeem-codes.private.json
+构建/
 
 发布版/
 源码版/
@@ -25,6 +33,7 @@ legacy-artifacts-*/
 build.config.json
 environment-report.md
 v* 自动化开发与构建报告.md
+unknown 自动化开发与构建报告.md
 
 .idea/
 .vscode/
