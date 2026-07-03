@@ -682,6 +682,7 @@ class JsonlStore:
         return {
             "ok": True,
             "version": clean_text(data.get("version") or "v3.9", 24),
+            "versionCode": int(data.get("versionCode") or 0) or None,
             "updatedAt": clean_text(data.get("updatedAt") or utc_iso(), 32),
             "items": items,
         }
