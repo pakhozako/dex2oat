@@ -19,6 +19,8 @@ webroot/**/*.map
 webroot-src/data/easter-cover.jpg
 webroot-src/data/easter-lyrics.txt
 webroot-src/data/supporter-redeem-codes.private.json
+webroot-src/css/theme-memorial-amber.css
+webroot-src/css/theme-founder-qingmu.css
 deploy/cloud/supporters.private.json
 deploy/cloud/supporters.private*.json
 构建/supporter-redeem-codes-v*.txt
