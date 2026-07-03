@@ -69,6 +69,11 @@ node tools\release.js
 ## Cloud Mirror
 
 云端镜像只更新 Codex 管理目录 `/root/codex-managed/dex2oat-lock`，不得修改服务器原有业务目录或无关 systemd 服务。
+当前 Dex2oat cloud 已迁到 `18082`；`18080` 由 1Panel 承载服务器管理面板；
+`18081` 继续空置，旧 admin 服务应保持停止和禁用。发布与运维工具继续检查
+`18082`，不要回退到旧端口。发布给 WebUI 的远端元数据只允许 HTTPS 或本机
+HTTP；如果公网云端仍是明文 HTTP，构建产物会清空 WebUI cloud URL，避免手机
+WebView 在生产环境发起不安全请求。
 
 本地发布完成后可检查云端状态：
 
@@ -92,7 +97,8 @@ PowerShell 5 默认执行策略可能拦截 `npm.ps1`，因此 Windows 环境优
 - 更新 `/api/update.json`、`/api/releases.json`、`/api/rules.json`、`/health.json`。
 - 备份旧云端 JSON 到服务器 `backups/deploy-*`。
 - 校验远端 ZIP SHA256 与本地 release 一致。
-- 保持云端首页为发布镜像和模块通信说明，不展示公开用户统计面板。
+- 不生成或维护自写云端首页；部署时会清理旧 `index.html`、`admin.html`
+  和 `usage.html`，避免把 18080 重新变成 Dex2oat 自写面板。
 
 发布同步完成后可用运维入口复核服务器状态：
 

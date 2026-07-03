@@ -7,9 +7,10 @@
 - Shell 状态更新必须通过 `state_update`，最终由 `core/statectl.sh` 执行。
 - `statectl.sh` 通过 `sh statectl.sh` 调用，不依赖可执行位。
 - `statectl.sh update key=value ...` 使用 `$STATE_DIR/.state.lock`、PID 临时文件和 `mv` 原子替换。
+- 状态 key 只允许 `A-Z`、`a-z`、`0-9`、`_`、`.`、`-`，value 必须是单行文本；非法 `key=value` 会被拒绝，不会写入 `state.prop`。
 - summary attention 清理使用 `statectl.sh clear-attention`，同样受状态锁保护。
 - WebUI 不允许直接整文件覆盖 `state.prop`。
-- `core/webui-save.sh` 负责 WebUI 保存事务，并在成功后统一更新配置摘要。
+- `core/webui-save.sh` 负责 WebUI 保存事务，并在成功后统一更新配置摘要；失败路径会回滚已替换文件并清理 `stage-*` / `rollback.*` 临时目录。
 
 ## Runtime Files
 
@@ -40,6 +41,12 @@
 - `summary.updated_at`
 
 summary 只表达当前诊断结论，不直接改变配置。
+
+## Restore State
+
+- `restore.status=restored`：健康检查或恢复流程已成功补回必要运行文件。
+- `restore.status=recovery`：模块正在尝试恢复运行文件，仍需继续观察。
+- `restore.status=failed`：恢复失败，属于异常状态，应进入 `summary.status=error` 并优先查看恢复原因。
 
 ## Concurrency
 

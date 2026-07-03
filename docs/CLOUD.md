@@ -1,6 +1,9 @@
 # Cloud Service
 
-Dex2oat Lock cloud service is an optional support layer for release mirrors, cloud rule metadata, health checks and privacy-minimal module communication.
+Dex2oat Lock cloud service is an optional support layer for release mirrors,
+cloud rule metadata, health checks and privacy-minimal module communication.
+Server administration is handled by an upstream open-source panel, not by a
+Dex2oat-authored web dashboard.
 
 ## Public Endpoints
 
@@ -11,6 +14,27 @@ Dex2oat Lock cloud service is an optional support layer for release mirrors, clo
 - `GET /api/evidence-summary.json`: aggregate rule-evidence summary for rule-library expansion.
 - `POST /api/telemetry`: optional module communication heartbeat.
 - `POST /api/rule-evidence`: user-confirmed, allowlisted rule evidence upload.
+- `POST /api/feedback`: WebUI feedback submission.
+- `POST /api/supporter/verify`: server-side supporter credential verification.
+
+## Port Layout
+
+- `18080`: server management panel, currently handled by 1Panel. Do not serve
+  Dex2oat-authored HTML dashboards on this port.
+- `18082`: Dex2oat-Lock cloud release/API service.
+- `18083`: Dex2oat-Lock business management panel, handled by upstream Directus
+  Studio when deployed. Bind it to loopback by default and publish it through
+  the server panel/reverse proxy with HTTPS.
+- `18081`: legacy internal admin port; keep it disabled.
+
+Server status on 2026-06-29: Dex2oat cloud has moved to `18082`; `18080` is
+served by 1Panel; `18081` is unused and the legacy admin service must stay
+stopped and must not be re-enabled. Release and operations tooling may continue
+to target the direct `18082` service. The v4.1 WebUI metadata intentionally
+allows the current plaintext `http://154.219.110.62:18082` cloud endpoints for
+release checks, optional telemetry, feedback and supporter verification until a
+public HTTPS reverse proxy is configured. WebUI must still treat every cloud
+operation as optional and must never receive Directus credentials.
 
 ## Module Communication Boundary
 
@@ -58,13 +82,16 @@ The server applies the same allowlist and sensitive-key filter again before writ
 
 Managed server files live under `/root/codex-managed/dex2oat-lock` and must not modify existing unrelated services.
 
-- `public/`: static files and public API JSON.
+- `public/`: static files and public API JSON for the Dex2oat cloud service.
 - `scripts/`: cloud HTTP service, maintenance scripts and backup helpers.
 - `data/`: local cloud service data, evidence samples and restricted internal aggregates.
 - `backups/`: server-side backups.
 - `logs/`: service and operation logs.
 
-Public user dashboards are not part of the current product surface. If legacy public pages such as `usage.html` exist, back them up under `backups/public-clean-*` and remove them from `public/`.
+Legacy public pages such as `admin.html`, `usage.html` or old side panels should
+not be served. Back them up under `backups/` when needed, then remove them from
+`public/`. New cloud status belongs in JSON endpoints and maintenance logs, not
+in a custom public server management page.
 
 ## Maintenance
 
@@ -100,7 +127,7 @@ Remove-Item Env:\DEX2OAT_CLOUD_PASSWORD
 
 Command scope:
 
-- `status`: services, disk usage, public endpoint reachability and basic files.
+- `status`: services, disk usage, Dex2oat cloud API reachability and basic files.
 - `health`: runs the remote managed health check and verifies current ZIP hash.
 - `logs`: tails managed health/backup logs and Dex2oat service journals.
 - `backups`: lists managed cloud backups and release mirrors.
@@ -115,7 +142,6 @@ tenant/application directories.
 The managed systemd units are:
 
 - `dex2oat-cloud.service`: public release mirror and module communication API.
-- `dex2oat-admin.service`: internal DevOps admin service.
 - `dex2oat-cloud-backup.timer`: scheduled managed data backup.
 - `dex2oat-cloud-health.timer`: scheduled managed health check.
 
@@ -126,15 +152,71 @@ execution API.
 
 ## Security Hardening
 
-The managed cloud/admin services are hardened without changing unrelated server services:
+The managed cloud service is hardened without changing unrelated server services:
 
 - request body size limits per endpoint
-- per-IP in-process rate limits for public POST APIs and admin status API
+- per-IP in-process rate limits for public POST APIs
 - `Content-Type: application/json` required for POST endpoints
 - `Cache-Control: no-store` for dynamic API responses
 - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and `Permissions-Policy` response headers
-- admin API requires a token and does not log query strings
 - `data/` is mode `0700`; token, SQLite and JSONL data are created with restrictive permissions
 - systemd drop-ins apply `UMask=0077`, `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=full`, kernel/control-group protection and an empty capability bounding set
 
 Global firewall, SSH, `komari.service`, `sing-box.service`, and unrelated server configuration are intentionally left untouched.
+
+## Server Panel
+
+Use 1Panel or another mature upstream open-source panel for server management.
+Do not add command execution, file management, firewall editing or system
+administration features to the Dex2oat cloud service.
+
+Official 1Panel v2 quick install:
+
+```bash
+bash -c "$(curl -sSL https://resource.1panel.pro/v2/quick_start.sh)"
+```
+
+After installation, use SSH-only maintenance commands to retrieve the non-public
+entry information:
+
+```bash
+systemctl status 1panel --no-pager
+1pctl user-info
+ss -ltnp
+```
+
+Do not commit the panel address security path, username, password or generated
+credentials. After the panel is installed, re-check that Dex2oat cloud APIs on
+`18082` still answer `health.json` and `api/update.json`.
+
+## Business Data Panel
+
+Use the ready-made Directus Studio stack under `deploy/directus/` for Dex2oat
+business data management. This panel is for feedback, supporters, supporter
+verification logs, optional telemetry, rule evidence and release/operator
+records. It is not a server management panel and must not replace 1Panel.
+
+Recommended deployment:
+
+```powershell
+$env:DEX2OAT_CLOUD_PASSWORD = "<server password>"
+npm.cmd run panel:deploy
+npm.cmd run panel:status
+Remove-Item Env:\DEX2OAT_CLOUD_PASSWORD
+```
+
+Operational boundary:
+
+- Directus Studio listens on `18083` by default.
+- Keep `18083` bound to `127.0.0.1` unless doing a short direct-port test.
+- Publish the Studio through 1Panel/Caddy/Nginx with HTTPS when remote browser
+  access is needed.
+- Keep public module traffic on `18082`; the cloud API may write accepted data
+  into Directus collections, but WebUI must not receive Directus admin tokens.
+- Current bridge coverage: `/api/telemetry`, `/api/rule-evidence`,
+  `/api/feedback`, and `/api/supporter/verify` all keep the public `18082`
+  response path small and rate-limited, then mirror accepted/rejected
+  operational records into Directus when `18083` is healthy.
+- The managed panel directory is `/root/codex-managed/dex2oat-lock/panel`.
+- The generated `.env` on the server contains passwords and secrets and must not
+  be copied into the repository.
