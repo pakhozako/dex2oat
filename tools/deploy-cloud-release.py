@@ -151,6 +151,7 @@ def run_local_preflight(args) -> dict:
         [node, "tools/validate.js"],
         cwd=ROOT,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         timeout=360,
     )
