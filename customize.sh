@@ -28,6 +28,8 @@ MATCHED_TOTAL=0
 INSTALL_PROGRESS_PERCENT=0
 INSTALL_PROGRESS_STAGE=init
 INSTALL_TOTAL_STAGES=15
+INSTALL_BOOT_ID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
+INSTALL_CHECK_MODE=full
 
 if ! command -v ui_print >/dev/null 2>&1; then
   ui_print() { printf '%s\n' "$*"; }
@@ -171,7 +173,7 @@ install_stage_wait_hint() {
   case "$1" in
     capture) printf '读取设备属性，低端设备可能需要几秒' ;;
     match) printf '匹配规则并生成输出' ;;
-    conflict) printf '扫描其它模块，最多等待 8 秒' ;;
+    conflict) printf '全量扫描其它模块的属性冲突' ;;
     health) printf '汇总健康状态，稍后写入 WebUI 首页' ;;
     integrity) printf '核对核心文件和受保护 WebUI' ;;
     permissions) printf '整理权限，避免 WebUI 或脚本不可读' ;;
@@ -244,13 +246,10 @@ install_banner() {
 
 install_purpose_prompt() {
   ui_print " "
-  ui_print "╭─ 模块作用"
-  ui_print "│ 根据设备属性生成 ART / dexopt 配置。"
-  ui_print "│ 目标是减少后台编译负载，并统一展示运行状态。"
-  ui_print "│ 安装后重启生效，可在模块 WebUI 查看和调整配置。"
-  ui_print "│"
-  ui_print "│ 确认是否安装：音量上继续，音量下取消。"
-  ui_print "╰─ 无响应将默认继续安装"
+  ui_print "╭─ 安装确认"
+  ui_print "│ 音量上继续，音量下取消。"
+  ui_print "│ 无响应默认继续。"
+  ui_print "╰──────────────────────────────────────"
   chooseport_once 8
   [ "$?" = "1" ] && return 1
   return 0
@@ -304,42 +303,6 @@ install_progress() {
   fi
 }
 
-run_optional_install_check() {
-  CHECK_NAME="$1"
-  CHECK_TIMEOUT="$2"
-  shift 2
-  [ -n "$CHECK_TIMEOUT" ] || CHECK_TIMEOUT=8
-  CHECK_STATUS_FILE="$STATE_DIR/.${CHECK_NAME}-status.$$"
-  rm -f "$CHECK_STATUS_FILE" 2>/dev/null || true
-  ( "$@" >/dev/null 2>&1; printf '%s\n' "$?" > "$CHECK_STATUS_FILE" 2>/dev/null ) &
-  CHECK_PID=$!
-  CHECK_ELAPSED=0
-  while [ ! -f "$CHECK_STATUS_FILE" ]; do
-    if [ "$CHECK_ELAPSED" -ge "$CHECK_TIMEOUT" ] 2>/dev/null; then
-      kill "$CHECK_PID" 2>/dev/null || true
-      sleep 1
-      kill -9 "$CHECK_PID" 2>/dev/null || true
-      wait "$CHECK_PID" 2>/dev/null || true
-      rm -f "$CHECK_STATUS_FILE" 2>/dev/null || true
-      log_install "- Optional install check timed out: $CHECK_NAME after ${CHECK_TIMEOUT}s"
-      return 124
-    fi
-    if [ "$CHECK_ELAPSED" -gt 0 ] && [ $((CHECK_ELAPSED % 3)) -eq 0 ] 2>/dev/null; then
-      CHECK_LEFT=$((CHECK_TIMEOUT - CHECK_ELAPSED))
-      [ "$CHECK_LEFT" -lt 0 ] 2>/dev/null && CHECK_LEFT=0
-      CHECK_MARK="$(install_spinner_frame "$CHECK_ELAPSED")"
-      ui_print "  ${CHECK_MARK} $CHECK_NAME ${CHECK_ELAPSED}s/${CHECK_TIMEOUT}s，剩余约 ${CHECK_LEFT}s"
-    fi
-    sleep 1
-    CHECK_ELAPSED=$((CHECK_ELAPSED + 1))
-  done
-  wait "$CHECK_PID" 2>/dev/null || true
-  CHECK_RESULT="$(cat "$CHECK_STATUS_FILE" 2>/dev/null)"
-  rm -f "$CHECK_STATUS_FILE" 2>/dev/null || true
-  case "$CHECK_RESULT" in ''|*[!0-9]*) CHECK_RESULT=1 ;; esac
-  return "$CHECK_RESULT"
-}
-
 write_install_state() {
   INSTALL_STATUS="$1"
   INSTALL_REASON="$2"
@@ -350,6 +313,8 @@ write_install_state() {
     printf 'source=%s\n' "${INSTALL_SOURCE:-unknown}"
     printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
     printf 'version=%s\n' "${MODULE_VERSION:-unknown}"
+    [ -n "$INSTALL_BOOT_ID" ] && printf 'boot_id=%s\n' "$INSTALL_BOOT_ID"
+    printf 'check_mode=%s\n' "${INSTALL_CHECK_MODE:-full}"
     printf 'updated_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
   } > "$FINAL_INSTALL_STATE" 2>/dev/null || true
   chmod 0600 "$FINAL_INSTALL_STATE" 2>/dev/null || true
@@ -360,6 +325,8 @@ write_install_state() {
       "install.source=${INSTALL_SOURCE:-unknown}" \
       "install.matched_total=${MATCHED_TOTAL:-0}" \
       "install.version=${MODULE_VERSION:-unknown}" \
+      "install.boot_id=$INSTALL_BOOT_ID" \
+      "install.check_mode=${INSTALL_CHECK_MODE:-full}" \
       "install.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
   fi
   if command -v state_set_lifecycle >/dev/null 2>&1; then
@@ -369,7 +336,14 @@ write_install_state() {
 
 cleanup_partial_state() {
   if [ "$STATE_CREATED" = "1" ] && [ "$BACKUP_READY" != "1" ]; then
-    rm -rf "$STATE_DIR"
+    case "$STATE_DIR" in
+      /data/adb/dex2oat-lock)
+        rm -rf "$STATE_DIR"
+        ;;
+      *)
+        log_install "! Refuse partial cleanup for unsafe STATE_DIR=$STATE_DIR"
+        ;;
+    esac
   fi
 }
 
@@ -458,10 +432,9 @@ chmod_readable_tree() {
 
 is_managed_prop() {
   case "$1" in
-    pm.dexopt.*|persist.sys.oplus.*|persist.sys.feature.compile.*|persist.device_config.runtime_native.*|persist.device_config.runtime_native_boot.*|persist.device_config.runtime.*|persist.dalvik.vm.dex2oat-threads|persist.miui.*|persist.oplus.*|persist.sys.app_dexfile_preload.enable|persist.sys.art_startup_class_preload.enable|persist.sys.dexpreload.*|persist.sys.precache.enable|dalvik.vm.*|system_perf_init.*|ro.vendor.dex2oat*|oplus.*|sys.oplus.*|sys.heap.*|sys.furtherHeapEnlarge.optimize.enable|sys.gcsupression.optimize.enable)
-      return 0 ;;
+    ""|*[!A-Za-z0-9_.-]*|.*|*.) return 1 ;;
   esac
-  return 1
+  return 0
 }
 
 normalize_prop_line() {
@@ -553,7 +526,7 @@ run_dex2oat_match() {
   [ -f "$GENERATE_SCRIPT" ] || return 11
   chmod 0755 "$CAPTURE_SCRIPT" "$GENERATE_SCRIPT" 2>/dev/null || true
 
-  sh "$CAPTURE_SCRIPT" "$CAPTURED_PROPS" "" || : > "$CAPTURED_PROPS"
+  sh "$CAPTURE_SCRIPT" "$CAPTURED_PROPS" "" "$RULES_FILE" || : > "$CAPTURED_PROPS"
   install_progress 42 match "规则匹配并生成配置" running
   command -v state_update >/dev/null 2>&1 && state_update "config.status=pending" "config.reason=generating-system-prop" || true
   sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$RULES_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS" || return $?
@@ -632,7 +605,7 @@ command -v state_update >/dev/null 2>&1 && state_update \
   "integrity.changed_total=0" \
   "integrity.runtime_missing_total=0" \
   "integrity.runtime_warning_total=0" \
-  "integrity.baseline_refreshed=no" \
+  "integrity.baseline_refresh_supported=no" \
   "integrity.updated_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
 command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
 state_set_lifecycle running install starting 2>/dev/null || true
@@ -676,41 +649,51 @@ cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
 init_webui_config
 touch "$STATE_DIR/service.log" 2>/dev/null || true
 append_install_log
+INSTALL_CHECK_PIDS=""
 
 if [ -f "$MODPATH/core/conflict-detect.sh" ]; then
-  install_progress 74 conflict "执行冲突检测" running
-  if run_optional_install_check conflict 8 sh "$MODPATH/core/conflict-detect.sh" "$MODPATH"; then
-    log_install "- Conflict detection completed"
-  else
-    CONFLICT_CHECK_STATUS=$?
-    log_install "- Conflict detection skipped or timed out: $CONFLICT_CHECK_STATUS"
-    {
-      printf '[conflict]\n'
-      printf 'checked_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-      printf 'scan_status=warning\n'
-      printf 'conflict_total=0\n'
-      printf 'reason=install-conflict-scan-timeout\n'
-      printf '[items]\n'
-    } > "$STATE_DIR/conflict-report.txt" 2>/dev/null || true
-    command -v state_update >/dev/null 2>&1 && state_update \
-      "conflict.status=warning" \
-      "conflict.reason=install-conflict-scan-timeout" \
-      "conflict.total=0" \
-      "conflict.checked_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
-    command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
-  fi
+  install_progress 74 conflict "Conflict scan" running
+  (
+    if DEX2OAT_DEFER_SUMMARY_RECOMPUTE=1 sh "$MODPATH/core/conflict-detect.sh" "$MODPATH"; then
+      log_install "- Conflict detection completed"
+    else
+      CONFLICT_CHECK_STATUS=$?
+      log_install "- Conflict detection failed: $CONFLICT_CHECK_STATUS"
+      {
+        printf '[conflict]\n'
+        printf 'checked_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        printf 'scan_status=warning\n'
+        printf 'conflict_total=0\n'
+        printf 'reason=install-conflict-scan-failed\n'
+        printf '[items]\n'
+      } > "$STATE_DIR/conflict-report.txt" 2>/dev/null || true
+      command -v state_update >/dev/null 2>&1 && state_update \
+        "conflict.status=warning" \
+        "conflict.reason=install-conflict-scan-failed" \
+        "conflict.checked_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
+      command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
+    fi
+  ) &
+  INSTALL_CHECK_PIDS="$INSTALL_CHECK_PIDS $!"
 fi
 
 if [ -f "$MODPATH/core/health-check.sh" ]; then
-  install_progress 84 health "初始化健康检查" running
-  sh "$MODPATH/core/health-check.sh" "$MODPATH" 2>/dev/null || true
+  install_progress 84 health "Health check" running
+  DEX2OAT_DEFER_SUMMARY_RECOMPUTE=1 sh "$MODPATH/core/health-check.sh" "$MODPATH" 2>/dev/null &
+  INSTALL_CHECK_PIDS="$INSTALL_CHECK_PIDS $!"
 fi
 
 if [ -f "$MODPATH/core/integrity-check.sh" ]; then
-  install_progress 88 integrity "执行完整性校验" running
-  sh "$MODPATH/core/integrity-check.sh" "$MODPATH" 2>/dev/null || true
+  install_progress 88 integrity "Integrity check" running
+  DEX2OAT_DEFER_SUMMARY_RECOMPUTE=1 sh "$MODPATH/core/integrity-check.sh" "$MODPATH" 2>/dev/null &
+  INSTALL_CHECK_PIDS="$INSTALL_CHECK_PIDS $!"
 fi
 
+for INSTALL_CHECK_PID in $INSTALL_CHECK_PIDS; do
+  wait "$INSTALL_CHECK_PID" 2>/dev/null || true
+done
+command -v state_recompute_summary >/dev/null 2>&1 && state_recompute_summary || true
+log_install "- Install checks completed: mode=${INSTALL_CHECK_MODE:-full}"
 chmod 0755 "$MODPATH" || fail_install "Failed to chmod module dir"
 set_perm "$MODPATH/service.sh" 0 0 0755 || fail_install "Failed to chmod service.sh"
 set_perm "$MODPATH/customize.sh" 0 0 0755 || fail_install "Failed to chmod customize.sh"

@@ -22,8 +22,12 @@ PROTECTED_RULES_FILE="$MODDIR/webroot/data/rule-props.pack"
 RULES_FILE="$STATE_DIR/rule-props.tsv"
 RULES_DECODE_SCRIPT="$MODDIR/scripts/decode-rules.sh"
 SERVICE_LOCK_DIR="$STATE_DIR/.service.lock"
+CONFIG_LOCK_DIR="$STATE_DIR/.config.lock"
 SERVICE_LOCK_TIMEOUT=20
 SERVICE_LOCK_STALE_SECONDS=7200
+SERVICE_BOOT_POST_DELAY=${DEX2OAT_BOOT_POST_DELAY:-3}
+SERVICE_RUNTIME_SETTLE_WAIT=${DEX2OAT_RUNTIME_SETTLE_WAIT:-8}
+SERVICE_RUNTIME_FINAL_WAIT=${DEX2OAT_RUNTIME_FINAL_WAIT:-12}
 
 if [ -f "$MODDIR/core/state.sh" ]; then
   . "$MODDIR/core/state.sh"
@@ -121,14 +125,26 @@ acquire_service_lock() {
 
 acquire_service_lock
 
-restore_system_prop_from_backup() {
+with_config_lock() {
+  if command -v dex_with_lock >/dev/null 2>&1; then
+    dex_with_lock "$CONFIG_LOCK_DIR" 20 "$@"
+  else
+    "$@"
+  fi
+}
+
+restore_system_prop_from_backup_locked() {
   [ -s "$SYSTEM_PROP_BAK" ] || return 1
   cp -af "$SYSTEM_PROP_BAK" "$PROP_FILE" 2>/dev/null || return 1
   chmod 0644 "$PROP_FILE" 2>/dev/null || true
   return 0
 }
 
-write_prop_lock_list() {
+restore_system_prop_from_backup() {
+  with_config_lock restore_system_prop_from_backup_locked
+}
+
+write_prop_lock_list_locked() {
   [ -s "$PROP_FILE" ] || return 1
   : > "$PROP_LOCK_LIST" 2>/dev/null || return 1
   while IFS='=' read -r PROP_KEY PROP_VALUE; do
@@ -140,6 +156,10 @@ write_prop_lock_list() {
     printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$PROP_LOCK_LIST" 2>/dev/null || true
   done < "$PROP_FILE"
   chmod 0600 "$PROP_LOCK_LIST" 2>/dev/null || true
+}
+
+write_prop_lock_list() {
+  with_config_lock write_prop_lock_list_locked
 }
 
 write_service_state() {
@@ -236,7 +256,7 @@ write_service_state() {
   fi
 }
 
-run_trigger_rematch() {
+run_trigger_rematch_locked() {
   [ -f "$TRIGGER_REMATCH" ] || return 0
 
   GENERATE_SCRIPT="$MODDIR/scripts/generate-props.sh"
@@ -250,12 +270,12 @@ run_trigger_rematch() {
     rm -f "$TRIGGER_REMATCH" 2>/dev/null
     return 0
   fi
-  sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "" || : > "$CAPTURED_PROPS"
+  sh "$MODDIR/scripts/capture-props.sh" "$CAPTURED_PROPS" "" "$RULES_FILE" || : > "$CAPTURED_PROPS"
   if sh "$GENERATE_SCRIPT" "$CAPTURED_PROPS" "$RULES_FILE" "$PROP_FILE" "$MATCHED_PROPS" "$MATCH_REPORT" "$CONFIG_SOURCE_FILE" "$MODULE_VERSION" "$ORIGINAL_PROPS"; then
     cp -af "$PROP_FILE" "$SYSTEM_PROP_BAK" 2>/dev/null || true
     chmod 0600 "$SYSTEM_PROP_BAK" 2>/dev/null || true
     rm -f "$RUNTIME_PROP_FILE" "$RUNTIME_PROP_HASH_FILE" 2>/dev/null || true
-    write_prop_lock_list || true
+    write_prop_lock_list_locked || true
     command -v state_set_config_summary >/dev/null 2>&1 && state_set_config_summary "$PROP_FILE" auto-rules rematch || true
     command -v state_update >/dev/null 2>&1 && state_update \
       "match.status=$(sed -n 's/^status=//p' "$MATCH_REPORT" 2>/dev/null | head -n 1)" \
@@ -279,6 +299,13 @@ run_trigger_rematch() {
   rm -f "$TRIGGER_REMATCH" 2>/dev/null
 }
 
+run_trigger_rematch() {
+  [ -f "$TRIGGER_REMATCH" ] || return 0
+  if ! with_config_lock run_trigger_rematch_locked; then
+    log_msg "Trigger rematch skipped or failed while waiting for config lock"
+  fi
+}
+
 apply_prop() {
   PROP_KEY="$1"
   PROP_VALUE="$2"
@@ -287,9 +314,12 @@ apply_prop() {
 
   if command -v resetprop >/dev/null 2>&1; then
     APPLY_TOOL="resetprop"
-    resetprop -n "$PROP_KEY" "$PROP_VALUE"
+    resetprop -n "$PROP_KEY" "$PROP_VALUE" 2>/dev/null || {
+      APPLY_TOOL="setprop-fallback"
+      setprop "$PROP_KEY" "$PROP_VALUE" 2>/dev/null
+    }
   else
-    setprop "$PROP_KEY" "$PROP_VALUE"
+    setprop "$PROP_KEY" "$PROP_VALUE" 2>/dev/null
   fi
 
   APPLY_CODE=$?
@@ -316,62 +346,15 @@ apply_prop() {
 
 is_runtime_prop() {
   case "$1" in
-    pm.dexopt.*|\
-    persist.sys.oplus.*|\
-    persist.sys.feature.compile.*|\
-    persist.device_config.runtime_native.*|\
-    persist.device_config.runtime_native_boot.*|\
-    persist.device_config.runtime.*|\
-    persist.dalvik.vm.dex2oat-threads|\
-    persist.miui.*|\
-    persist.oplus.*|\
-    persist.sys.app_dexfile_preload.enable|\
-    persist.sys.art_startup_class_preload.enable|\
-    persist.sys.dexpreload.*|\
-    persist.sys.precache.enable|\
-    dalvik.vm.dex2oat-minidebuginfo|\
-    dalvik.vm.minidebuginfo|\
-    dalvik.vm.dex2oat-filter|\
-    dalvik.vm.dex2oat-threads|\
-    dalvik.vm.dex2oat-very-large|\
-    dalvik.vm.dex2oat-resolve-startup-strings|\
-    dalvik.vm.dex2oat-cpu-set|\
-    dalvik.vm.boot-dex2oat-cpu-set|\
-    dalvik.vm.background-dex2oat-cpu-set|\
-    dalvik.vm.image-dex2oat-cpu-set|\
-    dalvik.vm.dex2oat-Xms|\
-    dalvik.vm.dex2oat-Xmx|\
-    dalvik.vm.image-dex2oat-Xms|\
-    dalvik.vm.image-dex2oat-Xmx|\
-    dalvik.vm.bg-dex2oat-threads|\
-    dalvik.vm.image-dex2oat-threads|\
-    dalvik.vm.boot-dex2oat-threads|\
-    dalvik.vm.useartservice|\
-    dalvik.vm.usejit|\
-    dalvik.vm.usejitprofiles|\
-    dalvik.vm.enable_pr_dexopt|\
-    dalvik.vm.pr_dexopt_async_for_ota|\
-    dalvik.vm.dexopt.secondary|\
-    dalvik.vm.dexopt.thermal-cutoff|\
-    dalvik.vm.madvise.artfile.size|\
-    dalvik.vm.madvise.odexfile.size|\
-    dalvik.vm.madvise.vdexfile.size|\
-    dalvik.vm.bgdexopt.*|\
-    dalvik.vm.background-dex2oat-threads|\
-    dalvik.vm.jitmaxsize|\
-    dalvik.vm.ps-min-save-period-ms|\
-    dalvik.vm.ps-min-first-save-ms|\
-    system_perf_init.*|\
-    ro.vendor.dex2oat*|\
-    oplus.*|\
-    sys.oplus.*|\
-    sys.heap.*|\
-    sys.furtherHeapEnlarge.optimize.enable|\
-    sys.gcsupression.optimize.enable)
-      return 0
-      ;;
+    ""|*[!A-Za-z0-9_.-]*|.*|*.) return 1 ;;
   esac
 
+  if [ -s "$MATCHED_PROPS" ] && grep -F -q "$1=" "$MATCHED_PROPS" 2>/dev/null; then
+    return 0
+  fi
+  if [ -s "$RULES_FILE" ] && awk -F "$(printf '\t')" -v key="$1" 'NR > 1 && $3 == key { found = 1; exit } END { exit found ? 0 : 1 }' "$RULES_FILE" 2>/dev/null; then
+    return 0
+  fi
   return 1
 }
 
@@ -479,17 +462,13 @@ if [ "$(getprop sys.boot_completed)" != "1" ]; then
   log_msg "Boot wait timed out after 600s, continuing anyway"
 fi
 
-sleep 10
+BOOT_POST_WAIT=0
+while [ "$BOOT_POST_WAIT" -lt "$SERVICE_BOOT_POST_DELAY" ]; do
+  sleep 1
+  BOOT_POST_WAIT=$((BOOT_POST_WAIT + 1))
+done
 log_msg "Boot completed, checking rule-driven state..."
 run_trigger_rematch
-
-if [ -f "$MODDIR/core/health-check.sh" ]; then
-  sh "$MODDIR/core/health-check.sh" "$MODDIR" 2>/dev/null || true
-fi
-
-if [ -f "$MODDIR/core/integrity-check.sh" ]; then
-  sh "$MODDIR/core/integrity-check.sh" "$MODDIR" 2>/dev/null || true
-fi
 
 if [ -f "$MODDIR/core/prop-lock.sh" ]; then
   sh "$MODDIR/core/prop-lock.sh" "$MODDIR" 2>/dev/null || true
@@ -528,11 +507,23 @@ if [ "$(getprop dalvik.vm.useartservice)" = "false" ]; then
   stop_service_if_running art_boot
 fi
 
-sleep 45
-apply_runtime_props recheck
+if [ "${TOTAL_MISMATCH_COUNT:-0}" -gt 0 ] 2>/dev/null || [ "${TOTAL_FAILED_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+  RUNTIME_RECHECK_WAIT=0
+  while [ "$RUNTIME_RECHECK_WAIT" -lt "$SERVICE_RUNTIME_SETTLE_WAIT" ]; do
+    sleep 1
+    RUNTIME_RECHECK_WAIT=$((RUNTIME_RECHECK_WAIT + 1))
+  done
+  apply_runtime_props recheck
+fi
 
-sleep 75
-apply_runtime_props settled
+if [ "${TOTAL_MISMATCH_COUNT:-0}" -gt 0 ] 2>/dev/null || [ "${TOTAL_FAILED_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+  RUNTIME_FINAL_WAIT=0
+  while [ "$RUNTIME_FINAL_WAIT" -lt "$SERVICE_RUNTIME_FINAL_WAIT" ]; do
+    sleep 1
+    RUNTIME_FINAL_WAIT=$((RUNTIME_FINAL_WAIT + 1))
+  done
+  apply_runtime_props settled
+fi
 
 write_service_state settled settled
 log_msg "Runtime property apply completed. Total: $TOTAL_PROP_COUNT applied=$TOTAL_APPLIED_COUNT matched=$TOTAL_MATCHED_COUNT mismatch=$TOTAL_MISMATCH_COUNT failed=$TOTAL_FAILED_COUNT"

@@ -40,6 +40,14 @@ TMP_MATCHED="$MATCHED_FILE.tmp"
 TMP_REPORT="$REPORT_FILE.tmp"
 TMP_SOURCE="$SOURCE_FILE.tmp"
 GENERATED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
+SCRIPT_DIR="${0%/*}"
+case "$SCRIPT_DIR" in
+  */scripts) MODULE_DIR="${SCRIPT_DIR%/scripts}" ;;
+  scripts) MODULE_DIR="." ;;
+  *) MODULE_DIR="${SCRIPT_DIR%/*}" ;;
+esac
+PROP_POLICY_FILE="${DEX2OAT_PROP_POLICY_FILE:-$MODULE_DIR/webroot/data/prop-policy.tsv}"
+TAB_CHAR="$(printf '\t')"
 
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 1
 
@@ -84,14 +92,72 @@ is_value_allowed() {
   return 1
 }
 
-is_everything_compatible_prop() {
-  case "$1" in
-    pm.dexopt.*|dalvik.vm.dex2oat-filter|dalvik.vm.dex2oat-very-large|dalvik.vm.systemuicompilerfilter)
-      return 0
-      ;;
-  esac
-
+policy_prop_matches() {
+  POLICY_SECTION="$1"
+  POLICY_PROP="$2"
+  [ -s "$PROP_POLICY_FILE" ] || return 1
+  while IFS="$TAB_CHAR" read -r POLICY_ROW_SECTION POLICY_KEY POLICY_VALUE POLICY_REST || [ -n "$POLICY_ROW_SECTION" ]; do
+    case "$POLICY_ROW_SECTION" in ""|\#*) continue ;; esac
+    [ "$POLICY_ROW_SECTION" = "$POLICY_SECTION" ] || continue
+    [ "$POLICY_KEY" = "prop" ] || continue
+    [ -n "$POLICY_VALUE" ] || continue
+    case "$POLICY_PROP" in
+      $POLICY_VALUE) return 0 ;;
+    esac
+  done < "$PROP_POLICY_FILE"
   return 1
+}
+
+policy_fallback_value() {
+  FALLBACK_TYPE="$1"
+  FALLBACK_DEFAULT="$2"
+  [ -s "$PROP_POLICY_FILE" ] || { printf '%s\n' "$FALLBACK_DEFAULT"; return 0; }
+  while IFS="$TAB_CHAR" read -r POLICY_ROW_SECTION POLICY_KEY POLICY_VALUE POLICY_REST || [ -n "$POLICY_ROW_SECTION" ]; do
+    case "$POLICY_ROW_SECTION" in ""|\#*) continue ;; esac
+    [ "$POLICY_ROW_SECTION" = "fallback" ] || continue
+    [ "$POLICY_KEY" = "$FALLBACK_TYPE" ] || continue
+    printf '%s\n' "$POLICY_VALUE"
+    return 0
+  done < "$PROP_POLICY_FILE"
+  printf '%s\n' "$FALLBACK_DEFAULT"
+}
+
+is_everything_compatible_prop() {
+  policy_prop_matches everything-compatible "$1"
+}
+
+rule_values_contain() {
+  NEEDLE_VALUE="$1"
+  HAYSTACK_VALUES="$2"
+  is_value_allowed "$NEEDLE_VALUE" "$HAYSTACK_VALUES"
+}
+
+fallback_default_for_rule() {
+  FALLBACK_PROP="$1"
+  FALLBACK_RULE_DEFAULT="$2"
+  FALLBACK_RULE_VALUES="$3"
+
+  if rule_values_contain "false" "$FALLBACK_RULE_VALUES" && rule_values_contain "true" "$FALLBACK_RULE_VALUES"; then
+    policy_fallback_value boolean false
+    return 0
+  fi
+  if rule_values_contain "everything" "$FALLBACK_RULE_VALUES"; then
+    policy_fallback_value dexoptEnum everything
+    return 0
+  fi
+  if rule_values_contain "9999" "$FALLBACK_RULE_VALUES"; then
+    policy_fallback_value limit 9999
+    return 0
+  fi
+  if rule_values_contain "0" "$FALLBACK_RULE_VALUES"; then
+    policy_fallback_value count 0
+    return 0
+  fi
+  if rule_values_contain "all" "$FALLBACK_RULE_VALUES"; then
+    policy_fallback_value enum all
+    return 0
+  fi
+  printf '%s\n' "$FALLBACK_RULE_DEFAULT"
 }
 
 should_promote_to_everything() {
@@ -119,45 +185,11 @@ should_promote_to_everything() {
 }
 
 should_keep_background_default() {
-  case "$1" in
-    pm.dexopt.bg-dexopt|\
-persist.sys.oplus.bgdex2oat_enabled|persist.oplus.ocompiler|oplus.opex.modulemerge|\
-persist.device_config.runtime.dexopt.enabled|persist.device_config.runtime.bg_dexopt.enabled|\
-persist.device_config.runtime.profile_merge|\
-persist.device_config.runtime_native_boot.iorap_readahead_enable|\
-persist.device_config.runtime_native_boot.iorap_perfetto_enable|\
-persist.sys.app_dexfile_preload.enable|persist.sys.art_startup_class_preload.enable|\
-persist.sys.precache.enable|dalvik.vm.enable_pr_dexopt|dalvik.vm.pr_dexopt_async_for_ota|\
-dalvik.vm.bgdexopt.new-classes-percent|dalvik.vm.bgdexopt.new-methods-percent|\
-sys.oplus.dalvik_sync_config|system_perf_init.bg-dex2oat-threads|\
-dalvik.vm.background-dex2oat-threads|dalvik.vm.background-dex2oat-cpu-set|\
-dalvik.vm.bg-dex2oat-threads)
-      return 0
-      ;;
-  esac
-
-  return 1
+  policy_prop_matches background-default "$1"
 }
 
 should_force_default_when_captured() {
-  case "$1" in
-    dalvik.vm.dex2oat-threads|dalvik.vm.default-dex2oat-cpu-set|\
-dalvik.vm.dex2oat-cpu-set|dalvik.vm.boot-dex2oat-cpu-set|\
-dalvik.vm.background-dex2oat-cpu-set|dalvik.vm.image-dex2oat-cpu-set|\
-dalvik.vm.bg-dex2oat-threads|dalvik.vm.boot-dex2oat-threads|\
-dalvik.vm.image-dex2oat-threads|dalvik.vm.dex2oat-Xms|dalvik.vm.dex2oat-Xmx|\
-dalvik.vm.image-dex2oat-Xms|dalvik.vm.image-dex2oat-Xmx|\
-pm.dexopt.boot-after-ota.concurrency|dalvik.vm.usap_pool_size_max|\
-dalvik.vm.usap_pool_size_min|dalvik.vm.usap_refill_threshold|\
-ro.vendor.dex2oat-aggressive-cpu-set|ro.vendor.dex2oat-aggressive-threads|\
-dalvik.vm.dex2oat64.enabled|persist.device_config.runtime_native.usap_pool_enabled|\
-dalvik.vm.usejitprofiles|persist.device_config.runtime_native_boot.use_generational_gc|\
-persist.device_config.runtime_native.metrics.write-to-statsd)
-      return 0
-      ;;
-  esac
-
-  return 1
+  policy_prop_matches force-default-when-captured "$1"
 }
 
 : > "$VALUES_FILE" || exit 1
@@ -238,8 +270,9 @@ while IFS="$RULE_FIELD_SEP" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RU
   CAPTURED_LINE="$(awk -v key="$RULE_PROP" 'index($0, key "=") == 1 { print; exit }' "$VALUES_FILE" 2>/dev/null)"
   CAPTURED_VALUE="${CAPTURED_LINE#*=}"
   [ "$CAPTURED_LINE" = "$CAPTURED_VALUE" ] && CAPTURED_VALUE=""
-  FINAL_VALUE="$RULE_DEFAULT"
-  FINAL_SOURCE=default
+  FALLBACK_VALUE="$(fallback_default_for_rule "$RULE_PROP" "$RULE_DEFAULT" "$RULE_VALUES")"
+  FINAL_VALUE="$FALLBACK_VALUE"
+  FINAL_SOURCE=fallback
 
   if [ -n "$CAPTURED_VALUE" ]; then
     if ! is_valid_prop_value "$CAPTURED_VALUE" || ! is_value_allowed "$CAPTURED_VALUE" "$RULE_VALUES"; then
@@ -275,16 +308,13 @@ while IFS="$RULE_FIELD_SEP" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RU
     DISABLED_TOTAL=$((DISABLED_TOTAL + 1))
   fi
 
-  printf '# %s\n' "${RULE_LABEL:-$RULE_ID}" >> "$TMP_OUTPUT"
-  printf '# rule_id=%s owner=%s risk=%s source=%s default=%s confidence=%s\n' "$RULE_ID" "$RULE_OWNER" "$RULE_RISK" "$FINAL_SOURCE" "$RULE_DEFAULT" "${RULE_CONFIDENCE:-medium}" >> "$TMP_OUTPUT"
-  [ -n "$RULE_EXPLAIN_REASON" ] && printf '# explain=%s\n' "$RULE_EXPLAIN_REASON" >> "$TMP_OUTPUT"
-  if [ "$RULE_ENABLED" = "true" ] || [ "$FINAL_SOURCE" = "captured" ] || [ "$FINAL_SOURCE" = "captured-promoted" ] || [ "$FINAL_SOURCE" = "captured-default" ]; then
+  if [ "$FINAL_SOURCE" = "captured" ] || [ "$FINAL_SOURCE" = "captured-promoted" ] || [ "$FINAL_SOURCE" = "captured-default" ]; then
+    printf '# %s\n' "${RULE_LABEL:-$RULE_ID}" >> "$TMP_OUTPUT"
+    printf '# rule_id=%s owner=%s risk=%s source=%s default=%s confidence=%s\n' "$RULE_ID" "$RULE_OWNER" "$RULE_RISK" "$FINAL_SOURCE" "$RULE_DEFAULT" "${RULE_CONFIDENCE:-medium}" >> "$TMP_OUTPUT"
+    [ -n "$RULE_EXPLAIN_REASON" ] && printf '# explain=%s\n' "$RULE_EXPLAIN_REASON" >> "$TMP_OUTPUT"
     printf '# prop.action=enable prop.key=%s prop.value=%s\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
     printf '%s=%s\n\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
     printf '%s=%s\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_MATCHED"
-  else
-    printf '# prop.action=disable prop.key=%s prop.value=%s\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
-    printf '# %s=%s\n\n' "$RULE_PROP" "$FINAL_VALUE" >> "$TMP_OUTPUT"
   fi
 done <<EOF
 $(awk -v sep="$RULE_FIELD_SEP" '
@@ -301,15 +331,15 @@ EOF
 
 [ -s "$TMP_OUTPUT" ] || exit 1
 
-FALLBACK_TOTAL="$DEFAULT_TOTAL"
-UNMATCHED_TOTAL="$DISABLED_TOTAL"
+FALLBACK_TOTAL=$((DEFAULT_TOTAL + DISABLED_TOTAL))
+UNMATCHED_TOTAL="$FALLBACK_TOTAL"
 if [ "${CAPTURED_TOTAL:-0}" -eq 0 ] 2>/dev/null; then
   MATCH_STATUS=fallback
-  MATCH_REASON=no-captured-props-safe-defaults
+  MATCH_REASON=no-captured-props-fallback-defaults
   MATCH_CONFIDENCE=low
 elif [ "${MATCHED_TOTAL:-0}" -eq 0 ] 2>/dev/null; then
   MATCH_STATUS=fallback
-  MATCH_REASON=no-managed-prop-hit-safe-defaults
+  MATCH_REASON=no-managed-prop-hit-fallback-defaults
   MATCH_CONFIDENCE=low
 elif [ "${INVALID_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
   MATCH_STATUS=partial
@@ -321,11 +351,11 @@ elif [ "${SKIPPED_DUP_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
   MATCH_CONFIDENCE=high
 elif [ "${MATCHED_TOTAL:-0}" -lt 3 ] 2>/dev/null && [ "${DEFAULT_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
   MATCH_STATUS=partial
-  MATCH_REASON=limited-captured-evidence-safe-defaults
+  MATCH_REASON=limited-captured-evidence-fallback-defaults
   MATCH_CONFIDENCE=medium
 elif [ "${DEFAULT_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
   MATCH_STATUS=ok
-  MATCH_REASON=captured-values-and-safe-defaults
+  MATCH_REASON=captured-values-and-fallback-defaults
   MATCH_CONFIDENCE=high
 else
   MATCH_STATUS=ok

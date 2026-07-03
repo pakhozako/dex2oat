@@ -2,6 +2,7 @@
 
 OUT_FILE="${1:-/data/adb/dex2oat-lock/captured-props.txt}"
 EXPORT_FILE="${2-}"
+RULES_FILE="${3-}"
 OUT_DIR="${OUT_FILE%/*}"
 TMP_FILE="$OUT_FILE.tmp"
 
@@ -10,9 +11,34 @@ TMP_FILE="$OUT_FILE.tmp"
 GETPROP=/system/bin/getprop
 [ -x "$GETPROP" ] || GETPROP=getprop
 
-if ! "$GETPROP" \
-  | grep -E '^\[(dalvik\.vm\.|pm\.dexopt\.|persist\.device_config\.runtime|persist\.device_config\.runtime_native|persist\.device_config\.runtime_native_boot|persist\.miui\.|persist\.oplus\.|persist\.sys\.|persist\.dalvik\.|system_perf_init\.|ro\.vendor\.dex2oat|vendor\.oplus\.dalvik\.|oplus\.|sys\.oplus\.|sys\.heap\.|sys\.furtherHeapEnlarge\.|sys\.gcsupression\.)' \
-  > "$TMP_FILE"; then
+if [ -s "$RULES_FILE" ]; then
+  if ! "$GETPROP" | awk -v rules="$RULES_FILE" '
+    BEGIN {
+      FS = "\t"
+      while ((getline line < rules) > 0) {
+        if (line == "" || line ~ /^#/) continue
+        split(line, fields, FS)
+        if (fields[3] != "" && fields[3] != "prop") wanted[fields[3]] = 1
+      }
+      close(rules)
+    }
+    /^\[[^]]+\]: \[.*\]$/ {
+      key = $0
+      sub(/^\[/, "", key)
+      sub(/\]: \[.*$/, "", key)
+      if (wanted[key]) print
+      next
+    }
+    /^[^=#][^=]*=/ {
+      key = $0
+      sub(/=.*/, "", key)
+      if (wanted[key]) print
+    }
+  ' > "$TMP_FILE"; then
+    rm -f "$TMP_FILE" 2>/dev/null
+    exit 1
+  fi
+elif ! "$GETPROP" > "$TMP_FILE"; then
   rm -f "$TMP_FILE" 2>/dev/null
   exit 1
 fi
