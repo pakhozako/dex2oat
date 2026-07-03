@@ -3005,6 +3005,84 @@
           "valueType": "boolean",
           "fallbackValue": "false",
           "displayFallbackValue": "false"
+        },
+        {
+          "id": "thread_suspend_timeout",
+          "label": "ART 线程挂起超时",
+          "description": "作用：设置 ART 运行时等待线程进入安全点的超时时间（毫秒）。适当延长可减少在高负载设备上因超时触发的 ANR 风险。默认值：30000ms。",
+          "prop": "dalvik.vm.thread-suspend-timeout-ms",
+          "defaultEnabled": false,
+          "defaultValue": "30000",
+          "values": [
+            "30000",
+            "60000",
+            "90000"
+          ],
+          "valueLabels": {
+            "30000": "30 秒（默认）",
+            "60000": "60 秒",
+            "90000": "90 秒"
+          },
+          "valueType": "enum",
+          "fallbackValue": "30000",
+          "displayFallbackValue": "all"
+        },
+        {
+          "id": "sys_heap_optimize",
+          "label": "系统堆优化",
+          "description": "作用：启用系统级堆内存优化。在部分 OnePlus/OPPO 设备上可减少内存碎片，改善应用响应速度。证据显示该属性在 OnePlus 设备上普遍存在且值为 1。",
+          "prop": "sys.heap.optimize.enable",
+          "defaultEnabled": false,
+          "defaultValue": "1",
+          "values": [
+            "0",
+            "1"
+          ],
+          "valueLabels": {
+            "0": "关闭",
+            "1": "开启"
+          },
+          "valueType": "count",
+          "fallbackValue": "0",
+          "displayFallbackValue": "0"
+        },
+        {
+          "id": "sys_gc_suppression_optimize",
+          "label": "GC 抑制优化",
+          "description": "作用：启用后系统可在特定条件下延迟 GC 触发，减少卡顿。仅在部分 OPPO/OnePlus 设备上生效（证据来源：OnePlus 设备）。关闭恢复默认行为。",
+          "prop": "sys.gcsupression.optimize.enable",
+          "defaultEnabled": false,
+          "defaultValue": "1",
+          "values": [
+            "0",
+            "1"
+          ],
+          "valueLabels": {
+            "0": "关闭",
+            "1": "开启"
+          },
+          "valueType": "count",
+          "fallbackValue": "0",
+          "displayFallbackValue": "0"
+        },
+        {
+          "id": "sys_heap_further_enlarge",
+          "label": "堆进一步扩大优化",
+          "description": "作用：允许 ART 堆在高内存设备上进一步扩大，减少 GC 频率。仅在支持该属性的 OPPO/OnePlus 设备上生效。",
+          "prop": "sys.furtherHeapEnlarge.optimize.enable",
+          "defaultEnabled": false,
+          "defaultValue": "1",
+          "values": [
+            "0",
+            "1"
+          ],
+          "valueLabels": {
+            "0": "关闭",
+            "1": "开启"
+          },
+          "valueType": "count",
+          "fallbackValue": "0",
+          "displayFallbackValue": "0"
         }
       ]
     },
@@ -3506,6 +3584,59 @@
           },
           "valueType": "enum",
           "fallbackValue": "cortex-a55",
+          "displayFallbackValue": "all"
+        },
+        {
+          "id": "isa_arm64_features",
+          "label": "arm64 ISA 特性",
+          "description": "作用：指定 arm64 架构可用的 CPU 特性集合，供 dex2oat 编译时进行指令选择。错误设置可能导致非法指令崩溃。证据显示多数设备值为 'default'。",
+          "prop": "dalvik.vm.isa.arm64.features",
+          "defaultEnabled": false,
+          "defaultValue": "default",
+          "values": [
+            "default"
+          ],
+          "valueLabels": {
+            "default": "系统默认"
+          },
+          "valueType": "enum",
+          "fallbackValue": "default",
+          "displayFallbackValue": "all"
+        },
+        {
+          "id": "isa_arm_features",
+          "label": "arm（32位）ISA 特性",
+          "description": "作用：指定 32 位 arm 架构可用的 CPU 特性集合。设置不当可能导致 32 位应用崩溃。证据显示多数设备值为 'default'。",
+          "prop": "dalvik.vm.isa.arm.features",
+          "defaultEnabled": false,
+          "defaultValue": "default",
+          "values": [
+            "default"
+          ],
+          "valueLabels": {
+            "default": "系统默认"
+          },
+          "valueType": "enum",
+          "fallbackValue": "default",
+          "displayFallbackValue": "all"
+        },
+        {
+          "id": "extra_opts",
+          "label": "dex2oat 额外参数",
+          "description": "作用：向 dex2oat 编译器传递额外的命令行参数。证据显示 '-Xss3M' 可将线程堆栈扩大至 3MB，适用于编译大型应用。参数错误可导致系统不稳定，使用前必须确认参数含义。",
+          "prop": "dalvik.vm.extra-opts",
+          "defaultEnabled": false,
+          "defaultValue": "-Xss3M",
+          "values": [
+            "-Xss3M",
+            "-Xss2M"
+          ],
+          "valueLabels": {
+            "-Xss3M": "线程栈 3MB",
+            "-Xss2M": "线程栈 2MB"
+          },
+          "valueType": "enum",
+          "fallbackValue": "-Xss3M",
           "displayFallbackValue": "all"
         }
       ]
