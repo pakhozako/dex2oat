@@ -897,27 +897,20 @@ function ensureSkinBadgeStyles() {
 
 async function applySelectedSkin() {
   const id = selectedSkinId();
-  const skin = skinById(id);
-  const themeLink = document.getElementById(SKIN_THEME_STYLESHEET_ID);
-  document.documentElement.dataset.skin = id;
-  document.documentElement.dataset.skinMotion = skinMotionEnabled() ? "on" : "off";
-  document.body?.setAttribute("data-skin", id);
-  document.body?.setAttribute("data-skin-motion", skinMotionEnabled() ? "on" : "off");
-  document.documentElement.classList.toggle("skin-motion-disabled", !skinMotionEnabled());
-  document.body?.classList.toggle("skin-motion-disabled", !skinMotionEnabled());
+  // Skin themes are badge-only: do NOT set global data-skin or load full
+  // theme CSS. The full-theme CSS files (theme-memorial-amber.css,
+  // theme-founder-qingmu.css) are no longer loaded — skins only affect
+  // badge display via skinBadgeMarkup(), which reads the skin manifest
+  // directly and does not depend on any global attribute.
+  document.getElementById(SKIN_THEME_STYLESHEET_ID)?.remove();
+  // skinMotion only controls badge animations.
+  const motionOn = skinMotionEnabled();
+  document.documentElement.dataset.skinMotion = motionOn ? "on" : "off";
+  document.body?.setAttribute("data-skin-motion", motionOn ? "on" : "off");
+  document.documentElement.classList.toggle("skin-motion-disabled", !motionOn);
+  document.body?.classList.toggle("skin-motion-disabled", !motionOn);
   if (id !== DEFAULT_SKIN_ID) {
     await ensureSkinBadgeStyles();
-  }
-  if (skin.themeHref) {
-    try {
-      await loadStylesheet(SKIN_THEME_STYLESHEET_ID, `${SKIN_CSS_BASE}${skin.themeHref}`);
-    } catch (error) {
-      console.warn(`[dex2oat] skin theme failed: ${error.message}`);
-      document.documentElement.dataset.skin = DEFAULT_SKIN_ID;
-      document.body?.setAttribute("data-skin", DEFAULT_SKIN_ID);
-    }
-  } else {
-    themeLink?.remove();
   }
   updateSupporterBadge();
   updateBootSupporterSignature();
@@ -1628,7 +1621,7 @@ function createSkinMotionToggle() {
   const row = createElement("label", "skin-motion-toggle");
   const copy = createElement("span", "skin-motion-copy");
   copy.append(createElement("strong", "", "徽章动态效果"));
-  copy.append(createElement("small", "", "关闭后只保留静态皮肤配色"));
+  copy.append(createElement("small", "", "关闭后徽章只显示静态样式"));
   const input = document.createElement("input");
   input.type = "checkbox";
   input.checked = skinMotionEnabled();
