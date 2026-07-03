@@ -1,9 +1,13 @@
+const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { createZipFromDirectory } = require("./archive");
 const { createManifest } = require("./manifest");
 const { detectHashTool, writeSha256 } = require("./hash");
+const { readSkinCssAssets } = require("./skin-assets");
 const { ensureDir, root, safeRemove } = require("./toolkit");
+const { validateReleaseManifest } = require("./validate");
+const { validateShell } = require("./validate-shell");
 const { readVersion } = require("./version");
 
 const include = [
@@ -21,6 +25,37 @@ const include = [
 
 const forbiddenNames = new Set(["README.md", "CHANGELOG.md", "update.json"]);
 const forbiddenExtensions = new Set([".br", ".gz", ".map"]);
+const allowedWebrootCss = new Set(readSkinCssAssets().map((file) => `webroot/css/${file}`));
+
+async function sha256File(file) {
+  return crypto.createHash("sha256").update(await fs.readFile(file)).digest("hex");
+}
+
+async function validateProtectedWebuiManifest() {
+  const manifestPath = path.join(root, "dist", "webui-protected", "manifest.json");
+  let manifest;
+  try {
+    manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+  } catch (error) {
+    throw new Error(`Protected WebUI manifest missing or invalid. Run node tools\\build-webui.mjs before release. (${error.message})`);
+  }
+  const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
+  if (!assets.length) throw new Error("Protected WebUI manifest has no assets");
+  for (const asset of assets) {
+    if (!asset.path || !asset.sha256) throw new Error("Protected WebUI manifest contains an invalid asset entry");
+    const target = path.join(root, "webroot", asset.path);
+    const stat = await fs.stat(target).catch(() => null);
+    if (!stat?.isFile()) throw new Error(`Protected WebUI asset missing: webroot/${asset.path}`);
+    if (Number(asset.bytes || 0) !== stat.size) {
+      throw new Error(`Protected WebUI asset size mismatch: webroot/${asset.path}`);
+    }
+    const digest = await sha256File(target);
+    if (digest !== asset.sha256) {
+      throw new Error(`Protected WebUI asset hash mismatch: webroot/${asset.path}`);
+    }
+  }
+  return { manifestPath, assets: assets.length };
+}
 
 async function stageReleaseTree(staging) {
   await safeRemove(staging, root);
@@ -41,7 +76,8 @@ async function copyReleaseItem(source, target) {
       const childTarget = path.join(target, entry.name);
       const relative = path.relative(root, childSource).replace(/\\/g, "/");
       if (relative.startsWith("webroot-src/") || relative.startsWith("tools/") || relative.startsWith(".webui-src-temp/")) continue;
-      if (relative.startsWith("webroot/js/") || relative.startsWith("webroot/css/")) continue;
+      if (relative.startsWith("webroot/js/")) continue;
+      if (relative.startsWith("webroot/css/") && !allowedWebrootCss.has(relative)) continue;
       await copyReleaseItem(childSource, childTarget);
     }
   } else if (!forbiddenNames.has(path.basename(source)) && !forbiddenExtensions.has(path.extname(source))) {
@@ -60,6 +96,7 @@ async function releaseBuild(options = {}) {
   const hashTool = options.hashTool || detectHashTool();
 
   await ensureDir(releaseRoot);
+  const webuiManifest = await validateProtectedWebuiManifest();
   await stageReleaseTree(staging);
 
   await fs.rm(zipPath, { force: true });
@@ -81,7 +118,8 @@ async function releaseBuild(options = {}) {
     manifestPath,
     sha256,
     bytes: zip.bytes,
-    files: manifest.files.length
+    files: manifest.files.length,
+    webuiManifest
   };
 }
 
@@ -91,8 +129,12 @@ module.exports = {
 };
 
 if (require.main === module) {
-  releaseBuild()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
+  (async () => {
+    const result = await releaseBuild();
+    const shell = await validateShell();
+    const gate = validateReleaseManifest({ blocking: true, shell: shell.shell });
+    console.log(JSON.stringify({ ...result, gate }, null, 2));
+  })()
     .catch((error) => {
       console.error(error.stack || error.message);
       process.exit(1);

@@ -24,15 +24,22 @@ function includeInBaseline(relative) {
     "core/health-check.sh",
     "core/integrity-check.sh",
     "core/prop-lock.sh",
+    "core/redeem-code-verify.sh",
+    "core/skin-unlock.sh",
     "core/state.sh",
     "core/statectl.sh",
+    "core/supporter-install-id.sh",
     "core/webui-save.sh",
+    "core/webui-config-save.sh",
     "scripts/capture-props.sh",
     "scripts/decode-rules.sh",
     "scripts/generate-props.sh",
     "webroot/index.html",
     "webroot/assets/dex2oat-ui.protected.css",
     "webroot/assets/dex2oat-ui.protected.js",
+    "webroot/css/skin-badges.css",
+    "webroot/css/theme-founder-qingmu.css",
+    "webroot/css/theme-memorial-amber.css",
     "webroot/data/rule-props.pack"
   ]).has(relative);
 }

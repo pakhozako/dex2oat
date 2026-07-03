@@ -4,6 +4,7 @@ const { createZipFromDirectory } = require("./archive");
 const { createManifest } = require("./manifest");
 const { detectHashTool, writeSha256 } = require("./hash");
 const { copyTree, ensureDir, root, safeRemove } = require("./toolkit");
+const { validateSourceManifest } = require("./validate");
 const { readVersion } = require("./version");
 
 const skip = [
@@ -22,9 +23,13 @@ const skip = [
   ".env.local",
   "build.config.json",
   "environment-report.md",
+  "unknown 自动化开发与构建报告.md",
+  "deploy/cloud/supporters.private.json",
+  "webroot-src/data/supporter-redeem-codes.private.json",
   "工具路径清单.md",
   "发布版",
-  "源码版"
+  "源码版",
+  "构建"
 ];
 
 async function backupSource(options = {}) {
@@ -69,7 +74,10 @@ module.exports = {
 
 if (require.main === module) {
   backupSource()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
+    .then((result) => {
+      const gate = validateSourceManifest({ blocking: true });
+      console.log(JSON.stringify({ ...result, gate }, null, 2));
+    })
     .catch((error) => {
       console.error(error.stack || error.message);
       process.exit(1);

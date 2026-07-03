@@ -6,8 +6,8 @@ const { detectEnvironment, writeEnvironmentFiles } = require("./environment");
 const { generateIntegrityBaseline } = require("./generate-integrity");
 const { protectWebui } = require("./protect-webui");
 const { releaseBuild } = require("./release");
-const { root, run } = require("./toolkit");
-const { validateAll } = require("./validate");
+const { copyTree, firstCommand, root, run } = require("./toolkit");
+const { validateAll, validateBuildReport, validateBuiltSourceVersion, validateReleaseManifest, validateSourceManifest } = require("./validate");
 const { syncVersion } = require("./version");
 
 function buildReportPath(version) {
@@ -22,17 +22,18 @@ async function maybeNpmInstall() {
     return { skipped: true, reason: "package.json not found" };
   }
   const command = firstNpm();
-  const result = process.platform === "win32"
-    ? run("cmd.exe", ["/d", "/s", "/c", command, "install"], { timeout: 900000 })
-    : run(command, ["install"], { timeout: 900000 });
+  if (!command) {
+    throw new Error("npm was not found; run node tools/environment.js or install Node.js/npm before building");
+  }
+  const result = run(command, ["install"], { timeout: 900000 });
   if (result.status !== 0) {
     throw new Error(`npm install failed:\n${result.stdout}\n${result.stderr}`);
   }
-  return { skipped: false };
+  return { skipped: false, command };
 }
 
 function firstNpm() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
+  return firstCommand(["npm"]);
 }
 
 function pushStep(steps, name, status, detail = {}) {
@@ -48,6 +49,13 @@ function pushStep(steps, name, status, detail = {}) {
 
 function formatJson(value) {
   return JSON.stringify(value, null, 2);
+}
+
+async function syncBuiltSource(sourceTree) {
+  const builtSource = path.join(root, "构建", "source");
+  const builtRoot = path.join(root, "构建");
+  await copyTree(sourceTree, builtSource, { allowedRemoveRoot: builtRoot, keepTargetRoot: true });
+  return validateBuiltSourceVersion({ blocking: true });
 }
 
 async function writeBuildReport({ status, steps, environment, version, validation, webui, integrity, release, source, error }) {
@@ -167,7 +175,7 @@ async function build() {
     reportPath = buildReportPath(version);
     pushStep(steps, "Version Sync", "ok", version);
 
-    validation = await validateAll(environment);
+    validation = await validateAll(environment, { skipReleaseManifest: true, skipSourceManifest: true, skipWebuiSmoke: true, skipBuildReport: true });
     pushStep(steps, "Validate", "ok", validation);
 
     webui = await protectWebui();
@@ -176,16 +184,29 @@ async function build() {
     integrity = await generateIntegrityBaseline();
     pushStep(steps, "Integrity Baseline", "ok", integrity);
 
-    validation = await validateAll(environment);
+    validation = await validateAll(environment, { skipReleaseManifest: true, skipSourceManifest: true, skipBuildReport: true });
     pushStep(steps, "Final Validate", "ok", validation);
 
     release = await releaseBuild({ hashTool: environment.hashTool });
     pushStep(steps, "Release ZIP + SHA256 + Manifest", "ok", release);
 
+    const releaseGate = validateReleaseManifest({ blocking: true, shell: environment.shell });
+    pushStep(steps, "Release Manifest Gate", "ok", releaseGate);
+
     source = await backupSource({ hashTool: environment.hashTool });
     pushStep(steps, "Source Backup + ZIP + SHA256 + Manifest", "ok", source);
 
+    const sourceGate = validateSourceManifest({ blocking: true });
+    pushStep(steps, "Source Manifest Gate", "ok", sourceGate);
+
+    const builtSource = await syncBuiltSource(source.sourceTree);
+    pushStep(steps, "Built Source Sync + Version Gate", "ok", builtSource);
+
     await writeBuildReport({ status: "success", steps, environment, version, validation, webui, integrity, release, source });
+    const reportGate = validateBuildReport({ blocking: true, requireBuildReportGate: false });
+    pushStep(steps, "Build Report Gate", "ok", reportGate);
+    await writeBuildReport({ status: "success", steps, environment, version, validation, webui, integrity, release, source });
+    validateBuildReport({ blocking: true });
     return { status: "success", reportPath, release, source };
   } catch (error) {
     pushStep(steps, error.step || "Build Failed", "fail", { message: error.message });

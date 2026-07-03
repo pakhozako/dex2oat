@@ -19,6 +19,24 @@ function moduleProp(version) {
   ].join("\n");
 }
 
+function webSafeUrl(value, { allowHttp = false } = {}) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    const isHttp = url.protocol === "http:";
+    if (url.protocol === "https:" || (allowHttp && isHttp)) {
+      url.hash = "";
+      url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+      if (url.pathname === "/" && !url.search) return `${url.origin}`;
+      return url.href;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 async function syncReadme(_version) {
   const readmePath = path.join(root, "README.md");
   let content = await fs.readFile(readmePath, "utf8");
@@ -56,13 +74,16 @@ async function syncVersion() {
     version: version.version,
     versionCode: version.versionCode,
     author: version.author,
-    githubUrl: version.githubUrl,
-    cloudBaseUrl: version.cloudBaseUrl,
+    githubUrl: webSafeUrl(version.githubUrl),
+    supportUrl: webSafeUrl(version.supportUrl),
+    feedbackUrl: webSafeUrl(version.feedbackUrl, { allowHttp: true }),
+    supporterVerifyUrl: webSafeUrl(version.supporterVerifyUrl, { allowHttp: true }),
+    supporterDirectoryUrl: webSafeUrl(version.supporterDirectoryUrl, { allowHttp: true }),
+    cloudBaseUrl: webSafeUrl(version.cloudBaseUrl, { allowHttp: true }),
     architecture: version.architecture,
     description: "Dex2oat Lock 是一个基于规则库生成 ART / dex2oat 配置并通过统一状态展示运行健康度的模块。"
   };
   await writeJson(path.join(root, "webroot-src", "data", "app-meta.json"), appMeta);
-  await writeJson(path.join(root, "webroot", "data", "app-meta.json"), appMeta);
   await syncReadme(version);
   await syncChangelog(version);
   return version;

@@ -80,7 +80,15 @@ def remote_command(args, body: str, timeout: int = 60) -> str:
     client = connect(args)
     try:
         require_managed_base(client, args.base_dir)
-        command = f"set -eu\nBASE={shell_quote(args.base_dir)}\nexport BASE\ncd \"$BASE\"\n{body}"
+        http_base = args.http_base or "http://127.0.0.1:18082"
+        command = (
+            "set -eu\n"
+            f"BASE={shell_quote(args.base_dir)}\n"
+            f"DEX2OAT_CLOUD_HTTP_BASE={shell_quote(http_base)}\n"
+            "export BASE DEX2OAT_CLOUD_HTTP_BASE\n"
+            "cd \"$BASE\"\n"
+            f"{body}"
+        )
         code, out, err = ssh_run(client, command, timeout=timeout)
         if code != 0:
             raise RuntimeError(f"remote command failed ({code})\n{out}{err}")
@@ -92,24 +100,80 @@ def remote_command(args, body: str, timeout: int = 60) -> str:
 def command_status(args) -> dict:
     script = r"""
 python3 - <<'PY'
-import json, os, shutil, subprocess
+import json, os, shutil, subprocess, urllib.request
 base = os.environ.get("BASE", ".")
+http_base = os.environ.get("DEX2OAT_CLOUD_HTTP_BASE", "http://127.0.0.1:18082").rstrip("/")
+panel_base = os.environ.get("DEX2OAT_PANEL_HTTP_BASE", "http://127.0.0.1:18083").rstrip("/")
 def cmd(args):
     return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.strip()
 def active(name):
     output = cmd(["systemctl", "is-active", name])
     return output.splitlines()[0] if output else "unknown"
+def enabled(name):
+    output = cmd(["systemctl", "is-enabled", name])
+    return output.splitlines()[0] if output else "unknown"
+def unit_show(name):
+    output = cmd(["systemctl", "show", name, "--no-pager", "-p", "ActiveState", "-p", "LoadState", "-p", "UnitFileState"])
+    data = {}
+    for line in output.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            data[key] = value or "unknown"
+    return data
 def endpoint(path):
-    result = subprocess.run(["curl", "-fsS", "http://127.0.0.1:18080" + path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return result.returncode == 0
+    try:
+        with urllib.request.urlopen(http_base + path, timeout=8) as response:
+            response.read(1)
+            return 200 <= getattr(response, "status", 200) < 400
+    except Exception:
+        return False
+def get_json(path):
+    try:
+        with urllib.request.urlopen(http_base + path, timeout=12) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception as error:
+        return {"ok": False, "error": str(error)[:200]}
+def directus_ping():
+    try:
+        with urllib.request.urlopen(panel_base + "/server/ping", timeout=8) as response:
+            body = response.read().decode("utf-8", "replace").strip()
+            return 200 <= getattr(response, "status", 200) < 400 and body == "pong"
+    except Exception:
+        return False
 disk = shutil.disk_usage(base)
+usage_summary = get_json("/api/usage-summary.json") if endpoint("/api/usage-summary.json") else {"ok": False}
+evidence_summary = get_json("/api/evidence-summary.json") if endpoint("/api/evidence-summary.json") else {"ok": False}
+supporters = get_json("/api/supporters.json") if endpoint("/api/supporters.json") else {"ok": False}
+endpoints = {
+    "/health.json": endpoint("/health.json"),
+    "/api/update.json": endpoint("/api/update.json"),
+    "/api/releases.json": endpoint("/api/releases.json"),
+    "/api/rules.json": endpoint("/api/rules.json"),
+    "/api/usage-summary.json": endpoint("/api/usage-summary.json"),
+    "/api/evidence-summary.json": endpoint("/api/evidence-summary.json"),
+    "/api/supporters.json": endpoint("/api/supporters.json")
+}
 data = {
   "base": os.path.abspath(base),
   "services": {
     "dex2oat-cloud.service": active("dex2oat-cloud.service"),
-    "dex2oat-admin.service": active("dex2oat-admin.service"),
     "dex2oat-cloud-backup.timer": active("dex2oat-cloud-backup.timer"),
     "dex2oat-cloud-health.timer": active("dex2oat-cloud-health.timer")
+  },
+  "legacyAdmin": {
+    "dex2oat-admin.service": {
+      "active": active("dex2oat-admin.service"),
+      "enabled": enabled("dex2oat-admin.service"),
+      "show": unit_show("dex2oat-admin.service")
+    }
+  },
+  "cloudApiBaseUrl": http_base,
+  "businessPanel": {
+    "baseUrl": panel_base,
+    "panelDir": os.path.join(base, "panel"),
+    "installed": os.path.exists(os.path.join(base, "panel", "docker-compose.yml")),
+    "env": os.path.exists(os.path.join(base, "panel", ".env")),
+    "ping": directus_ping()
   },
   "disk": {
     "total": disk.total,
@@ -117,16 +181,12 @@ data = {
     "free": disk.free,
     "percent": round((disk.used / disk.total) * 100, 2) if disk.total else 0
   },
-  "publicUsagePanel": os.path.exists(os.path.join(base, "public", "usage.html")),
   "healthLog": os.path.exists(os.path.join(base, "logs", "health-check.latest.txt")),
   "backupLog": os.path.exists(os.path.join(base, "logs", "backup.latest.txt")),
-  "endpoints": {
-    "/health.json": endpoint("/health.json"),
-    "/api/update.json": endpoint("/api/update.json"),
-    "/api/releases.json": endpoint("/api/releases.json"),
-    "/api/rules.json": endpoint("/api/rules.json"),
-    "/api/evidence-summary.json": endpoint("/api/evidence-summary.json")
-  },
+  "usageSummary": usage_summary,
+  "evidenceSummary": evidence_summary,
+  "supporters": supporters,
+  "endpoints": endpoints,
 }
 for name in ("public/api/update.json", "public/api/releases.json", "public/api/rules.json"):
     data[name] = os.path.exists(os.path.join(base, name))
@@ -137,7 +197,7 @@ PY
 
 
 def command_health(args) -> str:
-    return remote_command(args, '"$BASE/scripts/health-check.sh"\ncat "$BASE/logs/health-check.latest.txt"', timeout=90)
+    return remote_command(args, 'sh "$BASE/scripts/health-check.sh"\ncat "$BASE/logs/health-check.latest.txt"', timeout=90)
 
 
 def command_logs(args) -> str:
@@ -148,7 +208,7 @@ tail -n {lines} "$BASE/logs/health-check.latest.txt" 2>/dev/null || true
 printf '%s\\n' '--- backup.latest.txt ---'
 tail -n {lines} "$BASE/logs/backup.latest.txt" 2>/dev/null || true
 printf '%s\\n' '--- service journal ---'
-journalctl -u dex2oat-cloud.service -u dex2oat-admin.service --no-pager -n {lines} 2>/dev/null || true
+journalctl -u dex2oat-cloud.service --no-pager -n {lines} 2>/dev/null || true
 """
     return remote_command(args, script, timeout=90)
 
@@ -170,7 +230,7 @@ find "$BASE" -maxdepth 2 -type f | sort | sed "s#$BASE/##" | head -160
 printf '%s\n' '--- scripts ---'
 ls -l "$BASE/scripts"
 printf '%s\n' '--- ports ---'
-ss -ltnp 2>/dev/null | grep -E ':(18080|18081)\b' || true
+ss -ltnp 2>/dev/null | grep -E ':(18080|18081|18082|18083)\b' || true
 printf '%s\n' '--- resources ---'
 df -h "$BASE"
 free -h
@@ -186,7 +246,7 @@ find "$BASE/worker" -maxdepth 2 -type d | sort
 printf '%s\n' '--- latest worker logs ---'
 find "$BASE/worker/logs" -maxdepth 1 -type f -printf '%TY-%Tm-%Td %TH:%TM %9s %p\n' 2>/dev/null | sort | tail -30
 printf '%s\n' '--- worker env ---'
-"$BASE/scripts/run-worker-task.sh" worker-env-check sh -lc '. "$0"; node -v; npm -v; python3 --version; git --version; df -h "$DEX2OAT_WORKER"' "$BASE/scripts/remote-env.sh" 2>/dev/null || true
+sh "$BASE/scripts/run-worker-task.sh" worker-env-check sh -lc '. "$0"; node -v; npm -v; python3 --version; git --version; df -h "$DEX2OAT_WORKER"' "$BASE/scripts/remote-env.sh" 2>/dev/null || true
 tail -n 80 "$BASE/worker/logs"/worker-env-check-*.log 2>/dev/null | tail -80 || true
 """
     return remote_command(args, script, timeout=90)
@@ -195,7 +255,7 @@ tail -n 80 "$BASE/worker/logs"/worker-env-check-*.log 2>/dev/null | tail -80 || 
 def command_worker_selfcheck(args) -> str:
     script = r"""
 mkdir -p "$BASE/worker/jobs" "$BASE/worker/logs" "$BASE/worker/artifacts" "$BASE/worker/repos"
-"$BASE/scripts/run-worker-task.sh" worker-selfcheck sh -lc '. "$0"; node -v; npm -v; python3 --version; git --version; free -h; df -h "$DEX2OAT_WORKER"' "$BASE/scripts/remote-env.sh"
+sh "$BASE/scripts/run-worker-task.sh" worker-selfcheck sh -lc '. "$0"; node -v; npm -v; python3 --version; git --version; free -h; df -h "$DEX2OAT_WORKER"' "$BASE/scripts/remote-env.sh"
 tail -n 120 "$BASE/worker/logs"/worker-selfcheck-*.log 2>/dev/null | tail -120
 """
     return remote_command(args, script, timeout=90)

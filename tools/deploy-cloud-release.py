@@ -12,16 +12,18 @@ import argparse
 import json
 import os
 import posixpath
+import subprocess
 import sys
 import time
 import urllib.request
 from pathlib import Path
-from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "tools" / "version.json"
 RELEASE_DIR = ROOT / "releases"
+CLOUD_SERVER_FILE = ROOT / "deploy" / "cloud" / "dex2oat_cloud_server.py"
+PRIVATE_SUPPORTERS_FILE = ROOT / "deploy" / "cloud" / "supporters.private.json"
 DEFAULT_BASE_DIR = "/root/codex-managed/dex2oat-lock"
 
 
@@ -37,10 +39,39 @@ def read_sha256(path: Path) -> str:
     return path.read_text(encoding="utf-8").split()[0]
 
 
+def local_release_expectation(version: dict) -> dict | None:
+    label = version["version"]
+    zip_name = f"Dex2oat-Lock-{label}-release.zip"
+    zip_path = RELEASE_DIR / zip_name
+    sha_path = RELEASE_DIR / f"Dex2oat-Lock-{label}-release.sha256"
+    manifest_path = RELEASE_DIR / f"Dex2oat-Lock-{label}-manifest.json"
+    if not zip_path.exists() or not sha_path.exists() or not manifest_path.exists():
+        return None
+    return {
+        "version": label,
+        "versionCode": int(version["versionCode"]),
+        "sha256": read_sha256(sha_path),
+        "size": zip_path.stat().st_size,
+        "zipName": zip_name,
+    }
+
+
+def compare_remote_release(name: str, remote: dict | None, expected: dict) -> list[str]:
+    if not isinstance(remote, dict):
+        return [f"{name} is missing or not an object"]
+    mismatches = []
+    for key in ("version", "versionCode", "sha256", "size"):
+        if remote.get(key) != expected[key]:
+            mismatches.append(f"{name}.{key}={remote.get(key)!r} != {expected[key]!r}")
+    if expected["zipName"] not in str(remote.get("zipUrl", "")):
+        mismatches.append(f"{name}.zipUrl does not point to {expected['zipName']}")
+    return mismatches
+
+
 def atomic_write_text(sftp, remote_path: str, text: str) -> None:
     tmp_path = f"{remote_path}.tmp-{os.getpid()}"
-    with sftp.file(tmp_path, "w") as handle:
-        handle.write(text)
+    with sftp.file(tmp_path, "wb") as handle:
+        handle.write(text.encode("utf-8"))
     try:
         sftp.remove(remote_path)
     except OSError:
@@ -68,98 +99,6 @@ def ssh_run(client, command: str, timeout: int = 30) -> str:
     return out.strip()
 
 
-def build_index_html(version: dict, entry: dict, rules_version: str) -> str:
-    update_href = "/api/update.json"
-    releases_href = "/api/releases.json"
-    rules_href = "/api/rules.json"
-    evidence_href = "/api/evidence-summary.json"
-    download_href = urlparse(entry["zipUrl"]).path
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Dex2oat-Lock Cloud</title>
-  <style>
-    :root {{
-      color-scheme: light dark;
-      --surface: #fffbfe;
-      --surface2: #f3edf7;
-      --surface3: #ece6f0;
-      --primary: #6750a4;
-      --on: #1d1b20;
-      --muted: #625b71;
-      --outline: #cac4d0;
-      --ok: #146c2e;
-    }}
-    @media (prefers-color-scheme: dark) {{
-      :root {{
-        --surface: #141218;
-        --surface2: #211f26;
-        --surface3: #2b2930;
-        --primary: #d0bcff;
-        --on: #e6e0e9;
-        --muted: #cac4d0;
-        --outline: #49454f;
-        --ok: #7bd88f;
-      }}
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, transparent), transparent 42%), var(--surface);
-      color: var(--on);
-      font: 15px/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }}
-    main {{ width: min(960px, 100%); margin: 0 auto; padding: 32px 20px 48px; }}
-    .hero {{
-      display: grid;
-      gap: 18px;
-      padding: 28px;
-      border: 1px solid color-mix(in srgb, var(--outline) 68%, transparent);
-      border-radius: 28px;
-      background: color-mix(in srgb, var(--surface2) 88%, transparent);
-      box-shadow: 0 8px 28px rgba(0, 0, 0, .08);
-    }}
-    h1 {{ margin: 0; font-size: clamp(30px, 6vw, 56px); line-height: 1.04; }}
-    .lead {{ max-width: 680px; margin: 0; color: var(--muted); font-size: 17px; }}
-    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-top: 18px; }}
-    .card {{ padding: 20px; border: 1px solid color-mix(in srgb, var(--outline) 62%, transparent); border-radius: 22px; background: color-mix(in srgb, var(--surface3) 74%, transparent); }}
-    .card span {{ display: block; color: var(--muted); font-size: 13px; }}
-    .card strong {{ display: block; margin-top: 6px; font-size: 24px; }}
-    .button {{ display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border-radius: 999px; background: var(--primary); color: var(--surface); padding: 0 20px; text-decoration: none; font-weight: 700; }}
-    .actions {{ display: flex; flex-wrap: wrap; gap: 12px; }}
-    .links {{ display: grid; gap: 10px; margin-top: 22px; }}
-    .links a {{ color: var(--primary); text-decoration: none; }}
-    .status {{ color: var(--ok); font-weight: 700; }}
-  </style>
-</head>
-<body>
-  <main>
-    <section class="hero">
-      <p class="status">Service online</p>
-      <h1>Dex2oat-Lock Cloud</h1>
-      <p class="lead">Release mirror, cloud rule metadata, module communication, rule evidence sync, and maintenance checks. User-facing state stays inside the module WebUI.</p>
-      <div class="actions"><a class="button" href="{download_href}">Download {entry["version"]}</a></div>
-      <div class="grid">
-        <article class="card"><span>Latest version</span><strong>{entry["version"]}</strong></article>
-        <article class="card"><span>Version code</span><strong>{entry["versionCode"]}</strong></article>
-        <article class="card"><span>Rules</span><strong>{rules_version}</strong></article>
-        <article class="card"><span>Status</span><strong>OK</strong></article>
-      </div>
-      <div class="links">
-        <a href="{update_href}">{update_href}</a>
-        <a href="{releases_href}">{releases_href}</a>
-        <a href="{rules_href}">{rules_href}</a>
-        <a href="{evidence_href}">{evidence_href}</a>
-      </div>
-    </section>
-  </main>
-</body>
-</html>
-"""
-
-
 def make_release_entry(version: dict, http_base: str, sha256: str, size: int, updated_at: str) -> dict:
     label = version["version"]
     zip_name = f"Dex2oat-Lock-{label}-release.zip"
@@ -172,6 +111,61 @@ def make_release_entry(version: dict, http_base: str, sha256: str, size: int, up
         "size": size,
         "changelog": version.get("changelog", ""),
         "updatedAt": updated_at,
+    }
+
+
+def make_supporters_payload(version: dict, updated_at: str) -> dict:
+    return {
+        "ok": True,
+        "version": version.get("version", "v0"),
+        "versionCode": int(version.get("versionCode") or 0),
+        "updatedAt": updated_at,
+        "items": [
+            {
+                "name": "pakhozako",
+                "tier": "作者",
+                "badge": "作者",
+                "note": "Dex2oat Lock",
+                "order": 100,
+                "active": True,
+                "expiresAt": 0
+            }
+        ]
+    }
+
+
+def load_private_supporters() -> dict | None:
+    if not PRIVATE_SUPPORTERS_FILE.exists():
+        return None
+    data = load_json(PRIVATE_SUPPORTERS_FILE)
+    if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+        raise SystemExit(f"Invalid private supporters file: {PRIVATE_SUPPORTERS_FILE}")
+    return data
+
+
+def run_local_preflight(args) -> dict:
+    if args.skip_local_preflight:
+        return {"skipped": True, "reason": "explicit --skip-local-preflight"}
+    node = os.environ.get("DEX2OAT_NODE") or "node"
+    result = subprocess.run(
+        [node, "tools/validate.js"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=360,
+    )
+    if result.returncode != 0:
+        detail = "\n".join(part for part in (result.stdout.strip(), result.stderr.strip()) if part)
+        raise SystemExit(f"Local release preflight failed. Run `node tools\\validate.js` locally for details.\n{detail}")
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        data = {}
+    return {
+        "skipped": False,
+        "releaseSha256": (data.get("releaseManifest") or {}).get("sha256", ""),
+        "sourceSha256": (data.get("sourceManifest") or {}).get("sha256", ""),
+        "webuiSmoke": bool(data.get("webuiSmoke")),
     }
 
 
@@ -211,6 +205,7 @@ def connect(args):
 
 
 def deploy(args) -> dict:
+    local_preflight = run_local_preflight(args)
     version = load_json(VERSION_FILE)
     label = version["version"]
     zip_name = f"Dex2oat-Lock-{label}-release.zip"
@@ -224,7 +219,7 @@ def deploy(args) -> dict:
     sha256 = read_sha256(sha_path)
     size = zip_path.stat().st_size
     updated_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    http_base = args.http_base or version.get("cloudBaseUrl") or f"http://{args.host}:18080"
+    http_base = args.http_base or version.get("cloudBaseUrl") or f"http://{args.host}:18082"
     entry = make_release_entry(version, http_base, sha256, size, updated_at)
     rules_version = version.get("rulesVersion") or label
     rules = {
@@ -234,6 +229,8 @@ def deploy(args) -> dict:
         "updatedAt": updated_at,
         "note": "Cloud rule metadata endpoint is reserved; module release embeds protected rule data.",
     }
+    supporters = make_supporters_payload(version, updated_at)
+    private_supporters = load_private_supporters()
     health = {
         "ok": True,
         "service": "dex2oat-cloud",
@@ -244,6 +241,8 @@ def deploy(args) -> dict:
     base = args.base_dir.rstrip("/")
     public_dir = posixpath.join(base, "public")
     api_dir = posixpath.join(public_dir, "api")
+    data_dir = posixpath.join(base, "data")
+    scripts_dir = posixpath.join(base, "scripts")
     files_dir = posixpath.join(public_dir, "files")
     backup_dir = posixpath.join(base, "backups", f"deploy-{time.strftime('%Y%m%d-%H%M%S', time.gmtime())}")
 
@@ -251,11 +250,12 @@ def deploy(args) -> dict:
     try:
         if ssh_run(client, f"test -d {shell_quote(base)} && echo yes || echo no") != "yes":
             raise RuntimeError(f"managed base directory does not exist: {base}")
-        ssh_run(client, f"mkdir -p {shell_quote(api_dir)} {shell_quote(files_dir)} {shell_quote(backup_dir)}")
+        ssh_run(client, f"mkdir -p {shell_quote(api_dir)} {shell_quote(files_dir)} {shell_quote(data_dir)} {shell_quote(scripts_dir)} {shell_quote(backup_dir)}")
         backup_cmd = (
-            f"for f in {shell_quote(public_dir)}/index.html {shell_quote(public_dir)}/health.json "
+            f"for f in {shell_quote(public_dir)}/health.json "
             f"{shell_quote(public_dir)}/update.json {shell_quote(public_dir)}/releases.json "
-            f"{shell_quote(api_dir)}/update.json {shell_quote(api_dir)}/releases.json {shell_quote(api_dir)}/rules.json; "
+            f"{shell_quote(api_dir)}/update.json {shell_quote(api_dir)}/releases.json {shell_quote(api_dir)}/rules.json "
+            f"{shell_quote(data_dir)}/supporters.json {shell_quote(scripts_dir)}/dex2oat_cloud_server.py; "
             f"do [ -f \"$f\" ] && cp -p \"$f\" {shell_quote(backup_dir)}/ || true; done"
         )
         ssh_run(client, backup_cmd)
@@ -279,25 +279,41 @@ def deploy(args) -> dict:
                 atomic_write_text(sftp, posixpath.join(prefix, "update.json"), json.dumps(entry, ensure_ascii=False, indent=2) + "\n")
                 atomic_write_text(sftp, posixpath.join(prefix, "releases.json"), json.dumps(releases, ensure_ascii=False, indent=2) + "\n")
             atomic_write_text(sftp, posixpath.join(api_dir, "rules.json"), json.dumps(rules, ensure_ascii=False, indent=2) + "\n")
+            atomic_write_text(sftp, posixpath.join(api_dir, "supporters.json"), json.dumps(supporters, ensure_ascii=False, indent=2) + "\n")
+            if private_supporters:
+                atomic_write_text(sftp, posixpath.join(data_dir, "supporters.json"), json.dumps(private_supporters, ensure_ascii=False, indent=2) + "\n")
+            if CLOUD_SERVER_FILE.exists():
+                atomic_put(sftp, CLOUD_SERVER_FILE, posixpath.join(scripts_dir, "dex2oat_cloud_server.py"))
             atomic_write_text(sftp, posixpath.join(public_dir, "health.json"), json.dumps(health, ensure_ascii=False, indent=2) + "\n")
-            if not args.no_index:
-                atomic_write_text(sftp, posixpath.join(public_dir, "index.html"), build_index_html(version, entry, rules_version))
         finally:
             sftp.close()
 
         chmod_targets = [
-            posixpath.join(public_dir, "index.html"),
             posixpath.join(public_dir, "health.json"),
             posixpath.join(public_dir, "update.json"),
             posixpath.join(public_dir, "releases.json"),
             posixpath.join(api_dir, "update.json"),
             posixpath.join(api_dir, "releases.json"),
             posixpath.join(api_dir, "rules.json"),
+            posixpath.join(api_dir, "supporters.json"),
             posixpath.join(files_dir, zip_name),
             posixpath.join(files_dir, manifest_name),
         ]
         ssh_run(client, "chmod 0644 " + " ".join(shell_quote(item) for item in chmod_targets))
+        if private_supporters:
+            ssh_run(client, f"chmod 0600 {shell_quote(posixpath.join(data_dir, 'supporters.json'))}")
+        if CLOUD_SERVER_FILE.exists():
+            ssh_run(client, f"chmod 0644 {shell_quote(posixpath.join(scripts_dir, 'dex2oat_cloud_server.py'))}")
+        cleanup_pages = ["index.html", "admin.html", "usage.html"]
+        ssh_run(
+            client,
+            "rm -f " + " ".join(shell_quote(posixpath.join(public_dir, name)) for name in cleanup_pages),
+            timeout=20,
+        )
         remote_sha = ssh_run(client, f"sha256sum {shell_quote(posixpath.join(files_dir, zip_name))} | awk '{{print $1}}'")
+        if CLOUD_SERVER_FILE.exists():
+            ssh_run(client, "systemctl restart dex2oat-cloud.service", timeout=30)
+            time.sleep(1)
         service_state = ssh_run(client, "systemctl is-active dex2oat-cloud.service 2>/dev/null || true")
         if remote_sha != sha256:
             raise RuntimeError(f"remote sha mismatch: {remote_sha} != {sha256}")
@@ -307,7 +323,10 @@ def deploy(args) -> dict:
     if not args.skip_http_verify:
         update = http_json(f"{http_base.rstrip('/')}/api/update.json")
         if update.get("version") != label or update.get("sha256") != sha256:
-            raise RuntimeError("HTTP update endpoint did not return the deployed release")
+            raise RuntimeError(
+                "HTTP update endpoint did not return the deployed release "
+                f"(expected version={label} sha256={sha256}, got version={update.get('version')} sha256={update.get('sha256')})"
+            )
 
     return {
         "deployed": True,
@@ -318,6 +337,9 @@ def deploy(args) -> dict:
         "httpBase": http_base,
         "backup": backup_dir,
         "service": service_state,
+        "cloudServerUploaded": CLOUD_SERVER_FILE.exists(),
+        "privateSupportersUploaded": bool(private_supporters),
+        "localPreflight": local_preflight,
     }
 
 
@@ -326,17 +348,71 @@ def http_json(url: str) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def validate_public_supporters(data: dict, version: dict) -> dict:
+    if not isinstance(data, dict) or not data.get("ok"):
+        raise RuntimeError("Public supporters directory is not ok")
+    if data.get("version") != version.get("version"):
+        raise RuntimeError(f"Public supporters directory version {data.get('version')} != {version.get('version')}")
+    warnings = []
+    if data.get("versionCode") is None:
+        warnings.append("public supporters directory has no versionCode; next deploy will add it")
+    elif int(data.get("versionCode") or 0) != int(version.get("versionCode") or 0):
+        raise RuntimeError(
+            "Public supporters directory versionCode "
+            f"{data.get('versionCode')} != {version.get('versionCode')}"
+        )
+
+    items = data.get("items") or []
+    if not isinstance(items, list):
+        raise RuntimeError("Public supporters directory items is not a list")
+    forbidden_keys = {"hash", "sha256", "credential", "credentialHash", "code", "secret"}
+    for index, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            raise RuntimeError(f"Public supporters item {index} is not an object")
+        leaked = sorted(forbidden_keys.intersection(item))
+        if leaked:
+            raise RuntimeError(f"Public supporters item {index} leaks private fields: {', '.join(leaked)}")
+    return {
+        "version": data.get("version"),
+        "versionCode": int(data.get("versionCode") or 0) if data.get("versionCode") is not None else None,
+        "items": len(items),
+        "warnings": warnings,
+    }
+
+
 def check(args) -> dict:
     version = load_json(VERSION_FILE)
-    http_base = args.http_base or version.get("cloudBaseUrl") or f"http://{args.host}:18080"
+    http_base = args.http_base or version.get("cloudBaseUrl") or f"http://{args.host}:18082"
     update = http_json(f"{http_base.rstrip('/')}/api/update.json")
     releases = http_json(f"{http_base.rstrip('/')}/api/releases.json")
     health = http_json(f"{http_base.rstrip('/')}/health.json")
+    supporters = http_json(f"{http_base.rstrip('/')}/api/supporters.json")
+    supporters_check = validate_public_supporters(supporters, version)
+    expected = local_release_expectation(version)
+    local_compare = {"skipped": True, "reason": "missing local release files"}
+    if args.skip_local_compare:
+        local_compare = {"skipped": True, "reason": "explicit --skip-local-compare"}
+    elif expected:
+        mismatches = []
+        mismatches.extend(compare_remote_release("update", update, expected))
+        mismatches.extend(compare_remote_release("latest", releases.get("latest"), expected))
+        if mismatches:
+            raise RuntimeError("Cloud release does not match local build:\n" + "\n".join(mismatches))
+        local_compare = {
+            "skipped": False,
+            "version": expected["version"],
+            "versionCode": expected["versionCode"],
+            "sha256": expected["sha256"],
+            "size": expected["size"],
+        }
     return {
         "httpBase": http_base,
         "update": update,
         "latest": releases.get("latest"),
+        "releaseCount": len(releases.get("items") or []),
         "health": health,
+        "supporters": supporters_check,
+        "localCompare": local_compare,
     }
 
 
@@ -350,8 +426,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--key", default=os.environ.get("DEX2OAT_CLOUD_KEY") or "")
     parser.add_argument("--base-dir", default=os.environ.get("DEX2OAT_CLOUD_BASE") or DEFAULT_BASE_DIR)
     parser.add_argument("--http-base", default=os.environ.get("DEX2OAT_CLOUD_HTTP_BASE") or "")
-    parser.add_argument("--no-index", action="store_true", help="Do not update public/index.html.")
     parser.add_argument("--skip-http-verify", action="store_true")
+    parser.add_argument("--skip-local-preflight", action="store_true")
+    parser.add_argument("--skip-local-compare", action="store_true")
     return parser.parse_args(argv)
 
 

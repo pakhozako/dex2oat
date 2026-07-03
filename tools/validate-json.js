@@ -3,7 +3,10 @@ const fs = require("node:fs/promises");
 const { listFiles, root } = require("./toolkit");
 
 async function validateJson() {
-  const files = (await listFiles(root)).filter((file) => path.extname(file) === ".json");
+  const files = (await listFiles(root, {
+    // Skip the checked-in KernelSU reference tree; it includes non-strict sample JSON.
+    skip: ["KernelSU-ref"]
+  })).filter((file) => path.extname(file) === ".json");
   const failures = [];
   for (const file of files) {
     try {

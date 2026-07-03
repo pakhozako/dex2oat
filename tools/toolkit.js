@@ -42,14 +42,38 @@ async function writeJson(file, data) {
   await fsp.writeFile(file, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
+function quoteCmdArg(value) {
+  const text = String(value);
+  if (text === "") return "\"\"";
+  if (!/[\s"&()<>^|]/.test(text)) return text;
+  return `"${text.replace(/"/g, "\"\"")}"`;
+}
+
+function commandCandidateScore(file) {
+  if (process.platform !== "win32") return 0;
+  const ext = path.extname(file).toLowerCase();
+  if (ext === ".exe" || ext === ".com") return 0;
+  if (ext === ".cmd" || ext === ".bat") return 1;
+  if (ext === ".ps1") return 3;
+  return 4;
+}
+
 function run(command, args = [], options = {}) {
-  const result = spawnSync(command, args, {
+  let runCommand = command;
+  let runArgs = args;
+  const spawnOptions = {
     cwd: options.cwd || root,
     encoding: "utf8",
     windowsHide: true,
     shell: false,
     timeout: options.timeout || 120000
-  });
+  };
+  if (process.platform === "win32" && /\.(?:cmd|bat)$/i.test(command)) {
+    runCommand = process.env.ComSpec || "cmd.exe";
+    runArgs = ["/d", "/c", [quoteCmdArg(command), ...args.map(quoteCmdArg)].join(" ")];
+    spawnOptions.windowsVerbatimArguments = true;
+  }
+  const result = spawnSync(runCommand, runArgs, spawnOptions);
   return {
     command,
     args,
@@ -77,7 +101,10 @@ function where(command) {
       if (item && pathExists(item)) candidates.push(path.resolve(item));
     }
   }
-  return [...new Set(candidates)];
+  return [...new Set(candidates)].sort((a, b) => {
+    const score = commandCandidateScore(a) - commandCandidateScore(b);
+    return score || a.localeCompare(b);
+  });
 }
 
 function firstCommand(commands) {
@@ -108,15 +135,30 @@ async function safeRemove(target, allowedRoot = root) {
   await fsp.rm(resolved, { recursive: true, force: true });
 }
 
+async function emptyDirContents(target, allowedRoot = root) {
+  const resolved = path.resolve(target);
+  if (!isInside(allowedRoot, resolved)) {
+    throw new Error(`Refusing to empty outside workspace: ${resolved}`);
+  }
+  await ensureDir(resolved);
+  for (const entry of await fsp.readdir(resolved)) {
+    await safeRemove(path.join(resolved, entry), resolved);
+  }
+}
+
 function shouldSkipRel(relativePath, extraSkips = []) {
   const normalized = slash(relativePath);
   const parts = normalized.split("/");
   const first = parts[0];
   if (first.startsWith("legacy-artifacts-") || first.startsWith("修复前备份-")) return true;
+  if (/^(?:unknown|v[^/]+) 自动化开发与构建报告\.md$/.test(normalized)) return true;
+  if (/^deploy\/cloud\/supporters\.private(?:\.|$)/.test(normalized)) return true;
+  if (/^webroot-src\/data\/.*\.private\.json$/i.test(normalized)) return true;
   if (parts.includes("__pycache__") || normalized.endsWith(".pyc")) return true;
   const defaults = new Set([
     ".git",
     ".webui-src-temp",
+    ".codex",
     "node_modules",
     "dist",
     "release",
@@ -126,7 +168,8 @@ function shouldSkipRel(relativePath, extraSkips = []) {
     "cache",
     ".cache",
     "发布版",
-    "源码版"
+    "源码版",
+    "构建"
   ]);
   if (defaults.has(first)) return true;
   return extraSkips.some((skip) => normalized === skip || normalized.startsWith(`${skip}/`));
@@ -154,7 +197,11 @@ async function listFiles(dir, options = {}) {
 async function copyTree(source, target, options = {}) {
   const sourceRoot = path.resolve(source);
   const files = await listFiles(sourceRoot, { skip: options.skip || [] });
-  await safeRemove(target, options.allowedRemoveRoot || path.dirname(path.resolve(target)));
+  if (options.keepTargetRoot) {
+    await emptyDirContents(target, options.allowedRemoveRoot || path.dirname(path.resolve(target)));
+  } else {
+    await safeRemove(target, options.allowedRemoveRoot || path.dirname(path.resolve(target)));
+  }
   await ensureDir(target);
   for (const file of files) {
     const relative = path.relative(sourceRoot, file);
@@ -210,6 +257,7 @@ module.exports = {
   copyTree,
   defaultConfig,
   ensureDir,
+  emptyDirContents,
   firstCommand,
   isInside,
   listFiles,
