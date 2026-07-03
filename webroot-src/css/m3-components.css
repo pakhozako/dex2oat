@@ -7,6 +7,10 @@
   --m3-component-easing: var(--md-sys-motion-easing-standard);
   --m3-component-duration-hover: var(--md-sys-motion-duration-short3);
   --m3-component-duration-press: var(--md-sys-motion-duration-short4);
+  --m3-switch-track-width: 52px;
+  --m3-switch-track-height: 32px;
+  --m3-switch-thumb-unchecked: 16px;
+  --m3-switch-thumb-checked: 24px;
 }
 
 .m3-surface {

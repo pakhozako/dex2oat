@@ -48,19 +48,19 @@
   --md-sys-font-mono: "Roboto Mono", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   --md-sys-font-icon: "Material Symbols Rounded", "Material Icons Round", system-ui, sans-serif;
 
-  --md-sys-typescale-display-large: 400 57px/64px var(--md-sys-font-brand);
-  --md-sys-typescale-display-medium: 400 45px/52px var(--md-sys-font-brand);
-  --md-sys-typescale-display-small: 400 36px/44px var(--md-sys-font-brand);
-  --md-sys-typescale-headline-large: 400 32px/40px var(--md-sys-font-brand);
-  --md-sys-typescale-headline-medium: 400 28px/36px var(--md-sys-font-brand);
-  --md-sys-typescale-headline-small: 400 24px/32px var(--md-sys-font-brand);
-  --md-sys-typescale-title-large: 400 22px/28px var(--md-sys-font-brand);
-  --md-sys-typescale-title-medium: 500 16px/24px var(--md-sys-font-brand);
-  --md-sys-typescale-title-small: 500 14px/20px var(--md-sys-font-brand);
-  --md-sys-typescale-body-large: 400 16px/24px var(--md-sys-font-plain);
-  --md-sys-typescale-body-medium: 400 14px/20px var(--md-sys-font-plain);
+  --md-sys-typescale-display-large: 400 54px/62px var(--md-sys-font-brand);
+  --md-sys-typescale-display-medium: 400 43px/50px var(--md-sys-font-brand);
+  --md-sys-typescale-display-small: 400 34px/42px var(--md-sys-font-brand);
+  --md-sys-typescale-headline-large: 400 30px/38px var(--md-sys-font-brand);
+  --md-sys-typescale-headline-medium: 400 26px/34px var(--md-sys-font-brand);
+  --md-sys-typescale-headline-small: 400 23px/30px var(--md-sys-font-brand);
+  --md-sys-typescale-title-large: 400 20px/26px var(--md-sys-font-brand);
+  --md-sys-typescale-title-medium: 500 15px/22px var(--md-sys-font-brand);
+  --md-sys-typescale-title-small: 500 13px/19px var(--md-sys-font-brand);
+  --md-sys-typescale-body-large: 400 15px/22px var(--md-sys-font-plain);
+  --md-sys-typescale-body-medium: 400 13px/19px var(--md-sys-font-plain);
   --md-sys-typescale-body-small: 400 12px/16px var(--md-sys-font-plain);
-  --md-sys-typescale-label-large: 500 14px/20px var(--md-sys-font-brand);
+  --md-sys-typescale-label-large: 500 13px/18px var(--md-sys-font-brand);
   --md-sys-typescale-label-medium: 500 12px/16px var(--md-sys-font-brand);
   --md-sys-typescale-label-small: 500 11px/16px var(--md-sys-font-brand);
 
