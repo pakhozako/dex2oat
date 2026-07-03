@@ -1,2 +1,0 @@
-id	label	prop	defaultEnabled	defaultValue	risk	owner	ownerReason	explainTitle	explainReason	confidence	values
-fixture_vendor_rule	Fixture vendor rule	persist.vendor.dex2oat.fixture	false	false	caution	fixture_vendor_rule	fixture	Fixture vendor prop	Matches a managed prop outside the old capture prefix list	high	false|true
