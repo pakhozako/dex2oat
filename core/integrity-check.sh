@@ -52,7 +52,7 @@ is_integrity_key_path() {
   case "$1" in
     service.sh|uninstall.sh|module.prop|\
 core/common.sh|core/conflict-detect.sh|core/health-check.sh|core/integrity-check.sh|\
-core/prop-lock.sh|core/state.sh|core/statectl.sh|core/webui-save.sh|\
+core/prop-lock.sh|core/state.sh|core/statectl.sh|core/supporter-install-id.sh|core/webui-save.sh|core/webui-config-save.sh|\
 scripts/capture-props.sh|scripts/decode-rules.sh|scripts/generate-props.sh|webroot/index.html|\
 webroot/assets/dex2oat-ui.protected.css|webroot/assets/dex2oat-ui.protected.js|\
 webroot/data/rule-props.pack)
@@ -143,8 +143,6 @@ check_runtime_file() {
   esac
 }
 
-BASELINE_CREATED=no
-
 STATUS=ok
 REASON=passed
 CHECKED_TOTAL=0
@@ -154,15 +152,12 @@ CHANGED_TOTAL=0
 BLOCKING_CHANGED_TOTAL=0
 RUNTIME_MISSING_TOTAL=0
 RUNTIME_WARNING_TOTAL=0
-BASELINE_REFRESHED=no
-BASELINE_REFRESH_MISSING_TOTAL=0
 
 : > "$TMP_REPORT" 2>/dev/null || STATUS=error
 {
   printf '[integrity]\n'
   printf 'checked_at=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
   printf 'baseline=%s\n' "$([ -s "$BASELINE_FILE" ] && printf present || printf missing)"
-  printf 'baseline_created=%s\n' "$BASELINE_CREATED"
   printf '[source]\n'
 } > "$TMP_REPORT" 2>/dev/null || STATUS=error
 
@@ -172,9 +167,9 @@ fi
 
 cat "$SOURCE_REPORT_TMP" >> "$TMP_REPORT" 2>/dev/null || true
 {
-  printf '[baseline-refresh]\n'
-  printf 'refreshed=%s\n' "$BASELINE_REFRESHED"
-  printf 'missing_before_refresh=%s\n' "$BASELINE_REFRESH_MISSING_TOTAL"
+  printf '[baseline]\n'
+  printf 'refresh_supported=no\n'
+  printf 'refresh_owner=build-release\n'
   printf 'blocking_missing_total=%s\n' "$BLOCKING_MISSING_TOTAL"
   printf 'blocking_changed_total=%s\n' "$BLOCKING_CHANGED_TOTAL"
 } >> "$TMP_REPORT" 2>/dev/null || true
@@ -195,9 +190,6 @@ if [ "$STATUS" = "error" ]; then
 elif [ ! -s "$BASELINE_FILE" ]; then
   STATUS=error
   REASON=baseline-missing
-elif [ "$BASELINE_REFRESHED" = "failed" ]; then
-  STATUS=error
-  REASON=baseline-refresh-failed
 elif [ "$BLOCKING_MISSING_TOTAL" -gt 0 ] 2>/dev/null; then
   STATUS=missing
   REASON=missing-files
@@ -213,12 +205,6 @@ elif [ "$RUNTIME_WARNING_TOTAL" -gt 0 ] 2>/dev/null; then
 elif [ "$MISSING_TOTAL" -gt 0 ] 2>/dev/null || [ "$CHANGED_TOTAL" -gt 0 ] 2>/dev/null; then
   STATUS=ok
   REASON=passed-with-non-key-drift
-elif [ "$BASELINE_REFRESHED" = "yes" ]; then
-  STATUS=ok
-  REASON=baseline-refreshed
-elif [ "$BASELINE_CREATED" = "yes" ]; then
-  STATUS=ok
-  REASON=baseline-created
 fi
 
 {
@@ -231,9 +217,6 @@ fi
   printf 'blocking_changed_total=%s\n' "$BLOCKING_CHANGED_TOTAL"
   printf 'runtime_missing_total=%s\n' "$RUNTIME_MISSING_TOTAL"
   printf 'runtime_warning_total=%s\n' "$RUNTIME_WARNING_TOTAL"
-  printf 'baseline_created=%s\n' "$BASELINE_CREATED"
-  printf 'baseline_refreshed=%s\n' "$BASELINE_REFRESHED"
-  printf 'baseline_refresh_missing_total=%s\n' "$BASELINE_REFRESH_MISSING_TOTAL"
   cat "$TMP_REPORT" 2>/dev/null
 } > "$REPORT_FILE" 2>/dev/null || true
 rm -f "$TMP_REPORT" "$SOURCE_REPORT_TMP" 2>/dev/null || true
@@ -250,9 +233,7 @@ if command -v state_update >/dev/null 2>&1; then
     "integrity.blocking_changed_total=$BLOCKING_CHANGED_TOTAL" \
     "integrity.runtime_missing_total=$RUNTIME_MISSING_TOTAL" \
     "integrity.runtime_warning_total=$RUNTIME_WARNING_TOTAL" \
-    "integrity.baseline_created=$BASELINE_CREATED" \
-    "integrity.baseline_refreshed=$BASELINE_REFRESHED" \
-    "integrity.baseline_refresh_missing_total=$BASELINE_REFRESH_MISSING_TOTAL" \
+    "integrity.baseline_refresh_supported=no" \
     "integrity.report=$REPORT_FILE" \
     "integrity.checked_at=$(date '+%Y-%m-%d %H:%M:%S')" || true
   state_recompute_summary || true

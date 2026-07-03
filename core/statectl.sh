@@ -6,25 +6,64 @@ STATE_LOCK_DIR="$STATE_DIR/.state.lock"
 
 [ -f "${0%/*}/common.sh" ] && . "${0%/*}/common.sh"
 
+statectl_pair_key() {
+  STATE_PAIR_KEY="${1%%=*}"
+  [ "$STATE_PAIR_KEY" != "$1" ] || return 1
+  case "$STATE_PAIR_KEY" in
+    ""|*[!A-Za-z0-9_.-]*)
+      return 1
+      ;;
+  esac
+  printf '%s\n' "$STATE_PAIR_KEY"
+}
+
+statectl_pair_valid() {
+  statectl_pair_key "$1" >/dev/null || return 1
+  case "$1" in
+    *"
+"*)
+      return 1
+      ;;
+  esac
+  return 0
+}
+
 statectl_apply() {
   mkdir -p "$STATE_DIR" 2>/dev/null || return 1
   TMP_STATE="$STATE_FILE.tmp.$$"
   : > "$TMP_STATE" 2>/dev/null || return 1
+  for STATE_PAIR in "$@"; do
+    statectl_pair_valid "$STATE_PAIR" || {
+      rm -f "$TMP_STATE" 2>/dev/null || true
+      return 1
+    }
+  done
 
   if [ -f "$STATE_FILE" ]; then
     while IFS= read -r STATE_LINE || [ -n "$STATE_LINE" ]; do
-      STATE_KEY="${STATE_LINE%%=*}"
-      [ -n "$STATE_KEY" ] || continue
+      STATE_KEY="$(statectl_pair_key "$STATE_LINE" 2>/dev/null)" || continue
       SKIP_STATE_KEY=0
       for STATE_PAIR in "$@"; do
-        [ "${STATE_PAIR%%=*}" = "$STATE_KEY" ] && SKIP_STATE_KEY=1 && break
+        STATE_PAIR_KEY="$(statectl_pair_key "$STATE_PAIR" 2>/dev/null)" || {
+          rm -f "$TMP_STATE" 2>/dev/null || true
+          return 1
+        }
+        [ "$STATE_PAIR_KEY" = "$STATE_KEY" ] && SKIP_STATE_KEY=1 && break
       done
-      [ "$SKIP_STATE_KEY" = "1" ] || printf '%s\n' "$STATE_LINE" >> "$TMP_STATE"
+      if [ "$SKIP_STATE_KEY" != "1" ]; then
+        printf '%s\n' "$STATE_LINE" >> "$TMP_STATE" || {
+          rm -f "$TMP_STATE" 2>/dev/null || true
+          return 1
+        }
+      fi
     done < "$STATE_FILE"
   fi
 
   for STATE_PAIR in "$@"; do
-    printf '%s\n' "$STATE_PAIR" >> "$TMP_STATE"
+    printf '%s\n' "$STATE_PAIR" >> "$TMP_STATE" || {
+      rm -f "$TMP_STATE" 2>/dev/null || true
+      return 1
+    }
   done
 
   sync "$TMP_STATE" 2>/dev/null || sync 2>/dev/null || true
