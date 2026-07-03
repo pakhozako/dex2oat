@@ -3,7 +3,7 @@
 MODDIR="$1"
 [ -n "$MODDIR" ] || MODDIR=${0%/*}/..
 
-STATE_DIR=/data/adb/dex2oat-lock
+STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 LOCK_FILE="$STATE_DIR/prop-lock.list"
 SERVICE_LOG="$STATE_DIR/service.log"
 PROP_FILE="$MODDIR/system.prop"
@@ -30,7 +30,7 @@ apply_prop() {
   PROP_KEY="$1"
   PROP_VALUE="$2"
   if command -v resetprop >/dev/null 2>&1; then
-    resetprop -n "$PROP_KEY" "$PROP_VALUE" 2>/dev/null
+    resetprop -n "$PROP_KEY" "$PROP_VALUE" 2>/dev/null || setprop "$PROP_KEY" "$PROP_VALUE" 2>/dev/null
   else
     setprop "$PROP_KEY" "$PROP_VALUE" 2>/dev/null
   fi
@@ -47,7 +47,7 @@ while IFS='=' read -r PROP_KEY PROP_VALUE; do
   PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
   PROP_VALUE="$(printf '%s' "$PROP_VALUE" | tr -d '\r')"
   case "$PROP_KEY" in
-    ""|\#*) continue ;;
+    ""|\#*|*[!A-Za-z0-9_.-]*|.*|*.) continue ;;
   esac
   CURRENT_VALUE="$(getprop "$PROP_KEY")"
   if [ "$CURRENT_VALUE" != "$PROP_VALUE" ]; then

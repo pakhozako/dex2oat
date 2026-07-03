@@ -1,10 +1,14 @@
 {
   "moduleName": "Dex2oat Lock",
-  "version": "v3.9",
-  "versionCode": 390,
+  "version": "v4.6",
+  "versionCode": 460,
   "author": "pakhozako",
   "githubUrl": "https://github.com/pakhozako/dex2oat",
-  "cloudBaseUrl": "http://154.219.110.62:18080",
+  "supportUrl": "https://www.ifdian.net/a/pakhozako?utm_source=copylink&utm_medium=link",
+  "feedbackUrl": "https://cloud.154-219-110-62.sslip.io/api/feedback",
+  "supporterVerifyUrl": "https://cloud.154-219-110-62.sslip.io/api/supporter/verify",
+  "supporterDirectoryUrl": "https://cloud.154-219-110-62.sslip.io/api/supporters.json",
+  "cloudBaseUrl": "https://cloud.154-219-110-62.sslip.io",
   "architecture": "规则驱动 / 统一状态",
   "description": "Dex2oat Lock 是一个基于规则库生成 ART / dex2oat 配置并通过统一状态展示运行健康度的模块。"
 }

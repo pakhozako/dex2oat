@@ -7,6 +7,7 @@ STAGE_DIR="$2"
 STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 STATE_FILE="$STATE_DIR/state.prop"
 LOCK_DIR="$STATE_DIR/.webui-save.lock"
+CONFIG_LOCK_DIR="$STATE_DIR/.config.lock"
 PROP_FILE="$MODDIR/system.prop"
 CONFIG_FILE="$STATE_DIR/config.json"
 CONFIG_SOURCE_FILE="$STATE_DIR/config-source.prop"
@@ -31,13 +32,17 @@ validate_stage() {
   [ -s "$STAGE_DIR/system.prop" ] || fail "missing-staged-system-prop"
   [ -s "$STAGE_DIR/config.json" ] || fail "missing-staged-config"
   [ -s "$STAGE_DIR/prop-lock.list" ] || fail "missing-staged-prop-lock"
-  grep -q -E '^[A-Za-z0-9_.-]+=' "$STAGE_DIR/system.prop" 2>/dev/null || fail "invalid-system-prop"
+  if ! grep -q -E '^[A-Za-z0-9_.-]+=' "$STAGE_DIR/system.prop" 2>/dev/null; then
+    grep -q -E '^# [A-Za-z0-9_.-]+=' "$STAGE_DIR/system.prop" 2>/dev/null \
+      || grep -q '^# Dex2oat Lock generated system.prop' "$STAGE_DIR/system.prop" 2>/dev/null \
+      || fail "invalid-system-prop"
+  fi
   grep -q '[{}]' "$STAGE_DIR/config.json" 2>/dev/null || fail "invalid-config-json"
   grep -q '"items"[[:space:]]*:' "$STAGE_DIR/config.json" 2>/dev/null || fail "invalid-config-items"
   grep -q -E '"riskMode"[[:space:]]*:[[:space:]]*"(safe|caution|aggressive)"' "$STAGE_DIR/config.json" 2>/dev/null || fail "invalid-config-risk-mode"
 }
 
-apply_stage() {
+apply_stage_locked() {
   mkdir -p "$STATE_DIR/backup" 2>/dev/null || fail "create-backup-dir"
   validate_stage
 
@@ -57,6 +62,16 @@ apply_stage() {
     [ -f "$ROLLBACK_DIR/config-source.prop" ] && cp -af "$ROLLBACK_DIR/config-source.prop" "$CONFIG_SOURCE_FILE" 2>/dev/null || true
   }
 
+  cleanup_stage() {
+    for WORK_DIR in "$ROLLBACK_DIR" "$STAGE_DIR"; do
+      case "$WORK_DIR" in
+        "$STATE_DIR"/rollback.*|"$STATE_DIR"/stage-*)
+          rm -rf "$WORK_DIR" 2>/dev/null || true
+          ;;
+      esac
+    done
+  }
+
   replace_file() {
     SRC_FILE="$1"
     DST_FILE="$2"
@@ -65,12 +80,14 @@ apply_stage() {
     cp -af "$SRC_FILE" "$TMP_FILE" 2>/dev/null || {
       rm -f "$TMP_FILE" 2>/dev/null || true
       rollback_stage
+      cleanup_stage
       fail "$LABEL"
     }
     sync "$TMP_FILE" 2>/dev/null || sync 2>/dev/null || true
     mv -f "$TMP_FILE" "$DST_FILE" 2>/dev/null || {
       rm -f "$TMP_FILE" 2>/dev/null || true
       rollback_stage
+      cleanup_stage
       fail "$LABEL"
     }
   }
@@ -88,6 +105,12 @@ apply_stage() {
   PROP_COUNT="$(grep -E '^[A-Za-z0-9_.-]+=' "$PROP_FILE" 2>/dev/null | wc -l | tr -d ' ')"
   PROP_HASH="$(dex_hash_file "$PROP_FILE" 2>/dev/null)"
   if command -v state_update >/dev/null 2>&1; then
+    RISK_MODE_FROM_CFG="$(grep -oE '"riskMode"[[:space:]]*:[[:space:]]*"[a-z]+"' "$STAGE_DIR/config.json" 2>/dev/null \
+      | sed 's/.*"\([a-z]*\)"[[:space:]]*$/\1/' | head -n 1)"
+    case "$RISK_MODE_FROM_CFG" in
+      safe|caution|aggressive) ;;
+      *) RISK_MODE_FROM_CFG="safe" ;;
+    esac
     state_update \
       "config.status=ok" \
       "config.source=webui-custom" \
@@ -101,10 +124,18 @@ apply_stage() {
       "apply.reason=waiting-for-reboot-or-service" \
       "apply.last_reason=waiting-for-reboot-or-service" \
       "apply.last_updated_at=$(dex_now)" \
-      "risk.mode=$(cat "$STAGE_DIR/risk-mode" 2>/dev/null || printf safe)" || true
+      "risk.mode=$RISK_MODE_FROM_CFG" || true
     state_recompute_summary || true
   fi
-  rm -rf "$ROLLBACK_DIR" "$STAGE_DIR" 2>/dev/null || true
+  cleanup_stage
+}
+
+apply_stage() {
+  if command -v dex_with_lock >/dev/null 2>&1; then
+    dex_with_lock "$CONFIG_LOCK_DIR" 20 apply_stage_locked
+  else
+    apply_stage_locked
+  fi
 }
 
 mkdir -p "$STATE_DIR" 2>/dev/null || fail "create-state-dir"
