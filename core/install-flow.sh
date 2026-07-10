@@ -319,13 +319,21 @@ install_check_summary() {
   [ -n "$HEALTH_REASON" ] || HEALTH_REASON="$(state_get health.reason 2>/dev/null)"
   HEALTH_GRADE="$(install_check_grade health "$HEALTH_STATUS" "$HEALTH_REASON")"
   install_record_check_grade "health" "$HEALTH_GRADE" "$HEALTH_REASON"
-  if [ "$HEALTH_GRADE" = PASS ]; then
-    ui_print "✓ Health Check Passed"
-  else
-    [ -n "$HEALTH_REASON" ] || HEALTH_REASON=unknown
-    ui_print "⚠ Health Check Failed"
-    ui_print "原因: $HEALTH_REASON"
-  fi
+  case "$HEALTH_GRADE" in
+    PASS)
+      ui_print "✓ Health Check Passed"
+      ;;
+    FAIL)
+      [ -n "$HEALTH_REASON" ] || HEALTH_REASON=unknown
+      ui_print "❌ Health Check Failed"
+      ui_print "原因: $HEALTH_REASON"
+      ;;
+    *)
+      [ -n "$HEALTH_REASON" ] || HEALTH_REASON=unknown
+      ui_print "⚠ Health Check Warning"
+      ui_print "原因: $HEALTH_REASON"
+      ;;
+  esac
 
   INTEGRITY_STATUS="$(install_check_value status "$STATE_DIR/integrity-report.txt")"
   INTEGRITY_REASON="$(install_check_value reason "$STATE_DIR/integrity-report.txt")"
@@ -337,13 +345,21 @@ install_check_summary() {
   [ -n "$INTEGRITY_BLOCKING_CHANGED" ] || INTEGRITY_BLOCKING_CHANGED="$(state_get integrity.blocking_changed_total 2>/dev/null)"
   INTEGRITY_GRADE="$(install_check_grade integrity "$INTEGRITY_STATUS" "$INTEGRITY_REASON" "${INTEGRITY_BLOCKING_MISSING:-0}" "${INTEGRITY_BLOCKING_CHANGED:-0}")"
   install_record_check_grade "integrity" "$INTEGRITY_GRADE" "$INTEGRITY_REASON"
-  if [ "$INTEGRITY_GRADE" = PASS ]; then
-    ui_print "✓ Integrity Verified"
-  else
-    [ -n "$INTEGRITY_REASON" ] || INTEGRITY_REASON=unknown
-    ui_print "⚠ Integrity Verification Failed"
-    ui_print "原因: $INTEGRITY_REASON"
-  fi
+  case "$INTEGRITY_GRADE" in
+    PASS)
+      ui_print "✓ Integrity Verified"
+      ;;
+    FAIL)
+      [ -n "$INTEGRITY_REASON" ] || INTEGRITY_REASON=unknown
+      ui_print "❌ Integrity Verification Failed"
+      ui_print "原因: $INTEGRITY_REASON"
+      ;;
+    *)
+      [ -n "$INTEGRITY_REASON" ] || INTEGRITY_REASON=unknown
+      ui_print "⚠ Integrity Verification Warning"
+      ui_print "原因: $INTEGRITY_REASON"
+      ;;
+  esac
 
   PROP_LOCK_STATUS="${INSTALL_PROP_LOCK_STATUS:-}"
   PROP_LOCK_REASON="${INSTALL_PROP_LOCK_REASON:-}"

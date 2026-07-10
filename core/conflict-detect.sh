@@ -17,6 +17,7 @@ SCAN_REASON=passed
 SCAN_MODULE_TOTAL=0
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
+[ ! -L "$STATE_DIR" ] && [ ! -L "$REPORT_FILE" ] && [ ! -L "$TMP_FILE" ] && [ ! -L "$MANAGED_FILE" ] && [ ! -L "$REPORT_TMP" ] || exit 1
 
 cleanup_conflict_scan() {
   rm -f "$TMP_FILE" "$MANAGED_FILE" "$REPORT_TMP" 2>/dev/null || true

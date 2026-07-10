@@ -155,8 +155,17 @@ installer_wait_volume_key() {
         timeout 1 "$DEX_INSTALL_KEYCHECK" > "$DEX_INSTALL_EVENT" 2>&1
         DEX_INSTALL_KEY_CODE=$?
       else
-        "$DEX_INSTALL_KEYCHECK" > "$DEX_INSTALL_EVENT" 2>&1
-        DEX_INSTALL_KEY_CODE=$?
+        "$DEX_INSTALL_KEYCHECK" > "$DEX_INSTALL_EVENT" 2>&1 &
+        DEX_INSTALL_KEY_PID=$!
+        sleep 1
+        if kill -0 "$DEX_INSTALL_KEY_PID" 2>/dev/null; then
+          kill "$DEX_INSTALL_KEY_PID" 2>/dev/null || true
+          wait "$DEX_INSTALL_KEY_PID" 2>/dev/null || true
+          DEX_INSTALL_KEY_CODE=124
+        else
+          wait "$DEX_INSTALL_KEY_PID" 2>/dev/null
+          DEX_INSTALL_KEY_CODE=$?
+        fi
       fi
       case "$DEX_INSTALL_KEY_CODE" in
         42|115|24) installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"; return 0 ;;
@@ -306,7 +315,25 @@ disclaimer_device() {
   [ -n "$DISCLAIMER_DEVICE" ] || DISCLAIMER_DEVICE="$(getprop ro.boot.serialno 2>/dev/null)"
   [ -n "$DISCLAIMER_DEVICE" ] || DISCLAIMER_DEVICE="$(getprop ro.product.device 2>/dev/null)"
   [ -n "$DISCLAIMER_DEVICE" ] || DISCLAIMER_DEVICE=unknown
-  printf '%s\n' "$DISCLAIMER_DEVICE" | tr -d '\r\n'
+  DISCLAIMER_DEVICE="$(printf '%s' "$DISCLAIMER_DEVICE" | tr -d '\r\n')"
+  [ "$DISCLAIMER_DEVICE" != unknown ] || { printf 'unknown\n'; return 0; }
+  installer_source_common || true
+  if command -v dex_hash_file >/dev/null 2>&1; then
+    DISCLAIMER_DEVICE_FILE="$(installer_temp_path dex2oat-disclaimer-device)"
+    DISCLAIMER_DEVICE_DIR="${DISCLAIMER_DEVICE_FILE%/*}"
+    printf '%s' "$DISCLAIMER_DEVICE" > "$DISCLAIMER_DEVICE_FILE" 2>/dev/null || {
+      installer_cleanup_temp_dir "$DISCLAIMER_DEVICE_DIR"
+      printf 'masked\n'
+      return 0
+    }
+    DISCLAIMER_DEVICE_HASH="$(dex_hash_file "$DISCLAIMER_DEVICE_FILE")"
+    installer_cleanup_temp_dir "$DISCLAIMER_DEVICE_DIR"
+    if disclaimer_valid_sha256 "$DISCLAIMER_DEVICE_HASH"; then
+      printf 'sha256:%s\n' "$DISCLAIMER_DEVICE_HASH"
+      return 0
+    fi
+  fi
+  printf 'masked\n'
 }
 
 disclaimer_log_warning() {

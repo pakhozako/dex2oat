@@ -32,6 +32,7 @@ elif [ "$HISTORY_MAX_LINES" -gt 500 ] 2>/dev/null; then
 fi
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
+[ ! -L "$STATE_DIR" ] && [ ! -L "$HEALTH_LOG" ] && [ ! -L "$HEALTH_HISTORY" ] || exit 1
 
 if [ -f "$MODDIR/core/state.sh" ]; then
   . "$MODDIR/core/state.sh"

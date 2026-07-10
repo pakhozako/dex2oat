@@ -237,8 +237,22 @@ backup_original_props_if_missing() {
   chmod 0600 "$ORIGINAL_PROPS" 2>/dev/null || true
 }
 
+cleanup_old_dry_runs() {
+  DRY_BASE="$1"
+  case "$DRY_BASE" in
+    /data/local/tmp|/tmp|/dev)
+      for OLD_DRY_DIR in "$DRY_BASE"/dex2oat-lock-dry-run.*; do
+        [ -d "$OLD_DRY_DIR" ] || continue
+        rm -rf "$OLD_DRY_DIR" 2>/dev/null || true
+      done
+      ;;
+  esac
+}
+
 dry_run_rules() {
-  DRY_DIR="${TMPDIR:-/data/local/tmp}/dex2oat-lock-dry-run.$$"
+  DRY_BASE="${TMPDIR:-/data/local/tmp}"
+  cleanup_old_dry_runs "$DRY_BASE"
+  DRY_DIR="$DRY_BASE/dex2oat-lock-dry-run.$$"
   DRY_RULES="$DRY_DIR/rule-props.tsv"
   mkdir -p "$DRY_DIR" || return 1
   chmod 0700 "$DRY_DIR" 2>/dev/null || true

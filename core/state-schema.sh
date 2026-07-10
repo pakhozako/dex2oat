@@ -16,7 +16,7 @@ state_pair_key() {
 
 state_schema_key_valid() {
   case "$1" in
-    schema_version|module_version|device.*|root.*|lifecycle.*|install.*|agreement.*|match.*|config.*|apply.*|service.*|health.*|conflict.*|integrity.*|restore.*|summary.*|runtime.*|snapshot.*|protection.*|diagnostics.*|performance.*|migration.*) return 0 ;;
+    schema_version|module_version|device.*|root.*|lifecycle.*|install.*|agreement.*|match.*|config.*|apply.*|service.*|health.*|conflict.*|integrity.*|restore.*|summary.*|runtime.*|snapshot.*|protection.*|diagnostics.*|performance.*|migration.*|prop_lock.*) return 0 ;;
   esac
   return 1
 }
@@ -63,7 +63,7 @@ state_schema_hash() {
 state_schema_status() {
   state_schema_enum "$1" \
     ok done running pending failed error warning warn missing changed settled problem \
-    restored restoring skipped blocked reset recovered recovery preview unavailable unknown off on
+    restored restoring skipped blocked reset recovered recovery preview unavailable unknown off on fallback partial
 }
 
 state_schema_mode() {

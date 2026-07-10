@@ -8,7 +8,8 @@ REPORT_FILE=${INTEGRITY_REPORT_FILE:-$STATE_DIR/integrity-report.txt}
 BASELINE_FILE="$MODDIR/core/integrity-baseline.prop"
 TMP_REPORT="$REPORT_FILE.tmp.$$"
 SOURCE_REPORT_TMP="$REPORT_FILE.source.tmp.$$"
-trap 'rm -f "$TMP_REPORT" "$SOURCE_REPORT_TMP" 2>/dev/null || true' EXIT HUP INT TERM
+BASELINE_SELF_TMP="$REPORT_FILE.baseline-self.tmp.$$"
+trap 'rm -f "$TMP_REPORT" "$SOURCE_REPORT_TMP" "$BASELINE_SELF_TMP" 2>/dev/null || true' EXIT HUP INT TERM
 [ -f "$MODDIR/core/state.sh" ] && . "$MODDIR/core/state.sh"
 mkdir -p "$STATE_DIR" 2>/dev/null || exit 1
 [ ! -L "$STATE_DIR" ] && [ ! -L "$REPORT_FILE" ] || exit 1
@@ -18,7 +19,14 @@ scan_baseline() {
   : > "$SOURCE_REPORT_TMP" || return 1
   BASELINE_VERSION="$(sed -n 's/^meta.baseline_version=//p' "$BASELINE_FILE" | head -n 1)"
   BASELINE_FORMAT="$(sed -n 's/^meta.format=//p' "$BASELINE_FILE" | head -n 1)"
+  BASELINE_SELF_HASH="$(sed -n 's/^meta.self_hash=//p' "$BASELINE_FILE" | head -n 1)"
   [ "$BASELINE_VERSION" = 1 ] && [ "$BASELINE_FORMAT" = 'path|sha256|critical' ] || return 1
+  case "$BASELINE_SELF_HASH" in ""|*[!0-9a-f]*) return 1 ;; esac
+  [ "${#BASELINE_SELF_HASH}" -eq 64 ] 2>/dev/null || return 1
+  grep -v '^meta.self_hash=' "$BASELINE_FILE" > "$BASELINE_SELF_TMP" 2>/dev/null || return 1
+  BASELINE_ACTUAL_SELF_HASH="$(dex_hash_file "$BASELINE_SELF_TMP" file require-sha256)"
+  rm -f "$BASELINE_SELF_TMP" 2>/dev/null || true
+  [ "$BASELINE_ACTUAL_SELF_HASH" = "$BASELINE_SELF_HASH" ] || return 1
   while IFS='|' read -r REL_PATH EXPECTED_HASH CRITICAL_FLAG || [ -n "$REL_PATH" ]; do
     case "$REL_PATH" in ''|\#*|meta.*) continue ;; esac
     [ "$CRITICAL_FLAG" = critical ] || [ "$CRITICAL_FLAG" = mutable ] || return 1

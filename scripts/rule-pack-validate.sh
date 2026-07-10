@@ -16,7 +16,7 @@ rule_validate_pack() {
     { exit 15 }
     END {
       if (version != "1" || seed !~ /^[0-9]+$/ || seed <= 0 || total !~ /^[0-9]+$/ || total <= 0 || total > 262144) exit 16
-      if (hash !~ /^[0-9a-fA-F]{64}$/ && length(hash) != 64) exit 17
+      if (hash !~ /^[0-9a-fA-F]{64}$/ || length(hash) != 64) exit 17
       if (encoded != total * 2) exit 18
     }
   ' "$RULE_PACK_FILE"
