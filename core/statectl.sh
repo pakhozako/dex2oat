@@ -2,116 +2,28 @@
 
 STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 STATE_FILE=${STATE_FILE:-$STATE_DIR/state.prop}
-STATE_LOCK_DIR="$STATE_DIR/.state.lock"
-
-[ -f "${0%/*}/common.sh" ] && . "${0%/*}/common.sh"
-
-statectl_pair_key() {
-  STATE_PAIR_KEY="${1%%=*}"
-  [ "$STATE_PAIR_KEY" != "$1" ] || return 1
-  case "$STATE_PAIR_KEY" in
-    ""|*[!A-Za-z0-9_.-]*)
-      return 1
-      ;;
-  esac
-  printf '%s\n' "$STATE_PAIR_KEY"
-}
-
-statectl_pair_valid() {
-  statectl_pair_key "$1" >/dev/null || return 1
-  case "$1" in
-    *"
-"*)
-      return 1
-      ;;
-  esac
-  return 0
-}
-
-statectl_apply() {
-  mkdir -p "$STATE_DIR" 2>/dev/null || return 1
-  TMP_STATE="$STATE_FILE.tmp.$$"
-  : > "$TMP_STATE" 2>/dev/null || return 1
-  for STATE_PAIR in "$@"; do
-    statectl_pair_valid "$STATE_PAIR" || {
-      rm -f "$TMP_STATE" 2>/dev/null || true
-      return 1
-    }
-  done
-
-  if [ -f "$STATE_FILE" ]; then
-    while IFS= read -r STATE_LINE || [ -n "$STATE_LINE" ]; do
-      STATE_KEY="$(statectl_pair_key "$STATE_LINE" 2>/dev/null)" || continue
-      SKIP_STATE_KEY=0
-      for STATE_PAIR in "$@"; do
-        STATE_PAIR_KEY="$(statectl_pair_key "$STATE_PAIR" 2>/dev/null)" || {
-          rm -f "$TMP_STATE" 2>/dev/null || true
-          return 1
-        }
-        [ "$STATE_PAIR_KEY" = "$STATE_KEY" ] && SKIP_STATE_KEY=1 && break
-      done
-      if [ "$SKIP_STATE_KEY" != "1" ]; then
-        printf '%s\n' "$STATE_LINE" >> "$TMP_STATE" || {
-          rm -f "$TMP_STATE" 2>/dev/null || true
-          return 1
-        }
-      fi
-    done < "$STATE_FILE"
-  fi
-
-  for STATE_PAIR in "$@"; do
-    printf '%s\n' "$STATE_PAIR" >> "$TMP_STATE" || {
-      rm -f "$TMP_STATE" 2>/dev/null || true
-      return 1
-    }
-  done
-
-  sync "$TMP_STATE" 2>/dev/null || sync 2>/dev/null || true
-  mv -f "$TMP_STATE" "$STATE_FILE" 2>/dev/null || {
-    rm -f "$TMP_STATE" 2>/dev/null || true
-    return 1
-  }
-  chmod 0600 "$STATE_FILE" 2>/dev/null || true
-}
-
-statectl_update() {
-  if command -v dex_with_lock >/dev/null 2>&1; then
-    dex_with_lock "$STATE_LOCK_DIR" 15 statectl_apply "$@"
-  else
-    statectl_apply "$@"
-  fi
-}
-
-statectl_clear_attention_apply() {
-  mkdir -p "$STATE_DIR" 2>/dev/null || return 1
-  [ -f "$STATE_FILE" ] || return 0
-  TMP_STATE="$STATE_FILE.clear.tmp.$$"
-  grep -v -E '^(summary\.attention\.|summary\.attention_total=|summary\.attention_alert_total=)' "$STATE_FILE" > "$TMP_STATE" 2>/dev/null || : > "$TMP_STATE"
-  mv -f "$TMP_STATE" "$STATE_FILE" 2>/dev/null || {
-    rm -f "$TMP_STATE" 2>/dev/null || true
-    return 1
-  }
-  chmod 0600 "$STATE_FILE" 2>/dev/null || true
-}
-
-statectl_clear_attention() {
-  if command -v dex_with_lock >/dev/null 2>&1; then
-    dex_with_lock "$STATE_LOCK_DIR" 15 statectl_clear_attention_apply
-  else
-    statectl_clear_attention_apply
-  fi
-}
+CORE_DIR="${0%/*}"
+. "$CORE_DIR/common.sh" || exit 1
+. "$CORE_DIR/state-schema.sh" || exit 1
+. "$CORE_DIR/state-store.sh" || exit 1
 
 case "$1" in
-  update)
+  update|transaction)
     shift
-    statectl_update "$@"
+    state_update "$@"
     ;;
   clear-attention)
-    statectl_clear_attention
+    if command -v dex_with_lock >/dev/null 2>&1; then
+      dex_with_lock "$STATE_LOCK_DIR" 15 state_clear_attention_keys
+    else
+      state_clear_attention_keys
+    fi
+    ;;
+  validate)
+    state_schema_file_valid "$STATE_FILE"
     ;;
   *)
-    printf 'usage: statectl.sh update key=value [...] | clear-attention\n' >&2
+    printf '用法: statectl.sh update key=value [...] | transaction key=value [...] | clear-attention | validate\n' >&2
     exit 2
     ;;
 esac

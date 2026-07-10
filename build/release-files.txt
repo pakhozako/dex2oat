@@ -1,0 +1,11 @@
+module.prop
+customize.sh
+service.sh
+system.prop
+skip_mount
+uninstall.sh
+action.sh
+META-INF
+core
+rules
+scripts

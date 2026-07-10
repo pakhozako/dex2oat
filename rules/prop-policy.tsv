@@ -1,4 +1,4 @@
-# Dex2oat Lock shared property policy v1
+# Dex2oat Lock 共享属性策略 v1
 # section	key	value
 fallback	boolean	false
 fallback	limit	9999
@@ -54,8 +54,8 @@ force-default-when-captured	prop	persist.device_config.runtime_native.usap_pool_
 force-default-when-captured	prop	dalvik.vm.usejitprofiles
 force-default-when-captured	prop	persist.device_config.runtime_native_boot.use_generational_gc
 force-default-when-captured	prop	persist.device_config.runtime_native.metrics.write-to-statsd
-# Evidence-derived property catalog from prop-frequency.non-test.csv.
-# These sections are informational inputs for future rule generation; current runtime logic consumes fallback/background-default/force-default-when-captured/everything-compatible only.
+# 来自 prop-frequency.non-test.csv 的属性证据目录。
+# 这些分区仅作为规则生成的信息输入；当前运行逻辑只读取 fallback/background-default/force-default-when-captured/everything-compatible。
 # section	key	value	count	distinctValues	topValues	topModels	topSdk	reason
 # evidence-safe
 evidence-safe	prop	dalvik.vm.bgdexopt.new-classes-percent	8	1	0 (8)	PLK110 (2); PKR110 (1); PJZ110 (1); CPH2723 (1); Xiaomi 15 (1)	36 (8)	existing-safe

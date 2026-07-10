@@ -4,12 +4,15 @@ OUT_FILE="${1:-/data/adb/dex2oat-lock/captured-props.txt}"
 EXPORT_FILE="${2-}"
 RULES_FILE="${3-}"
 OUT_DIR="${OUT_FILE%/*}"
-TMP_FILE="$OUT_FILE.tmp"
+TMP_FILE="$OUT_FILE.tmp.$$"
+
+trap 'rm -f "$TMP_FILE" 2>/dev/null || true' EXIT HUP INT TERM
 
 [ "$OUT_DIR" != "$OUT_FILE" ] && mkdir -p "$OUT_DIR" 2>/dev/null
 
 GETPROP=/system/bin/getprop
 [ -x "$GETPROP" ] || GETPROP=getprop
+command -v "$GETPROP" >/dev/null 2>&1 || exit 1
 
 if [ -s "$RULES_FILE" ]; then
   if ! "$GETPROP" | awk -v rules="$RULES_FILE" '
@@ -49,6 +52,7 @@ if [ ! -s "$TMP_FILE" ]; then
 fi
 
 mv -f "$TMP_FILE" "$OUT_FILE" || exit 1
+trap - EXIT HUP INT TERM
 chmod 0600 "$OUT_FILE" 2>/dev/null || true
 
 if [ -n "$EXPORT_FILE" ]; then

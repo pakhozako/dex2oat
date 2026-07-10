@@ -1,5 +1,6 @@
 #!/system/bin/sh
 
+MODDIR=${0%/*}
 STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 LOG_DIR="$STATE_DIR/logs"
 LOG_FILE="$LOG_DIR/uninstall.log"
@@ -8,14 +9,16 @@ FINAL_LOG=/data/adb/dex2oat-lock-uninstall.log
 FINAL_STATE=/data/adb/dex2oat-lock-uninstall.prop
 ARCHIVE_MAX_SIZE=524288
 SERVICE_LOCK_DIR="$STATE_DIR/.service.lock"
-CONFIG_LOCK_DIR="$STATE_DIR/.config.lock"
 ORIGINAL_PROPS="$STATE_DIR/original-props.conf"
+
+[ -f "$MODDIR/core/common.sh" ] && . "$MODDIR/core/common.sh"
+[ -f "$MODDIR/core/safety.sh" ] && . "$MODDIR/core/safety.sh"
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
   LOG_FILE="$FALLBACK_LOG"
 fi
 
-log_msg() {
+uninstall_log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null
 }
 
@@ -53,9 +56,7 @@ is_service_pid() {
   [ -d "/proc/$PID_VALUE" ] || return 1
   CMDLINE="$(tr '\000' ' ' < "/proc/$PID_VALUE/cmdline" 2>/dev/null)"
   case "$CMDLINE" in
-    *dex2oat-lock*service.sh*|*Dex2oat*service.sh*|*dex2oat*service.sh*)
-      return 0
-      ;;
+    *dex2oat-lock*service.sh*|*Dex2oat*service.sh*|*dex2oat*service.sh*) return 0 ;;
   esac
   return 1
 }
@@ -69,23 +70,19 @@ terminate_pid() {
     sleep 1
     WAIT_COUNT=$((WAIT_COUNT + 1))
   done
-  if [ -d "/proc/$PID_VALUE" ]; then
-    kill -9 "$PID_VALUE" 2>/dev/null || true
-  fi
-  log_msg "Stopped running service pid=$PID_VALUE"
+  [ -d "/proc/$PID_VALUE" ] && kill -9 "$PID_VALUE" 2>/dev/null || true
+  uninstall_log "已停止运行中的服务 pid=$PID_VALUE"
 }
 
 stop_running_service() {
   if [ -f "$SERVICE_LOCK_DIR/pid" ]; then
     terminate_pid "$(cat "$SERVICE_LOCK_DIR/pid" 2>/dev/null)"
   fi
-
   for PROC_DIR in /proc/[0-9]*; do
     [ -d "$PROC_DIR" ] || continue
     terminate_pid "${PROC_DIR##*/}"
   done
-
-  rm -rf "$SERVICE_LOCK_DIR" 2>/dev/null || true
+  dex_safe_remove_state_tree "$SERVICE_LOCK_DIR" || uninstall_log "拒绝递归清理非白名单路径: $SERVICE_LOCK_DIR"
 }
 
 apply_runtime_prop() {
@@ -95,14 +92,10 @@ apply_runtime_prop() {
     ""|*[!A-Za-z0-9_.-]*|.*|*.) return 0 ;;
   esac
   case "$PROP_KEY" in
-    ro.*)
-      log_msg "Restoring read-only prop key=$PROP_KEY; some ROMs require reboot to fully clear cached ro.* values"
-      ;;
+    ro.*) uninstall_log "正在恢复只读属性 key=$PROP_KEY；可能需要重启后完全生效" ;;
   esac
-  if command -v resetprop >/dev/null 2>&1; then
-    resetprop -n "$PROP_KEY" "$PROP_VALUE" 2>/dev/null && return 0
-  fi
-  setprop "$PROP_KEY" "$PROP_VALUE" 2>/dev/null || true
+  command -v dex_apply_prop >/dev/null 2>&1 || return 0
+  dex_apply_prop "$PROP_KEY" "$PROP_VALUE" 2>/dev/null || true
 }
 
 restore_original_props() {
@@ -117,21 +110,18 @@ restore_original_props() {
       *=*)
         PROP_KEY="${LINE_VALUE%%=*}"
         PROP_VALUE="${LINE_VALUE#*=}"
-        case "$PROP_VALUE" in
-          @unset:*) PROP_VALUE="" ;;
-        esac
+        case "$PROP_VALUE" in @unset:*) PROP_VALUE="" ;; esac
         ;;
-      *)
-        continue
-        ;;
+      *) continue ;;
     esac
     apply_runtime_prop "$PROP_KEY" "$PROP_VALUE"
   done < "$ORIGINAL_PROPS"
-  log_msg "Runtime properties restored from original-props.conf when supported by the current root stack"
+  uninstall_log "已按支持情况从 original-props.conf 恢复运行时属性"
 }
 
 cleanup_state_files() {
   [ -d "$STATE_DIR" ] || return 0
+  dex_safe_state_dir || { uninstall_log "拒绝清理非安全状态目录: $STATE_DIR"; return 0; }
   rm -f "$STATE_DIR/config-source.prop" 2>/dev/null
   rm -f "$STATE_DIR/state.prop" 2>/dev/null
   rm -f "$STATE_DIR/device.prop" 2>/dev/null
@@ -141,20 +131,33 @@ cleanup_state_files() {
   rm -f "$STATE_DIR/matched-props.txt" 2>/dev/null
   rm -f "$STATE_DIR/rule-props.tsv" "$STATE_DIR/rule-seen-props.txt" 2>/dev/null
   rm -f "$STATE_DIR/system.prop.bak" 2>/dev/null
-  rm -f "$STATE_DIR/trigger-rematch" 2>/dev/null
   rm -f "$STATE_DIR/captured-keys.txt" 2>/dev/null
   rm -f "$STATE_DIR/captured-values.prop" 2>/dev/null
   rm -f "$STATE_DIR/options-props.txt" 2>/dev/null
   rm -f "$STATE_DIR/service-state.prop" 2>/dev/null
   rm -f "$STATE_DIR/service.log" 2>/dev/null
   rm -f "$STATE_DIR/runtime-props.tmp" "$STATE_DIR/runtime-props.hash" 2>/dev/null
-  rm -f "$STATE_DIR/health.log" 2>/dev/null
+  rm -f "$STATE_DIR/health.log" "$STATE_DIR/health-history.tsv" 2>/dev/null
   rm -f "$STATE_DIR/conflict-report.txt" 2>/dev/null
-  rm -f "$STATE_DIR/conflict-report.tmp" 2>/dev/null
+  rm -f "$STATE_DIR"/conflict-report*.tmp "$STATE_DIR"/conflict-managed*.tmp 2>/dev/null
   rm -f "$STATE_DIR/integrity-report.txt" 2>/dev/null
   rm -f "$STATE_DIR/prop-lock.list" 2>/dev/null
+  rm -f "$STATE_DIR/action.log" 2>/dev/null
   rm -f "$STATE_DIR"/.*-status.* 2>/dev/null
-  rm -rf "$STATE_DIR/backup" "$STATE_DIR/logs" "$STATE_DIR"/stage-* "$STATE_DIR"/rollback.* "$STATE_DIR"/.state.lock "$STATE_DIR"/.webui-save.lock "$STATE_DIR"/.service.lock "$CONFIG_LOCK_DIR" 2>/dev/null
+  for CLEANUP_DIR in \
+    "$STATE_DIR/backup" \
+    "$STATE_DIR/logs" \
+    "$STATE_DIR/snapshots" \
+    "$STATE_DIR/diagnostics" \
+    "$STATE_DIR/dry-run" \
+    "$STATE_DIR/.state.lock" \
+    "$STATE_DIR/.summary.lock" \
+    "$STATE_DIR/.service.lock" \
+    "$STATE_DIR/.runtime.lock" \
+    "$STATE_DIR/.action.lock" \
+    "$STATE_DIR/.health-history.lock"; do
+    dex_safe_remove_state_tree "$CLEANUP_DIR" || uninstall_log "拒绝递归清理非白名单路径: $CLEANUP_DIR"
+  done
   trim_archive_file "$STATE_DIR/captured-props.txt"
   trim_archive_file "$STATE_DIR/match-report.txt"
   trim_archive_file "$STATE_DIR/install.log"
@@ -162,12 +165,12 @@ cleanup_state_files() {
   chmod 0600 "$STATE_DIR/captured-props.txt" "$STATE_DIR/match-report.txt" "$STATE_DIR/install.log" 2>/dev/null || true
 }
 
-log_msg "Uninstalling Dex2oat Lock..."
+uninstall_log "开始卸载 Dex2oat Lock..."
 stop_running_service
 restore_original_props
 persist_uninstall_log
 cleanup_state_files
 LOG_FILE="$FINAL_LOG"
 write_uninstall_state ok cleaned
-log_msg "Cleanup completed. Module uninstalled. Archived captured-props.txt, match-report.txt, install.log."
+uninstall_log "清理完成，模块已卸载；已保留 captured-props.txt、match-report.txt、install.log 归档。"
 persist_uninstall_log

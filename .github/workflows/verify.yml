@@ -1,0 +1,30 @@
+name: verify
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install shellcheck and 7zip
+        run: sudo apt-get update && sudo apt-get install -y shellcheck p7zip-full
+      - name: ShellCheck
+        run: shellcheck -s sh action.sh customize.sh service.sh uninstall.sh core/*.sh scripts/*.sh
+      - name: Verify
+        run: node tools/verify.mjs
+      - name: Build
+        run: node tools/build.mjs
+      - name: Read module version
+        id: module
+        run: echo "version=$(sed -n 's/^version=//p' module.prop)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dex2oat-lock-${{ steps.module.outputs.version }}
+          path: |
+            dex2oat-lock-${{ steps.module.outputs.version }}.zip
+            dex2oat-lock-${{ steps.module.outputs.version }}.zip.sha256

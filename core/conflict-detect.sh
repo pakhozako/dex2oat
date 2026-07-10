@@ -3,10 +3,11 @@
 MODDIR="$1"
 [ -n "$MODDIR" ] || MODDIR=${0%/*}/..
 
-STATE_DIR=/data/adb/dex2oat-lock
+STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
 REPORT_FILE="$STATE_DIR/conflict-report.txt"
 STATE_FILE="$STATE_DIR/state.prop"
 PROP_FILE="$MODDIR/system.prop"
+MODULES_ROOT=${DEX2OAT_MODULES_ROOT:-/data/adb/modules}
 TMP_FILE="$STATE_DIR/conflict-report.$$.items.tmp"
 MANAGED_FILE="$STATE_DIR/conflict-managed.$$.tmp"
 REPORT_TMP="$STATE_DIR/conflict-report.$$.tmp"
@@ -16,6 +17,11 @@ SCAN_REASON=passed
 SCAN_MODULE_TOTAL=0
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
+
+cleanup_conflict_scan() {
+  rm -f "$TMP_FILE" "$MANAGED_FILE" "$REPORT_TMP" 2>/dev/null || true
+}
+trap 'cleanup_conflict_scan' EXIT HUP INT TERM
 
 if [ -f "$MODDIR/core/state.sh" ]; then
   . "$MODDIR/core/state.sh"
@@ -62,6 +68,11 @@ scan_prop_conflicts() {
   ' "$MANAGED_FILE" "$SCAN_OTHER_PROP"
 }
 
+module_skip_conflict_scan() {
+  SCAN_MODDIR="$1"
+  [ -e "$SCAN_MODDIR/disable" ] || [ -e "$SCAN_MODDIR/remove" ]
+}
+
 if [ -s "$PROP_FILE" ]; then
   while IFS= read -r PROP_LINE || [ -n "$PROP_LINE" ]; do
     case "$PROP_LINE" in
@@ -80,12 +91,13 @@ if [ -s "$PROP_FILE" ]; then
 fi
 
 if [ -s "$MANAGED_FILE" ]; then
-  for OTHER_PROP in /data/adb/modules/*/system.prop; do
+  for OTHER_PROP in "$MODULES_ROOT"/*/system.prop; do
     [ -f "$OTHER_PROP" ] || continue
     OTHER_MODDIR="${OTHER_PROP%/system.prop}"
     [ "$OTHER_MODDIR" = "$MODDIR" ] && continue
     OTHER_MODULE="${OTHER_MODDIR##*/}"
     [ "$OTHER_MODULE" = "dex2oat-lock" ] && continue
+    module_skip_conflict_scan "$OTHER_MODDIR" && continue
 
     SCAN_MODULE_TOTAL=$((SCAN_MODULE_TOTAL + 1))
     scan_prop_conflicts "$OTHER_PROP" "$OTHER_MODULE" >> "$TMP_FILE" 2>/dev/null || {
@@ -124,7 +136,8 @@ if ! write_report; then
   write_report || true
 fi
 
-rm -f "$TMP_FILE" "$MANAGED_FILE" "$REPORT_TMP" 2>/dev/null || true
+cleanup_conflict_scan
+trap - EXIT HUP INT TERM
 chmod 0600 "$REPORT_FILE" 2>/dev/null || true
 if command -v state_update >/dev/null 2>&1; then
   state_update \

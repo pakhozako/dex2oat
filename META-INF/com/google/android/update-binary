@@ -2,83 +2,704 @@
 
 umask 022
 
-MODID="dex2oat-lock"
-
-print_line() {
+installer_print() {
   if command -v ui_print >/dev/null 2>&1; then
     ui_print "$@"
   else
-    printf '%s
-' "$@"
+    printf '%s\n' "$@"
   fi
 }
 
 require_module_manager() {
-  print_line "*******************************"
-  print_line " Install from Magisk, KernelSU "
-  print_line " or APatch module manager.     "
-  print_line "*******************************"
+  installer_print "*******************************"
+  installer_print " 请从 Magisk / KernelSU / APatch"
+  installer_print " 管理器安装本模块。"
+  installer_print "Recovery installation is not supported by KernelSU/APatch official design."
+  installer_print "*******************************"
   exit 1
+}
+
+require_android_manager() {
+  getprop sys.boot_completed 2>/dev/null | grep -q '^1$' && return 0
+  ps 2>/dev/null | grep -q '[z]ygote' && return 0
+  ps -A 2>/dev/null | grep -q '[z]ygote' && return 0
+  require_module_manager
 }
 
 find_util_functions() {
   for UTIL_FUNCTIONS in \
     /data/adb/magisk/util_functions.sh \
     /data/adb/ksu/util_functions.sh \
-    /data/adb/ap/util_functions.sh \
-    /debug_ramdisk/.magisk/util_functions.sh; do
+    /data/adb/ap/util_functions.sh; do
     [ -f "$UTIL_FUNCTIONS" ] && return 0
   done
-
   return 1
 }
 
-extract_zip() {
-  if command -v unzip >/dev/null 2>&1; then
-    unzip -o "$ZIPFILE" -d "$MODPATH" >/dev/null && return 0
-  fi
+DEX_STATE_ROOT=${DEX_STATE_ROOT:-/data/adb/dex2oat-lock}
+DEX_MODULE_ROOT=${DEX_MODULE_ROOT:-/data/adb/modules/dex2oat-lock}
+INSTALL_TXN_DIR=${INSTALL_TXN_DIR:-/data/local/tmp/dex2oat-lock-install-txn}
+INSTALL_TXN_COMMITTED=0
+DISCLAIMER_VERSION=${DEX2OAT_DISCLAIMER_VERSION:-v6.0-disclaimer-1}
+DISCLAIMER_MIN_READ_WAIT=${DEX2OAT_DISCLAIMER_MIN_READ_WAIT:-8}
+DISCLAIMER_KEY_TIMEOUT=${DEX2OAT_DISCLAIMER_KEY_TIMEOUT:-60}
+DISCLAIMER_LINE_DELAY=${DEX2OAT_DISCLAIMER_LINE_DELAY:-0.35}
 
-  if command -v busybox >/dev/null 2>&1; then
-    busybox unzip -o "$ZIPFILE" -d "$MODPATH" >/dev/null && return 0
-  fi
+# Persistent legal acknowledgement storage. This directory is intentionally
+# outside DEX_STATE_ROOT and DEX_MODULE_ROOT, and must not be added to
+# preinstall_cleanup(): cleanup removes install state/module files, while this
+# log records cross-install disclaimer acknowledgements.
+DEX_PERSIST_ROOT=${DEX_PERSIST_ROOT:-/data/adb/.dex2oat-lock-persist}
+DISCLAIMER_ACK_LOG="$DEX_PERSIST_ROOT/disclaimer_ack.log"
+DEX_COMMON_READY=0
 
-  for BUSYBOX in \
-    /data/adb/magisk/busybox \
-    /data/adb/ksu/bin/busybox \
-    /data/adb/ap/bin/busybox \
-    /debug_ramdisk/.magisk/busybox; do
-    [ -x "$BUSYBOX" ] && "$BUSYBOX" unzip -o "$ZIPFILE" -d "$MODPATH" >/dev/null && return 0
+installer_line() {
+  installer_print "────────────────────────────"
+}
+
+installer_find_keycheck() {
+  for DEX_INSTALL_KEYCHECK in \
+    /data/adb/magisk/keycheck \
+    /data/adb/ksu/bin/keycheck \
+    /data/adb/ap/bin/keycheck; do
+    [ -x "$DEX_INSTALL_KEYCHECK" ] && { printf '%s\n' "$DEX_INSTALL_KEYCHECK"; return 0; }
   done
+  command -v keycheck 2>/dev/null
+}
 
+installer_random_token() {
+  if [ -r /proc/sys/kernel/random/uuid ]; then
+    IFS= read -r DEX_INSTALL_RANDOM < /proc/sys/kernel/random/uuid
+    printf '%s\n' "$DEX_INSTALL_RANDOM" | tr -d '-'
+    return 0
+  fi
+  if command -v od >/dev/null 2>&1 && [ -r /dev/urandom ]; then
+    od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n'
+    return 0
+  fi
+  printf '%s%s\n' "$$" "$(date '+%s' 2>/dev/null)"
+}
+
+installer_private_temp_dir() {
+  if [ -d /data/local/tmp ]; then
+    DEX_INSTALL_TMP_BASE=/data/local/tmp
+  else
+    DEX_INSTALL_TMP_BASE="${TMPDIR:-/dev}"
+  fi
+  if command -v mktemp >/dev/null 2>&1; then
+    DEX_INSTALL_TMP_DIR="$(mktemp -d "$DEX_INSTALL_TMP_BASE/dex2oat-install.XXXXXX" 2>/dev/null)" && {
+      chmod 0700 "$DEX_INSTALL_TMP_DIR" 2>/dev/null || {
+        rm -rf "$DEX_INSTALL_TMP_DIR" 2>/dev/null || true
+        return 1
+      }
+      : > "$DEX_INSTALL_TMP_DIR/.dex2oat-temp-root" 2>/dev/null || {
+        rm -rf "$DEX_INSTALL_TMP_DIR" 2>/dev/null || true
+        return 1
+      }
+      printf '%s\n' "$DEX_INSTALL_TMP_DIR"
+      return 0
+    }
+  fi
+  DEX_INSTALL_TMP_TRY=0
+  while [ "$DEX_INSTALL_TMP_TRY" -lt 20 ]; do
+    DEX_INSTALL_TMP_TOKEN="$(installer_random_token)"
+    DEX_INSTALL_TMP_DIR="$DEX_INSTALL_TMP_BASE/dex2oat-install.$DEX_INSTALL_TMP_TOKEN.$DEX_INSTALL_TMP_TRY"
+    if ( umask 077 && mkdir "$DEX_INSTALL_TMP_DIR" ) 2>/dev/null; then
+      chmod 0700 "$DEX_INSTALL_TMP_DIR" 2>/dev/null || {
+        rm -rf "$DEX_INSTALL_TMP_DIR" 2>/dev/null || true
+        return 1
+      }
+      : > "$DEX_INSTALL_TMP_DIR/.dex2oat-temp-root" 2>/dev/null || {
+        rm -rf "$DEX_INSTALL_TMP_DIR" 2>/dev/null || true
+        return 1
+      }
+      printf '%s\n' "$DEX_INSTALL_TMP_DIR"
+      return 0
+    fi
+    DEX_INSTALL_TMP_TRY=$((DEX_INSTALL_TMP_TRY + 1))
+  done
   return 1
 }
 
-fallback_install_module() {
-  MODPATH="/data/adb/modules/$MODID"
+installer_cleanup_temp_dir() {
+  DEX_INSTALL_CLEANUP_DIR="$1"
+  [ -n "$DEX_INSTALL_CLEANUP_DIR" ] || return 0
+  [ -f "$DEX_INSTALL_CLEANUP_DIR/.dex2oat-temp-root" ] || return 0
+  rm -rf "$DEX_INSTALL_CLEANUP_DIR" 2>/dev/null || true
+}
 
-  print_line "- Using standalone module installer"
-  mount /data 2>/dev/null
-  mkdir -p /data/adb/modules 2>/dev/null || require_module_manager
-  rm -rf "$MODPATH"
-  mkdir -p "$MODPATH" || require_module_manager
-  extract_zip || require_module_manager
-  rm -rf "$MODPATH/META-INF"
+installer_wait_volume_key() {
+  DEX_INSTALL_WAIT="${1:-30}"
+  DEX_INSTALL_WAITED=0
+  DEX_INSTALL_EVENT_DIR="$(installer_private_temp_dir)" || return 2
+  DEX_INSTALL_EVENT="$DEX_INSTALL_EVENT_DIR/key.event"
+  while [ "$DEX_INSTALL_WAITED" -lt "$DEX_INSTALL_WAIT" ]; do
+    DEX_INSTALL_GETEVENT=/system/bin/getevent
+    [ -x "$DEX_INSTALL_GETEVENT" ] || DEX_INSTALL_GETEVENT=getevent
+    if command -v "$DEX_INSTALL_GETEVENT" >/dev/null 2>&1; then
+      if command -v timeout >/dev/null 2>&1; then
+        timeout 1 "$DEX_INSTALL_GETEVENT" -l > "$DEX_INSTALL_EVENT" 2>/dev/null
+      else
+        "$DEX_INSTALL_GETEVENT" -l > "$DEX_INSTALL_EVENT" 2>/dev/null &
+        DEX_INSTALL_EVENT_PID=$!
+        sleep 1
+        kill "$DEX_INSTALL_EVENT_PID" 2>/dev/null || true
+        wait "$DEX_INSTALL_EVENT_PID" 2>/dev/null || true
+      fi
+      grep -E -q 'KEY_VOLUMEUP[[:space:]].*(DOWN|00000001)| 0073 00000001' "$DEX_INSTALL_EVENT" 2>/dev/null && { installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"; return 0; }
+      grep -E -q 'KEY_VOLUMEDOWN[[:space:]].*(DOWN|00000001)| 0072 00000001' "$DEX_INSTALL_EVENT" 2>/dev/null && { installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"; return 1; }
+    fi
+    DEX_INSTALL_KEYCHECK="$(installer_find_keycheck)"
+    if [ -n "$DEX_INSTALL_KEYCHECK" ]; then
+      if command -v timeout >/dev/null 2>&1; then
+        timeout 1 "$DEX_INSTALL_KEYCHECK" > "$DEX_INSTALL_EVENT" 2>&1
+        DEX_INSTALL_KEY_CODE=$?
+      else
+        "$DEX_INSTALL_KEYCHECK" > "$DEX_INSTALL_EVENT" 2>&1
+        DEX_INSTALL_KEY_CODE=$?
+      fi
+      case "$DEX_INSTALL_KEY_CODE" in
+        42|115|24) installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"; return 0 ;;
+        41|114|25) installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"; return 1 ;;
+      esac
+      grep -E -q 'KEY_VOLUMEUP|VOLUMEUP|(^|[^0-9])(42|115|24)([^0-9]|$)' "$DEX_INSTALL_EVENT" 2>/dev/null && { installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"; return 0; }
+      grep -E -q 'KEY_VOLUMEDOWN|VOLUMEDOWN|(^|[^0-9])(41|114|25)([^0-9]|$)' "$DEX_INSTALL_EVENT" 2>/dev/null && { installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"; return 1; }
+    fi
+    DEX_INSTALL_WAITED=$((DEX_INSTALL_WAITED + 1))
+  done
+  installer_cleanup_temp_dir "$DEX_INSTALL_EVENT_DIR"
+  return 2
+}
 
-  export MODPATH ZIPFILE OUTFD BOOTMODE=true
-  . "$MODPATH/customize.sh"
+installer_temp_path() {
+  TEMP_NAME="$1"
+  DEX_INSTALL_TEMP_DIR="$(installer_private_temp_dir)" || return 1
+  printf '%s/%s\n' "$DEX_INSTALL_TEMP_DIR" "$TEMP_NAME"
+}
+
+installer_source_common() {
+  [ "$DEX_COMMON_READY" = 1 ] && return 0
+  [ -n "${ZIPFILE:-}" ] || return 1
+  command -v unzip >/dev/null 2>&1 || return 1
+  DEX_COMMON_TMP_DIR="$(installer_private_temp_dir)" || return 1
+  DEX_COMMON_TMP="$DEX_COMMON_TMP_DIR/common.sh"
+  DEX2OAT_STATE_DIR="$DEX_PERSIST_ROOT"
+  export DEX2OAT_STATE_DIR
+  unzip -p "$ZIPFILE" core/common.sh > "$DEX_COMMON_TMP" 2>/dev/null || {
+    installer_cleanup_temp_dir "$DEX_COMMON_TMP_DIR"
+    return 1
+  }
+  . "$DEX_COMMON_TMP" || {
+    installer_cleanup_temp_dir "$DEX_COMMON_TMP_DIR"
+    return 1
+  }
+  installer_cleanup_temp_dir "$DEX_COMMON_TMP_DIR"
+  DEX_COMMON_READY=1
+}
+
+disclaimer_text() {
+  cat <<'DEX2OAT_DISCLAIMER_TEXT'
+================================================
+dex2oat-lock 软件许可声明、免责条款及责任限制
+================================================
+在继续安装前，请完整阅读以下条款。
+按音量 + 键，即视为你已阅读、理解并接受本条款的全部内容；
+按音量 - 键，取消安装。
+
+第一条 定义
+本条款所称"本软件"，指 dex2oat-lock 及其相关组件、脚本、
+配置文件与后续更新版本；"维护者"，指本软件的开发者及贡献者；
+"用户"，指下载、安装、使用本软件的自然人或组织。
+
+第二条 许可声明
+本软件依据其开源许可证条款提供，用户对本软件的使用应同时
+遵守相应许可证的规定。本条款与许可证条款不一致之处，
+以对维护者更为有利的解释为准，但不得因此减损用户依据
+强制性法律规定所享有的权利。
+
+第三条 无担保声明
+1. 本软件按"现状"（AS IS）及"现有"（AS AVAILABLE）状态提供，
+   维护者不对本软件作出任何明示或默示的保证，包括但不限于：
+   适销性保证、特定用途适用性保证、不侵权保证、运行不中断
+   或无错误的保证。
+2. 维护者不保证本软件适用于用户的特定设备、ROM、内核版本
+   或 Root 实现方式（包括但不限于 Magisk、KernelSU、APatch），
+   亦不保证本软件与用户设备上其它软件或模块的兼容性。
+
+第四条 风险告知
+1. 本软件需要 Root 权限方可运行，将生成 system.prop 文件，
+   并修改运行时 ART / dexopt 相关系统属性。
+2. 前述操作存在导致应用程序运行异常、设备性能波动、功耗变化、
+   系统稳定性下降，乃至设备无法正常启动的风险。
+3. 用户应于安装前自行完成数据备份，并确认已具备卸载本软件
+   或以其它方式恢复系统正常状态的能力与知识。
+
+第五条 责任限制
+1. 在适用法律允许的最大范围内，因安装、使用、升级、卸载
+   本软件，或因本软件与用户设备、系统、第三方软件的交互
+   而产生的任何直接、间接、附带、特殊、惩罚性或后果性损害
+   （包括但不限于数据丢失、设备损坏、功能中断、预期利益
+   损失），维护者不承担赔偿责任，无论该等主张基于合同、
+   侵权（含过失）或其它任何法律理论。
+2. 前款责任限制不适用于以下情形：
+   （一）维护者的故意或重大过失行为；
+   （二）依据适用法律不得以约定方式排除或限制的责任。
+3. 若维护者依本条仍需承担责任，该责任在法律允许范围内，
+   以用户为使用本软件所支付的对价（如为免费软件，则为
+   人民币零元）为限。
+
+第六条 用户确认
+用户按音量 + 键即表示确认：
+（一）已充分阅读并理解本条款第三条至第五条所述内容；
+（二）理解 Root 权限操作及系统属性修改可能带来的风险，
+     并自愿承担继续安装、使用本软件所产生的相应后果；
+（三）已知悉可通过卸载本软件撤销其自身产生的变更，但
+     由此产生的、非本软件直接导致的系统层面问题不在
+     撤销范围之内。
+
+第七条 可分割性
+本条款任一条款被有管辖权的法院、仲裁机构认定为无效、
+违法或不可执行的，不影响其余条款的效力，其余条款
+应继续有效并按其原有目的解释和履行。
+
+第八条 确认记录
+本次确认操作对应的条款版本号、确认时间与正文哈希，
+将记录于本地日志文件：
+/data/adb/.dex2oat-lock-persist/disclaimer_ack.log
+该记录仅用于证明用户已知悉当前版本条款内容，不涉及网络传输。
+
+第九条 生效与变更
+本条款自用户按音量 + 键确认之时起，就当前安装 / 更新行为
+生效。维护者保留在后续版本中修改本条款的权利，修改后的
+条款以用户安装或更新时呈现的版本为准。
+
+按音量 + 键继续，即表示同意以上全部条款。
+按音量 - 键取消安装。
+================================================
+DEX2OAT_DISCLAIMER_TEXT
+}
+
+disclaimer_sleep_line() {
+  sleep "$DISCLAIMER_LINE_DELAY" 2>/dev/null || sleep 1
+}
+
+disclaimer_timestamp() {
+  installer_source_common || true
+  if command -v dex_now >/dev/null 2>&1; then
+    DISCLAIMER_TIME_BASE="$(dex_now)"
+    DISCLAIMER_TIME_ZONE="$(date '+%z' 2>/dev/null)"
+    if [ -n "$DISCLAIMER_TIME_ZONE" ]; then
+      printf '%s %s\n' "$DISCLAIMER_TIME_BASE" "$DISCLAIMER_TIME_ZONE"
+    else
+      printf '%s\n' "$DISCLAIMER_TIME_BASE"
+    fi
+    return 0
+  fi
+  if command -v date >/dev/null 2>&1; then
+    date '+%Y-%m-%d %H:%M:%S %z' 2>/dev/null && return 0
+  fi
+  printf 'unknown\n'
+}
+
+disclaimer_device() {
+  DISCLAIMER_DEVICE="$(getprop ro.serialno 2>/dev/null)"
+  [ -n "$DISCLAIMER_DEVICE" ] || DISCLAIMER_DEVICE="$(getprop ro.boot.serialno 2>/dev/null)"
+  [ -n "$DISCLAIMER_DEVICE" ] || DISCLAIMER_DEVICE="$(getprop ro.product.device 2>/dev/null)"
+  [ -n "$DISCLAIMER_DEVICE" ] || DISCLAIMER_DEVICE=unknown
+  printf '%s\n' "$DISCLAIMER_DEVICE" | tr -d '\r\n'
+}
+
+disclaimer_log_warning() {
+  installer_print "⚠ $*"
+  mkdir -p "$DEX_STATE_ROOT" 2>/dev/null || return 0
+  {
+    printf '%s WARNING disclaimer %s\n' "$(disclaimer_timestamp)" "$*"
+  } >> "$DEX_STATE_ROOT/install.log" 2>/dev/null || return 0
+  chmod 0600 "$DEX_STATE_ROOT/install.log" 2>/dev/null || true
+}
+
+disclaimer_valid_sha256() {
+  case "$1" in ""|*[!0-9a-fA-F]*) return 1 ;; esac
+  [ "${#1}" -eq 64 ] 2>/dev/null
+}
+
+disclaimer_hash() {
+  DISCLAIMER_TEXT_FILE="$(installer_temp_path dex2oat-disclaimer-text)"
+  DISCLAIMER_TEXT_DIR="${DISCLAIMER_TEXT_FILE%/*}"
+  disclaimer_text > "$DISCLAIMER_TEXT_FILE" 2>/dev/null || {
+    installer_cleanup_temp_dir "$DISCLAIMER_TEXT_DIR"
+    return 1
+  }
+  installer_source_common || {
+    installer_cleanup_temp_dir "$DISCLAIMER_TEXT_DIR"
+    return 1
+  }
+  DISCLAIMER_HASH_VALUE="$(dex_hash_file "$DISCLAIMER_TEXT_FILE")"
+  installer_cleanup_temp_dir "$DISCLAIMER_TEXT_DIR"
+  disclaimer_valid_sha256 "$DISCLAIMER_HASH_VALUE" || return 1
+  printf '%s\n' "$DISCLAIMER_HASH_VALUE"
+}
+
+disclaimer_last_ack_value() {
+  [ -f "$DISCLAIMER_ACK_LOG" ] && [ ! -L "$DISCLAIMER_ACK_LOG" ] || return 0
+  awk -F= -v want="$1" '
+    function commit() {
+      if (version != "" || timestamp != "" || hash != "" || ack != "") {
+        last_version = version
+        last_timestamp = timestamp
+        last_hash = hash
+        last_ack = ack
+      }
+      version = ""; timestamp = ""; hash = ""; ack = ""
+    }
+    $0 == "---" { commit(); next }
+    $1 == "version" { sub(/^[^=]*=/, ""); version = $0; next }
+    $1 == "timestamp" { sub(/^[^=]*=/, ""); timestamp = $0; next }
+    $1 == "hash" { sub(/^[^=]*=/, ""); hash = $0; next }
+    $1 == "ack" { sub(/^[^=]*=/, ""); ack = $0; next }
+    END {
+      commit()
+      if (want == "version") print last_version
+      else if (want == "timestamp") print last_timestamp
+      else if (want == "hash") print last_hash
+      else if (want == "ack") print last_ack
+    }
+  ' "$DISCLAIMER_ACK_LOG" 2>/dev/null
+}
+
+disclaimer_ack_current() {
+  [ -f "$DISCLAIMER_ACK_LOG" ] && [ ! -L "$DISCLAIMER_ACK_LOG" ] || return 1
+  [ "$(disclaimer_last_ack_value version)" = "$DISCLAIMER_VERSION" ] || return 1
+  [ "$(disclaimer_last_ack_value hash)" = "$1" ] || return 1
+  [ "$(disclaimer_last_ack_value ack)" = "true" ] || return 1
+}
+
+disclaimer_prepare_persist_root() {
+  case "$DEX_PERSIST_ROOT" in
+    /data/adb/.dex2oat-lock-persist) ;;
+    *) installer_print "❌ Installation Cancelled"; installer_print "原因: 持久化目录不在允许范围"; return 1 ;;
+  esac
+  case "$DEX_PERSIST_ROOT" in
+    "$DEX_STATE_ROOT"|"$DEX_STATE_ROOT"/*|"$DEX_MODULE_ROOT"|"$DEX_MODULE_ROOT"/*)
+      installer_print "❌ Installation Cancelled"
+      installer_print "原因: 持久化目录不能位于状态目录或模块目录内"
+      return 1
+      ;;
+  esac
+  [ ! -L "$DEX_PERSIST_ROOT" ] || {
+    installer_print "❌ Installation Cancelled"
+    installer_print "原因: 持久化目录不能是符号链接"
+    return 1
+  }
+  mkdir -p "$DEX_PERSIST_ROOT" 2>/dev/null || {
+    installer_print "❌ Installation Cancelled"
+    installer_print "原因: 无法创建免责声明确认目录"
+    installer_print "$DEX_PERSIST_ROOT"
+    return 1
+  }
+  [ ! -L "$DEX_PERSIST_ROOT" ] || return 1
+  chmod 0700 "$DEX_PERSIST_ROOT" 2>/dev/null || disclaimer_log_warning "设置持久化目录权限失败: $DEX_PERSIST_ROOT"
+  DISCLAIMER_WRITE_TEST="$DEX_PERSIST_ROOT/.write-test.$$"
+  : > "$DISCLAIMER_WRITE_TEST" 2>/dev/null || {
+    installer_print "❌ Installation Cancelled"
+    installer_print "原因: 免责声明确认目录不可写"
+    installer_print "$DEX_PERSIST_ROOT"
+    return 1
+  }
+  rm -f "$DISCLAIMER_WRITE_TEST" 2>/dev/null || true
+}
+
+disclaimer_write_ack_unlocked() {
+  DISCLAIMER_HASH_VALUE="$1"
+  DISCLAIMER_TIME_VALUE="$2"
+  DISCLAIMER_DEVICE_VALUE="$3"
+  [ ! -L "$DISCLAIMER_ACK_LOG" ] || return 1
+  DISCLAIMER_TMP_LOG="$DEX_PERSIST_ROOT/disclaimer_ack.log.tmp.$$"
+  if [ -f "$DISCLAIMER_ACK_LOG" ]; then
+    cat "$DISCLAIMER_ACK_LOG" > "$DISCLAIMER_TMP_LOG" 2>/dev/null || return 1
+  else
+    : > "$DISCLAIMER_TMP_LOG" 2>/dev/null || return 1
+  fi
+  {
+    printf 'version=%s\n' "$DISCLAIMER_VERSION"
+    printf 'timestamp=%s\n' "$DISCLAIMER_TIME_VALUE"
+    printf 'hash=%s\n' "$DISCLAIMER_HASH_VALUE"
+    printf 'device=%s\n' "$DISCLAIMER_DEVICE_VALUE"
+    printf 'ack=true\n'
+    printf '%s\n' '---'
+  } >> "$DISCLAIMER_TMP_LOG" 2>/dev/null || {
+    rm -f "$DISCLAIMER_TMP_LOG" 2>/dev/null || true
+    return 1
+  }
+  command -v dex_atomic_commit >/dev/null 2>&1 || return 1
+  dex_atomic_commit "$DISCLAIMER_TMP_LOG" "$DISCLAIMER_ACK_LOG" 0600 || return 1
+  chmod 0600 "$DISCLAIMER_ACK_LOG" 2>/dev/null || disclaimer_log_warning "设置免责声明确认日志权限失败: $DISCLAIMER_ACK_LOG"
+}
+
+disclaimer_write_ack() {
+  DISCLAIMER_HASH_VALUE="$1"
+  DISCLAIMER_TIME_VALUE="$(disclaimer_timestamp)"
+  DISCLAIMER_DEVICE_VALUE="$(disclaimer_device)"
+  disclaimer_prepare_persist_root || return 1
+  installer_source_common || return 1
+  command -v dex_with_lock >/dev/null 2>&1 || return 1
+  dex_with_lock "$DEX_PERSIST_ROOT/.disclaimer.lock" 10 disclaimer_write_ack_unlocked "$DISCLAIMER_HASH_VALUE" "$DISCLAIMER_TIME_VALUE" "$DISCLAIMER_DEVICE_VALUE"
+}
+
+disclaimer_export_agreement_state() {
+  DEX2OAT_AGREEMENT_VERSION="$DISCLAIMER_VERSION"
+  DEX2OAT_AGREEMENT_ACCEPTED=yes
+  DEX2OAT_AGREEMENT_ACCEPTED_AT="$1"
+  export DEX2OAT_AGREEMENT_VERSION DEX2OAT_AGREEMENT_ACCEPTED DEX2OAT_AGREEMENT_ACCEPTED_AT
+}
+
+disclaimer_show_text() {
+  disclaimer_text | while IFS= read -r DISCLAIMER_LINE || [ -n "$DISCLAIMER_LINE" ]; do
+    installer_print "$DISCLAIMER_LINE"
+    disclaimer_sleep_line
+  done
+}
+
+installation_agreement() {
+  DISCLAIMER_HASH_VALUE="$(disclaimer_hash)" || {
+    installer_print "❌ Installation Cancelled"
+    installer_print "原因: 无法计算免责声明 SHA256"
+    exit 2
+  }
+
+  if disclaimer_ack_current "$DISCLAIMER_HASH_VALUE"; then
+    disclaimer_export_agreement_state "$(disclaimer_last_ack_value timestamp)"
+    return 0
+  fi
+
+  installer_print ""
+  disclaimer_show_text
+  installer_print ""
+  installer_print "阅读倒计时: ${DISCLAIMER_MIN_READ_WAIT}s"
+  sleep "$DISCLAIMER_MIN_READ_WAIT" 2>/dev/null || sleep 8
+  installer_print ""
+  installer_print "现在可以确认。"
+  installer_line
+  installer_print "【音量 +】同意免责声明并继续安装"
+  installer_print "【音量 -】不同意并取消安装"
+  installer_line
+  installer_wait_volume_key "$DISCLAIMER_KEY_TIMEOUT"
+  DEX_AGREEMENT_STATUS=$?
+  case "$DEX_AGREEMENT_STATUS" in
+    0)
+      disclaimer_write_ack "$DISCLAIMER_HASH_VALUE" || {
+        installer_print "❌ Installation Cancelled"
+        installer_print "原因: 写入免责声明确认记录失败"
+        exit 2
+      }
+      disclaimer_export_agreement_state "$(disclaimer_last_ack_value timestamp)"
+      installer_print "✓ 已确认免责声明，继续安装"
+      return 0
+      ;;
+    1)
+      installer_print "Installation Cancelled"
+      installer_print "用户不同意免责声明，未执行安装步骤。"
+      exit 2
+      ;;
+    *)
+      installer_print "Installation Cancelled"
+      installer_print "确认超时，未执行安装步骤。"
+      exit 2
+      ;;
+  esac
+}
+
+install_transaction_manifest() {
+  TXN_TREE="$1"
+  TXN_MANIFEST="$2"
+  [ -d "$TXN_TREE" ] && [ ! -L "$TXN_TREE" ] || return 1
+  : > "$TXN_MANIFEST" || return 1
+  find "$TXN_TREE" -mindepth 1 -print 2>/dev/null | sort | while IFS= read -r TXN_ENTRY; do
+    TXN_RELATIVE=${TXN_ENTRY#"$TXN_TREE"/}
+    if [ -L "$TXN_ENTRY" ]; then
+      exit 1
+    elif [ -d "$TXN_ENTRY" ]; then
+      printf 'd\t%s\n' "$TXN_RELATIVE"
+    elif [ -f "$TXN_ENTRY" ]; then
+      TXN_SIZE="$(wc -c < "$TXN_ENTRY" 2>/dev/null | tr -d ' ')" || exit 1
+      TXN_HASH="$(dex_hash_file "$TXN_ENTRY")" || exit 1
+      [ -n "$TXN_HASH" ] || exit 1
+      printf 'f\t%s\t%s\t%s\n' "$TXN_RELATIVE" "$TXN_SIZE" "$TXN_HASH"
+    else
+      exit 1
+    fi
+  done >> "$TXN_MANIFEST"
+}
+
+install_transaction_copy_verified() {
+  TXN_SOURCE="$1"
+  TXN_DESTINATION="$2"
+  TXN_LABEL="$3"
+  [ -d "$TXN_SOURCE" ] && [ ! -L "$TXN_SOURCE" ] || return 1
+  rm -rf "$TXN_DESTINATION" 2>/dev/null || return 1
+  cp -af "$TXN_SOURCE" "$TXN_DESTINATION" 2>/dev/null || return 1
+  install_transaction_manifest "$TXN_SOURCE" "$INSTALL_TXN_DIR/.source.$TXN_LABEL.$$" || return 1
+  install_transaction_manifest "$TXN_DESTINATION" "$INSTALL_TXN_DIR/.destination.$TXN_LABEL.$$" || return 1
+  cmp -s "$INSTALL_TXN_DIR/.source.$TXN_LABEL.$$" "$INSTALL_TXN_DIR/.destination.$TXN_LABEL.$$" || return 1
+  rm -f "$INSTALL_TXN_DIR/.source.$TXN_LABEL.$$" "$INSTALL_TXN_DIR/.destination.$TXN_LABEL.$$" || return 1
+}
+
+install_transaction_restore_tree() {
+  TXN_BACKUP="$1"
+  TXN_TARGET="$2"
+  TXN_PRESENT_FILE="$3"
+  TXN_LABEL="$4"
+  TXN_STAGE="$TXN_TARGET.restore.$$"
+  [ -f "$TXN_PRESENT_FILE" ] || return 1
+  IFS= read -r TXN_PRESENT < "$TXN_PRESENT_FILE"
+  case "$TXN_PRESENT" in
+    0)
+      rm -rf "$TXN_STAGE" "$TXN_TARGET" 2>/dev/null || return 1
+      return 0
+      ;;
+    1)
+      [ -d "$TXN_BACKUP" ] || return 1
+      mkdir -p "${TXN_TARGET%/*}" 2>/dev/null || return 1
+      install_transaction_copy_verified "$TXN_BACKUP" "$TXN_STAGE" "restore-$TXN_LABEL" || return 1
+      rm -rf "$TXN_TARGET" 2>/dev/null || return 1
+      mv "$TXN_STAGE" "$TXN_TARGET" 2>/dev/null || return 1
+      install_transaction_manifest "$TXN_BACKUP" "$INSTALL_TXN_DIR/.backup.$TXN_LABEL.$$" || return 1
+      install_transaction_manifest "$TXN_TARGET" "$INSTALL_TXN_DIR/.restored.$TXN_LABEL.$$" || return 1
+      cmp -s "$INSTALL_TXN_DIR/.backup.$TXN_LABEL.$$" "$INSTALL_TXN_DIR/.restored.$TXN_LABEL.$$" || return 1
+      rm -f "$INSTALL_TXN_DIR/.backup.$TXN_LABEL.$$" "$INSTALL_TXN_DIR/.restored.$TXN_LABEL.$$" || return 1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+install_transaction_restore() {
+  install_transaction_restore_tree "$INSTALL_TXN_DIR/state" "$DEX_STATE_ROOT" "$INSTALL_TXN_DIR/had_state" state || return 1
+  install_transaction_restore_tree "$INSTALL_TXN_DIR/module" "$DEX_MODULE_ROOT" "$INSTALL_TXN_DIR/had_module" module || return 1
+}
+
+install_transaction_recover_pending() {
+  [ -f "$INSTALL_TXN_DIR/status" ] || return 0
+  IFS= read -r TXN_STATUS < "$INSTALL_TXN_DIR/status"
+  if [ "$TXN_STATUS" = committed ]; then
+    rm -rf "$INSTALL_TXN_DIR" 2>/dev/null || return 1
+    return 0
+  fi
+  [ "$TXN_STATUS" = prepared ] || return 1
+  installer_print ""
+  installer_print "⚠ 检测到未完成安装事务"
+  installer_print "正在恢复上一版本……"
+  install_transaction_restore || {
+    installer_print "❌ 无法恢复上一版本"
+    installer_print "事务目录已保留:"
+    installer_print "$INSTALL_TXN_DIR"
+    return 1
+  }
+  installer_print "✓ 已恢复上一版本"
+  installer_print "继续安装……"
+  rm -rf "$INSTALL_TXN_DIR" 2>/dev/null || return 1
+}
+
+install_transaction_prepare() {
+  rm -rf "$INSTALL_TXN_DIR" 2>/dev/null || return 1
+  mkdir -p "$INSTALL_TXN_DIR" 2>/dev/null || return 1
+  chmod 0700 "$INSTALL_TXN_DIR" 2>/dev/null || return 1
+  if [ -d "$DEX_STATE_ROOT" ]; then
+    printf '1\n' > "$INSTALL_TXN_DIR/had_state" || return 1
+    install_transaction_copy_verified "$DEX_STATE_ROOT" "$INSTALL_TXN_DIR/state" state || return 1
+  else
+    printf '0\n' > "$INSTALL_TXN_DIR/had_state" || return 1
+  fi
+  if [ -d "$DEX_MODULE_ROOT" ]; then
+    printf '1\n' > "$INSTALL_TXN_DIR/had_module" || return 1
+    install_transaction_copy_verified "$DEX_MODULE_ROOT" "$INSTALL_TXN_DIR/module" module || return 1
+  else
+    printf '0\n' > "$INSTALL_TXN_DIR/had_module" || return 1
+  fi
+  chmod 0600 "$INSTALL_TXN_DIR/had_state" "$INSTALL_TXN_DIR/had_module" 2>/dev/null || return 1
+  printf 'prepared\n' > "$INSTALL_TXN_DIR/status.tmp.$$" 2>/dev/null || return 1
+  mv "$INSTALL_TXN_DIR/status.tmp.$$" "$INSTALL_TXN_DIR/status" 2>/dev/null || return 1
+  chmod 0600 "$INSTALL_TXN_DIR/status" 2>/dev/null || return 1
+}
+
+install_transaction_rollback() {
+  [ "$INSTALL_TXN_COMMITTED" = 1 ] && return 0
+  [ -d "$INSTALL_TXN_DIR" ] || return 0
+  installer_print "⚠ 安装未提交"
+  installer_print "正在恢复上一版本……"
+  install_transaction_restore || {
+    installer_print "❌ 无法恢复上一版本"
+    installer_print "事务目录已保留:"
+    installer_print "$INSTALL_TXN_DIR"
+    return 1
+  }
+  installer_print "✓ 已恢复上一版本"
+}
+
+install_transaction_commit_valid() {
+  [ -s "$DEX_STATE_ROOT/install.commit" ] || return 1
+  TXN_MODULE_PATH="$(sed -n 's/^module_path=//p' "$DEX_STATE_ROOT/install.commit" 2>/dev/null | head -n 1)"
+  [ -n "$TXN_MODULE_PATH" ] && [ -d "$TXN_MODULE_PATH" ] && [ ! -L "$TXN_MODULE_PATH" ] || return 1
+  for TXN_REQUIRED in module.prop customize.sh service.sh action.sh uninstall.sh system.prop core/state.sh core/integrity-check.sh; do
+    [ -f "$TXN_MODULE_PATH/$TXN_REQUIRED" ] && [ ! -L "$TXN_MODULE_PATH/$TXN_REQUIRED" ] || return 1
+  done
+  [ -x "$TXN_MODULE_PATH/service.sh" ] || return 1
+  [ -x "$TXN_MODULE_PATH/action.sh" ] || return 1
+  [ -x "$TXN_MODULE_PATH/customize.sh" ] || return 1
+  [ -x "$TXN_MODULE_PATH/uninstall.sh" ] || return 1
+}
+
+install_transaction_finish() {
+  install_transaction_commit_valid || return 1
+  printf 'committed\n' > "$INSTALL_TXN_DIR/status.tmp.$$" 2>/dev/null || return 1
+  mv "$INSTALL_TXN_DIR/status.tmp.$$" "$INSTALL_TXN_DIR/status" 2>/dev/null || return 1
+  INSTALL_TXN_COMMITTED=1
+  rm -rf "$INSTALL_TXN_DIR" 2>/dev/null || return 1
+}
+
+preinstall_cleanup() {
+  for CLEANUP_TARGET in "$DEX_STATE_ROOT" "$DEX_MODULE_ROOT"; do
+    case "$CLEANUP_TARGET" in
+      /data/adb/dex2oat-lock|/data/adb/modules/dex2oat-lock)
+        if [ -e "$CLEANUP_TARGET" ]; then
+          rm -rf "$CLEANUP_TARGET" 2>/dev/null || {
+            installer_print "❌ Installation Failed"
+            installer_print "原因: 清理旧版本目录失败"
+            installer_print "建议: 检查目录权限后重新安装。"
+            installer_print "$CLEANUP_TARGET"
+            exit 1
+          }
+        fi
+        ;;
+      *)
+        installer_print "❌ Installation Failed"
+        installer_print "原因: 拒绝清理非预期目录"
+        installer_print "建议: 检查安装环境变量后重新安装。"
+        installer_print "$CLEANUP_TARGET"
+        exit 1
+        ;;
+    esac
+  done
 }
 
 OUTFD=$2
 ZIPFILE=$3
 
 mount /data 2>/dev/null
-
+require_android_manager
 if find_util_functions; then
   . "$UTIL_FUNCTIONS"
 else
-  fallback_install_module
-  exit 0
+  require_module_manager
 fi
+installation_agreement
+install_transaction_recover_pending || { installer_print "❌ Installation Failed"; installer_print "原因: 无法恢复未完成安装事务"; installer_print "建议: 保留事务目录并重新安装。"; exit 1; }
+install_transaction_prepare || { installer_print "❌ Installation Failed"; installer_print "原因: 无法准备安装事务"; installer_print "建议: 检查 /data/local/tmp 可写空间后重新安装。"; exit 1; }
+trap 'install_transaction_rollback' EXIT HUP INT TERM
+preinstall_cleanup
 
 install_module
+install_transaction_finish || exit 1
+trap - EXIT HUP INT TERM
 exit 0
