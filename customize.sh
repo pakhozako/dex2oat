@@ -19,6 +19,7 @@ MATCH_REPORT="$STATE_DIR/match-report.txt"
 RULES_PACK_FILE="$MODPATH/rules/rule-props.pack"
 RULES_FILE="$STATE_DIR/rule-props.tsv"
 RULES_DECODE_SCRIPT="$MODPATH/scripts/decode-rules.sh"
+INTEGRITY_BASELINE_FILE="$MODPATH/core/integrity-baseline.prop"
 INSTALL_STARTED=0
 BACKUP_READY=0
 STATE_CREATED=0
@@ -203,6 +204,42 @@ chmod_readable_tree() {
   return 0
 }
 
+install_preflight() {
+  for REQUIRED_FILE in \
+    "$RULES_PACK_FILE" \
+    "$RULES_DECODE_SCRIPT" \
+    "$MODPATH/scripts/capture-props.sh" \
+    "$MODPATH/scripts/generate-props.sh" \
+    "$MODPATH/core/common.sh" \
+    "$MODPATH/core/property.sh" \
+    "$INTEGRITY_BASELINE_FILE"; do
+    [ -s "$REQUIRED_FILE" ] || fail_install "安装预检失败，必要文件缺失: $REQUIRED_FILE"
+  done
+
+  [ -d "$STATE_DIR" ] && [ -w "$STATE_DIR" ] || fail_install "安装预检失败，状态目录不可写: $STATE_DIR"
+  PREFLIGHT_FILE="$STATE_DIR/.install-preflight.$$"
+  : > "$PREFLIGHT_FILE" 2>/dev/null || fail_install "安装预检失败，状态目录写入不可用"
+  rm -f "$PREFLIGHT_FILE" 2>/dev/null || fail_install "安装预检失败，状态目录清理不可用"
+
+  while IFS='=' read -r BASELINE_PATH BASELINE_HASH || [ -n "$BASELINE_PATH" ]; do
+    BASELINE_PATH="$(printf '%s' "$BASELINE_PATH" | tr -d '\r')"
+    BASELINE_HASH="$(printf '%s' "$BASELINE_HASH" | tr -d '\r')"
+    case "$BASELINE_PATH" in
+      ""|\#*) continue ;;
+      /*|../*|*/../*|*/..|*\\*) fail_install "安装预检失败，完整性基线路径非法: $BASELINE_PATH" ;;
+    esac
+    case "$BASELINE_HASH" in ""|*[!0-9A-Fa-f]*) fail_install "安装预检失败，完整性基线哈希无效: $BASELINE_PATH" ;; esac
+    [ "${#BASELINE_HASH}" -eq 64 ] 2>/dev/null || fail_install "安装预检失败，完整性基线哈希长度无效: $BASELINE_PATH"
+    [ -s "$MODPATH/$BASELINE_PATH" ] || fail_install "安装预检失败，关键文件缺失: $BASELINE_PATH"
+    if command -v sha256sum >/dev/null 2>&1 && [ "$BASELINE_PATH" != "module.prop" ]; then
+      PREFLIGHT_HASH="$(dex_hash_file "$MODPATH/$BASELINE_PATH" 2>/dev/null)"
+      [ "$PREFLIGHT_HASH" = "$BASELINE_HASH" ] || fail_install "安装预检失败，关键文件校验不通过: $BASELINE_PATH"
+    fi
+  done < "$INTEGRITY_BASELINE_FILE"
+
+  dex_prepare_runtime_rules "$RULES_DECODE_SCRIPT" "$RULES_PACK_FILE" "$RULES_FILE" || fail_install "安装预检失败，规则包不可用"
+}
+
 is_managed_prop() {
   dex_valid_prop_key "$1"
 }
@@ -219,9 +256,14 @@ write_device_prop() {
       printf 'root.platform=%s\n' "$(dex_detect_platform)"
       printf 'root.version=%s\n' "$(dex_platform_version)"
       printf 'root.version_code=%s\n' "$(dex_platform_version_code)"
-      [ -n "$KSU_RUNTIME_MODE" ] && printf 'root.runtime_mode=%s\n' "$KSU_RUNTIME_MODE"
-      [ -n "$KSU_KERNEL_VER_CODE" ] && printf 'root.kernel_version_code=%s\n' "$KSU_KERNEL_VER_CODE"
+      if [ -n "$KSU_RUNTIME_MODE" ]; then
+        printf 'root.runtime_mode=%s\n' "$KSU_RUNTIME_MODE"
+      fi
+      if [ -n "$KSU_KERNEL_VER_CODE" ]; then
+        printf 'root.kernel_version_code=%s\n' "$KSU_KERNEL_VER_CODE"
+      fi
     fi
+    :
   } > "$DEVICE_FILE" 2>/dev/null || fail_install "写入 device.prop 失败"
 
   if command -v state_update >/dev/null 2>&1; then
@@ -318,14 +360,15 @@ install_banner
 ui_print "- 正在安装模块并生成规则驱动的 system.prop"
 install_progress 1 init "正在初始化安装流程" running
 
+[ -d "$STATE_DIR" ] && STATE_DIR_PREEXISTED=1 || STATE_DIR_PREEXISTED=0
 mkdir -p "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" || fail_install "创建状态目录失败"
-STATE_CREATED=1
+[ "$STATE_DIR_PREEXISTED" = "1" ] || STATE_CREATED=1
 INSTALL_STARTED=1
 touch "$INSTALL_LOG" || fail_install "创建 install.log 失败"
 rm -f /storage/emulated/0/Download/dex2oat-captured-props.txt 2>/dev/null || true
 
 install_progress 8 environment "正在读取模块环境" running
-dex_prepare_runtime_rules "$RULES_DECODE_SCRIPT" "$RULES_PACK_FILE" "$RULES_FILE" || fail_install "规则包不可用"
+install_preflight
 command -v state_update >/dev/null 2>&1 && state_update \
   "integrity.status=pending" \
   "integrity.reason=install-integrity-check-pending" \

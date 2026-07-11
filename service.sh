@@ -19,8 +19,10 @@ RULES_FILE="$STATE_DIR/rule-props.tsv"
 RULES_DECODE_SCRIPT="$MODDIR/scripts/decode-rules.sh"
 SERVICE_LOCK_DIR="$STATE_DIR/.service.lock"
 RUNTIME_LOCK_DIR="$STATE_DIR/.runtime.lock"
-SERVICE_LOCK_TIMEOUT=20
+SERVICE_LOCK_TIMEOUT=${DEX2OAT_LOCK_TIMEOUT:-20}
 SERVICE_LOCK_STALE_SECONDS=7200
+SERVICE_BOOT_WAIT_SECONDS=${DEX2OAT_BOOT_WAIT_SECONDS:-300}
+SERVICE_BOOT_POLL_SECONDS=5
 SERVICE_BOOT_POST_DELAY=${DEX2OAT_BOOT_POST_DELAY:-3}
 SERVICE_RUNTIME_SETTLE_WAIT=${DEX2OAT_RUNTIME_SETTLE_WAIT:-10}
 SERVICE_RUNTIME_FINAL_WAIT=${DEX2OAT_RUNTIME_FINAL_WAIT:-12}
@@ -39,6 +41,21 @@ fi
 if [ -f "$MODDIR/core/safety.sh" ]; then
   . "$MODDIR/core/safety.sh"
 fi
+
+dex_bounded_uint() {
+  DEX_BOUND_VALUE="$1"
+  DEX_BOUND_DEFAULT="$2"
+  DEX_BOUND_MAX="$3"
+  case "$DEX_BOUND_VALUE" in ''|*[!0-9]*) DEX_BOUND_VALUE="$DEX_BOUND_DEFAULT" ;; esac
+  [ "$DEX_BOUND_VALUE" -le "$DEX_BOUND_MAX" ] 2>/dev/null || DEX_BOUND_VALUE="$DEX_BOUND_MAX"
+  printf '%s\n' "$DEX_BOUND_VALUE"
+}
+
+SERVICE_LOCK_TIMEOUT="$(dex_bounded_uint "$SERVICE_LOCK_TIMEOUT" 20 60)"
+SERVICE_BOOT_WAIT_SECONDS="$(dex_bounded_uint "$SERVICE_BOOT_WAIT_SECONDS" 300 600)"
+SERVICE_BOOT_POST_DELAY="$(dex_bounded_uint "$SERVICE_BOOT_POST_DELAY" 3 30)"
+SERVICE_RUNTIME_SETTLE_WAIT="$(dex_bounded_uint "$SERVICE_RUNTIME_SETTLE_WAIT" 10 30)"
+SERVICE_RUNTIME_FINAL_WAIT="$(dex_bounded_uint "$SERVICE_RUNTIME_FINAL_WAIT" 12 30)"
 
 if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
   LOG_FILE="$FALLBACK_LOG"
@@ -81,6 +98,7 @@ release_service_lock() {
 
 service_on_exit() {
   EXIT_CODE=$?
+  trap - EXIT HUP INT TERM
   if [ "${SERVICE_FINALIZED:-0}" != "1" ] && [ "${SERVICE_ALLOW_RUNNING_EXIT:-0}" != "1" ]; then
     if command -v write_service_state >/dev/null 2>&1; then
       if [ "$EXIT_CODE" -eq 0 ] 2>/dev/null; then
@@ -107,6 +125,36 @@ service_on_exit() {
   exit "$EXIT_CODE"
 }
 
+service_on_signal() {
+  SIGNAL_NAME="$1"
+  SIGNAL_EXIT_CODE="$2"
+  trap - EXIT HUP INT TERM
+  SERVICE_FINALIZED=1
+  TOTAL_FAILED_COUNT=$((${TOTAL_FAILED_COUNT:-0} + 1))
+  SIGNAL_NOW_TEXT="$(date '+%Y-%m-%d %H:%M:%S')"
+  SIGNAL_NOW_EPOCH="$(date '+%s' 2>/dev/null || printf '0')"
+  SIGNAL_STATE_TMP="$SERVICE_STATE.tmp.$$"
+  {
+    printf 'status=error\n'
+    printf 'phase=%s\n' "${APPLY_PHASE:-interrupted}"
+    printf 'health=problem\n'
+    printf 'reason=runtime_service_interrupted\n'
+    printf 'signal=%s\n' "$SIGNAL_NAME"
+    printf 'prop_total=%s\n' "${TOTAL_PROP_COUNT:-0}"
+    printf 'applied_total=%s\n' "${TOTAL_APPLIED_COUNT:-0}"
+    printf 'matched_total=%s\n' "${TOTAL_MATCHED_COUNT:-0}"
+    printf 'mismatch_total=%s\n' "${TOTAL_MISMATCH_COUNT:-0}"
+    printf 'failed_total=%s\n' "${TOTAL_FAILED_COUNT:-0}"
+    printf 'updated_at=%s\n' "$SIGNAL_NOW_TEXT"
+    printf 'updated_epoch=%s\n' "$SIGNAL_NOW_EPOCH"
+  } > "$SIGNAL_STATE_TMP" 2>/dev/null && mv -f "$SIGNAL_STATE_TMP" "$SERVICE_STATE" 2>/dev/null
+  rm -f "$SIGNAL_STATE_TMP" 2>/dev/null || true
+  chmod 0600 "$SERVICE_STATE" 2>/dev/null || true
+  service_log "运行时服务被信号中断: signal=$SIGNAL_NAME" || true
+  release_service_lock
+  exit "$SIGNAL_EXIT_CODE"
+}
+
 acquire_service_lock() {
   mkdir -p "$STATE_DIR" 2>/dev/null || true
   LOCK_WAIT=0
@@ -131,7 +179,10 @@ acquire_service_lock() {
   done
   printf '%s\n' "$$" > "$SERVICE_LOCK_DIR/pid" 2>/dev/null || true
   service_lock_now > "$SERVICE_LOCK_DIR/created_at" 2>/dev/null || true
-  trap 'service_on_exit' EXIT HUP INT TERM
+  trap 'service_on_exit' EXIT
+  trap 'service_on_signal HUP 129' HUP
+  trap 'service_on_signal INT 130' INT
+  trap 'service_on_signal TERM 143' TERM
 }
 
 acquire_service_lock
@@ -272,7 +323,7 @@ service_apply_prop() {
       service_log "应用不一致: phase=$APPLY_PHASE key=$PROP_KEY 目标=$PROP_VALUE 旧值=$DEX_CHECKED_OLD_VALUE 新值=$DEX_CHECKED_NEW_VALUE 工具=$DEX_CHECKED_APPLY_TOOL code=$DEX_CHECKED_APPLY_CODE"
       ;;
     3)
-      service_log "已匹配: phase=$APPLY_PHASE key=$PROP_KEY 目标=$PROP_VALUE 旧值=$DEX_CHECKED_OLD_VALUE 新值=$DEX_CHECKED_NEW_VALUE 工具=$DEX_CHECKED_APPLY_TOOL code=$DEX_CHECKED_APPLY_CODE"
+      :
       ;;
   esac
   return "$APPLY_STATUS"
@@ -378,13 +429,20 @@ fi
 service_log "等待系统启动完成..."
 write_service_state running boot-wait boot_wait
 BOOT_WAIT=0
-while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$BOOT_WAIT" -lt 120 ]; do
-  sleep 5
-  BOOT_WAIT=$((BOOT_WAIT + 1))
+while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$BOOT_WAIT" -lt "$SERVICE_BOOT_WAIT_SECONDS" ]; do
+  BOOT_SLEEP="$SERVICE_BOOT_POLL_SECONDS"
+  BOOT_REMAINING=$((SERVICE_BOOT_WAIT_SECONDS - BOOT_WAIT))
+  [ "$BOOT_REMAINING" -lt "$BOOT_SLEEP" ] 2>/dev/null && BOOT_SLEEP="$BOOT_REMAINING"
+  [ "$BOOT_SLEEP" -gt 0 ] 2>/dev/null || break
+  sleep "$BOOT_SLEEP"
+  BOOT_WAIT=$((BOOT_WAIT + BOOT_SLEEP))
 done
 
 if [ "$(getprop sys.boot_completed)" != "1" ]; then
-  service_log "等待系统启动超时 600 秒，继续执行"
+  service_log "等待系统启动超时 ${SERVICE_BOOT_WAIT_SECONDS} 秒，终止本次运行"
+  TOTAL_FAILED_COUNT=$((TOTAL_FAILED_COUNT + 1))
+  write_service_state error boot-wait boot_wait_timeout
+  exit 1
 fi
 
 BOOT_POST_WAIT=0

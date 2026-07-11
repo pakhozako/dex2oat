@@ -62,19 +62,25 @@ state_value() {
   fi
 }
 
+summary_value() {
+  SUMMARY_KEY="$1"
+  SUMMARY_FILE="$2"
+  SUMMARY_DEFAULT="${3:-0}"
+  SUMMARY_RESULT=""
+  [ -s "$SUMMARY_FILE" ] && SUMMARY_RESULT="$(sed -n "s/^$SUMMARY_KEY=//p" "$SUMMARY_FILE" 2>/dev/null | head -n 1)"
+  [ -n "$SUMMARY_RESULT" ] || SUMMARY_RESULT="$SUMMARY_DEFAULT"
+  printf '%s' "$SUMMARY_RESULT"
+}
+
 show_status() {
-  action_print "Dex2oat Lock 操作面板"
-  action_print "版本: $(module_version)"
-  action_print "汇总: $(state_value summary.status)"
-  action_print "原因: $(state_value summary.message)"
-  action_print "匹配: $(state_value match.status) $(state_value match.reason)"
+  action_print "Dex2oat Lock $(module_version)"
+  action_print "状态: $(state_value summary.status) $(state_value summary.message)"
+  action_print "规则: 命中=$(summary_value matched_total "$MATCH_REPORT") 默认=$(summary_value default_total "$MATCH_REPORT") 未匹配=$(summary_value unmatched_total "$MATCH_REPORT")"
   action_print "配置: $(state_value config.source) $(state_value config.prop_count) 项属性"
-  action_print "应用: $(state_value apply.status) $(state_value apply.reason)"
-  action_print "服务: $(state_value service.status) $(state_value service.health)"
+  action_print "运行: $(state_value apply.status) $(state_value service.health)"
   action_print "健康: $(state_value health.status) $(state_value health.reason)"
   action_print "完整性: $(state_value integrity.status) $(state_value integrity.reason)"
-  action_print "system.prop: $PROP_FILE"
-  action_print "状态目录: $STATE_DIR"
+  action_print "冲突: $(state_value conflict.status) $(state_value conflict.total) 项"
 }
 
 prompt_yes() {

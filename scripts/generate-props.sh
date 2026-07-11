@@ -340,8 +340,8 @@ EOF
 
 [ -s "$TMP_OUTPUT" ] || exit 1
 
-FALLBACK_TOTAL=$((DEFAULT_TOTAL + DISABLED_TOTAL))
-UNMATCHED_TOTAL="$FALLBACK_TOTAL"
+FALLBACK_TOTAL="$DISABLED_TOTAL"
+UNMATCHED_TOTAL="$DISABLED_TOTAL"
 if [ "${CAPTURED_TOTAL:-0}" -eq 0 ] 2>/dev/null; then
   MATCH_STATUS=fallback
   MATCH_REASON=no-captured-props-fallback-defaults
@@ -419,10 +419,31 @@ fi
   printf 'background_default_total=%s\n' "${BACKGROUND_DEFAULT_TOTAL:-0}"
 } > "$TMP_SOURCE" || exit 1
 
-mv -f "$TMP_OUTPUT" "$OUTPUT_FILE" || exit 1
+validate_generated_prop() {
+  [ -s "$TMP_OUTPUT" ] || return 1
+  awk -F= '
+    /^[[:space:]]*($|#)/ { next }
+    index($0, "=") == 0 { invalid = 1; next }
+    {
+      key = $1
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      sub(/^[[:space:]]+/, "", key)
+      sub(/[[:space:]]+$/, "", key)
+      if (key == "" || key !~ /^[A-Za-z0-9_.-]+$/ || key !~ /\./ || key ~ /^\./ || key ~ /\.$/) invalid = 1
+      if (value ~ /[^A-Za-z0-9_.,:\/@%+*\/-]/) invalid = 1
+      if (seen[key]++) invalid = 1
+    }
+    END { exit invalid ? 1 : 0 }
+  ' "$TMP_OUTPUT" || return 1
+  return 0
+}
+
+validate_generated_prop || exit 1
 mv -f "$TMP_MATCHED" "$MATCHED_FILE" || exit 1
 mv -f "$TMP_REPORT" "$REPORT_FILE" || exit 1
 mv -f "$TMP_SOURCE" "$SOURCE_FILE" || exit 1
+mv -f "$TMP_OUTPUT" "$OUTPUT_FILE" || exit 1
 trap - EXIT HUP INT TERM
 chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$VALUES_FILE" "$RULES_FILE" "$SEEN_PROPS" 2>/dev/null || true
 rm -f "$VALUES_FILE" "$SEEN_PROPS" 2>/dev/null || true

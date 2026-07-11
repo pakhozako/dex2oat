@@ -47,6 +47,12 @@ dex_apply_checked_prop() {
   DEX_CHECKED_APPLY_TOOL="${DEX_PROP_APPLY_TOOL:-setprop}"
   DEX_CHECKED_FAILURE_REASON=""
 
+  if [ "$DEX_CHECKED_OLD_VALUE" = "$DEX_CHECKED_PROP_VALUE" ]; then
+    DEX_CHECKED_APPLY_CODE=0
+    DEX_CHECKED_APPLY_TOOL=none
+    return 3
+  fi
+
   if ! command -v dex_apply_prop >/dev/null 2>&1; then
     DEX_CHECKED_FAILURE_REASON=dex_apply_prop_missing
     return 1
@@ -58,6 +64,5 @@ dex_apply_checked_prop() {
   DEX_CHECKED_NEW_VALUE="$(getprop "$DEX_CHECKED_PROP_KEY")"
   [ "$DEX_CHECKED_APPLY_CODE" -eq 0 ] 2>/dev/null || return 1
   [ "$DEX_CHECKED_NEW_VALUE" = "$DEX_CHECKED_PROP_VALUE" ] || return 2
-  [ "$DEX_CHECKED_OLD_VALUE" = "$DEX_CHECKED_PROP_VALUE" ] && return 3
   return 0
 }
