@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-DEX2OAT_STATE_DIR=${DEX2OAT_STATE_DIR:-${STATE_DIR:-/data/adb/dex2oat-lock}}
+DEX2OAT_STATE_DIR=${DEX2OAT_STATE_DIR:-/data/adb/dex2oat-lock}
 
 dex_now() {
   date '+%Y-%m-%d %H:%M:%S'
@@ -19,23 +19,9 @@ dex_rotate_log() {
 
 dex_hash_file() {
   TARGET_FILE="$1"
-  HASH_MODE="${2:-file}"
-  HASH_REQUIRE="${3:-allow-fallback}"
   [ -s "$TARGET_FILE" ] || { printf 'missing\n'; return 0; }
-  if [ "$HASH_MODE" = module-prop ]; then
-    if command -v sha256sum >/dev/null 2>&1; then
-      awk '{ sub(/\r$/, ""); if ($0 !~ /^description=/) lines[++count]=$0 } END { while(count>0 && lines[count]=="") count--; for(i=1;i<=count;i++) print lines[i] }' "$TARGET_FILE" 2>/dev/null | sha256sum 2>/dev/null | awk '{print $1}'
-    elif [ "$HASH_REQUIRE" = require-sha256 ]; then
-      printf 'unsupported\n'
-    elif command -v md5sum >/dev/null 2>&1; then
-      awk '{ sub(/\r$/, ""); if ($0 !~ /^description=/) lines[++count]=$0 } END { while(count>0 && lines[count]=="") count--; for(i=1;i<=count;i++) print lines[i] }' "$TARGET_FILE" 2>/dev/null | md5sum 2>/dev/null | awk '{print $1}'
-    else
-      awk '{ sub(/\r$/, ""); if ($0 !~ /^description=/) lines[++count]=$0 } END { while(count>0 && lines[count]=="") count--; for(i=1;i<=count;i++) print lines[i] }' "$TARGET_FILE" 2>/dev/null | wc -c | tr -d ' '
-    fi
-  elif command -v sha256sum >/dev/null 2>&1; then
+  if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$TARGET_FILE" 2>/dev/null | awk '{print $1}'
-  elif [ "$HASH_REQUIRE" = require-sha256 ]; then
-    printf 'unsupported\n'
   elif command -v md5sum >/dev/null 2>&1; then
     md5sum "$TARGET_FILE" 2>/dev/null | awk '{print $1}'
   else
@@ -68,14 +54,6 @@ dex_prepare_runtime_rules() {
   return 0
 }
 
-dex_atomic_commit() {
-  DEX_ATOMIC_SOURCE="$1"; DEX_ATOMIC_TARGET="$2"; DEX_ATOMIC_MODE="${3:-0600}"
-  [ -f "$DEX_ATOMIC_SOURCE" ] && [ ! -L "$DEX_ATOMIC_SOURCE" ] && [ ! -L "$DEX_ATOMIC_TARGET" ] || return 1
-  [ "${DEX2OAT_SKIP_SYNC:-0}" = 1 ] || sync "$DEX_ATOMIC_SOURCE" 2>/dev/null || true
-  mv -f "$DEX_ATOMIC_SOURCE" "$DEX_ATOMIC_TARGET" 2>/dev/null || return 1
-  chmod "$DEX_ATOMIC_MODE" "$DEX_ATOMIC_TARGET" 2>/dev/null || true
-}
-
 dex_write_prop_lock_list() {
   SOURCE_PROP_FILE="$1"
   TARGET_LOCK_FILE="$2"
@@ -83,15 +61,14 @@ dex_write_prop_lock_list() {
 
   case "$WRITE_MODE" in
     direct)
-      [ -s "$SOURCE_PROP_FILE" ] || return 1
-      : > "$TARGET_LOCK_FILE" 2>/dev/null || return 1
+      : > "$TARGET_LOCK_FILE" 2>/dev/null || return 0
       while IFS='=' read -r PROP_KEY PROP_VALUE || [ -n "$PROP_KEY" ]; do
         PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
         PROP_VALUE="$(dex_normalize_value "$PROP_VALUE")"
         case "$PROP_KEY" in
           ""|\#*) continue ;;
         esac
-        printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$TARGET_LOCK_FILE" 2>/dev/null || return 1
+        printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$TARGET_LOCK_FILE" 2>/dev/null || true
       done < "$SOURCE_PROP_FILE"
       chmod 0600 "$TARGET_LOCK_FILE" 2>/dev/null || true
       return 0
@@ -149,88 +126,75 @@ dex_lock_now() {
   date '+%s' 2>/dev/null || printf '0\n'
 }
 
-dex_boot_id() {
-  if [ -r /proc/sys/kernel/random/boot_id ]; then
-    IFS= read -r DEX_BOOT_ID < /proc/sys/kernel/random/boot_id
-    printf '%s\n' "$DEX_BOOT_ID"
-  else
-    printf 'unknown\n'
-  fi
-}
-
-dex_lock_path_valid() {
-  case "$1" in
-    "$DEX2OAT_STATE_DIR"/.*|"$DEX2OAT_STATE_DIR"/*|/data/local/tmp/*|/tmp/*) return 0 ;;
-  esac
-  return 1
-}
-
-dex_lock_valid_for_owner() {
-  LOCK_DIR="$1"
-  LOCK_OWNER="$2"
-  [ -f "$LOCK_DIR/pid" ] && [ -f "$LOCK_DIR/boot_id" ] && [ -f "$LOCK_DIR/owner" ] || return 1
-  LOCK_PID="$(cat "$LOCK_DIR/pid" 2>/dev/null)"
-  LOCK_BOOT_ID="$(cat "$LOCK_DIR/boot_id" 2>/dev/null)"
-  LOCK_FILE_OWNER="$(cat "$LOCK_DIR/owner" 2>/dev/null)"
-  case "$LOCK_PID" in ""|*[!0-9]*) return 1 ;; esac
-  [ "$LOCK_BOOT_ID" = "$(dex_boot_id)" ] || return 1
-  [ "$LOCK_FILE_OWNER" = "$LOCK_OWNER" ] || return 1
-  [ -d "/proc/$LOCK_PID" ]
-}
-
-dex_lock_prepare_path() {
-  LOCK_DIR="$1"
-  dex_lock_path_valid "$LOCK_DIR" || return 125
-  [ ! -L "$LOCK_DIR" ] || return 125
-  LOCK_PARENT="${LOCK_DIR%/*}"
-  [ ! -L "$LOCK_PARENT" ] || return 125
-  [ "$LOCK_PARENT" != "$LOCK_DIR" ] && mkdir -p "$LOCK_PARENT" 2>/dev/null || true
-}
-
-dex_acquire_lock() {
-  LOCK_DIR="$1"
-  LOCK_TIMEOUT="${2:-10}"
-  LOCK_OWNER="${3:-unknown}"
-  dex_lock_prepare_path "$LOCK_DIR" || return $?
-  LOCK_WAIT=0
-  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-    if ! dex_lock_valid_for_owner "$LOCK_DIR" "$LOCK_OWNER"; then
-      rm -rf "$LOCK_DIR" 2>/dev/null || return 125
-      continue
-    fi
-    if [ "$LOCK_WAIT" -ge "$LOCK_TIMEOUT" ] 2>/dev/null; then
-      return 124
-    fi
-    sleep 1
-    LOCK_WAIT=$((LOCK_WAIT + 1))
-  done
-  printf '%s\n' "$$" > "$LOCK_DIR/pid" 2>/dev/null || return 1
-  dex_lock_now > "$LOCK_DIR/created_at" 2>/dev/null || return 1
-  dex_boot_id > "$LOCK_DIR/boot_id" 2>/dev/null || return 1
-  printf '%s\n' "$LOCK_OWNER" > "$LOCK_DIR/owner" 2>/dev/null || return 1
-  chmod 0600 "$LOCK_DIR/pid" "$LOCK_DIR/created_at" "$LOCK_DIR/boot_id" "$LOCK_DIR/owner" 2>/dev/null || true
-}
-
-dex_release_named_lock() {
-  LOCK_DIR="$1"
-  LOCK_OWNER="${2:-unknown}"
-  [ -f "$LOCK_DIR/pid" ] || return 0
-  [ "$(cat "$LOCK_DIR/pid" 2>/dev/null)" = "$$" ] || return 0
-  [ "$(cat "$LOCK_DIR/owner" 2>/dev/null)" = "$LOCK_OWNER" ] || return 0
-  rm -f "$LOCK_DIR/pid" "$LOCK_DIR/created_at" "$LOCK_DIR/boot_id" "$LOCK_DIR/owner" 2>/dev/null || true
-  rmdir "$LOCK_DIR" 2>/dev/null || true
-}
-
 dex_with_lock() {
-  LOCK_DIR="$1"
-  LOCK_TIMEOUT="${2:-10}"
-  shift 2
-  LOCK_OWNER="${1:-unknown}"
-  dex_acquire_lock "$LOCK_DIR" "$LOCK_TIMEOUT" "$LOCK_OWNER" || return $?
-  LOCK_CODE=0
-  "$@" || LOCK_CODE=$?
-  dex_release_named_lock "$LOCK_DIR" "$LOCK_OWNER"
-  return "$LOCK_CODE"
+  (
+    LOCK_DIR="$1"
+    LOCK_TIMEOUT="${2:-10}"
+    LOCK_STALE_SECONDS="${DEX_LOCK_STALE_SECONDS:-300}"
+    shift 2
+
+    case "$LOCK_DIR" in
+      ""|"/"|"/data"|"/data/adb"|"$DEX2OAT_STATE_DIR")
+        return 125
+        ;;
+    esac
+
+    LOCK_PARENT="${LOCK_DIR%/*}"
+    [ "$LOCK_PARENT" != "$LOCK_DIR" ] && mkdir -p "$LOCK_PARENT" 2>/dev/null || true
+
+    dex_lock_pid_alive() {
+      [ -f "$LOCK_DIR/pid" ] || return 1
+      LOCK_PID="$(cat "$LOCK_DIR/pid" 2>/dev/null)"
+      case "$LOCK_PID" in
+        ""|*[!0-9]*) return 1 ;;
+      esac
+      [ -d "/proc/$LOCK_PID" ]
+    }
+
+    dex_lock_age() {
+      [ -f "$LOCK_DIR/created_at" ] || { printf '0\n'; return 0; }
+      LOCK_CREATED="$(cat "$LOCK_DIR/created_at" 2>/dev/null)"
+      LOCK_NOW="$(dex_lock_now)"
+      case "$LOCK_CREATED:$LOCK_NOW" in
+        *[!0-9:]*|:*) printf '0\n' ;;
+        *) printf '%s\n' $((LOCK_NOW - LOCK_CREATED)) ;;
+      esac
+    }
+
+    dex_release_lock() {
+      if [ -f "$LOCK_DIR/pid" ] && [ "$(cat "$LOCK_DIR/pid" 2>/dev/null)" = "$$" ]; then
+        rm -f "$LOCK_DIR/pid" "$LOCK_DIR/created_at" 2>/dev/null || true
+        rmdir "$LOCK_DIR" 2>/dev/null || true
+      fi
+    }
+
+    LOCK_WAIT=0
+    while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+      if ! dex_lock_pid_alive; then
+        rm -rf "$LOCK_DIR" 2>/dev/null || true
+        continue
+      fi
+      LOCK_AGE="$(dex_lock_age)"
+      if [ "${LOCK_AGE:-0}" -gt "$LOCK_STALE_SECONDS" ] 2>/dev/null; then
+        rm -rf "$LOCK_DIR" 2>/dev/null || true
+        continue
+      fi
+      if [ "$LOCK_WAIT" -ge "$LOCK_TIMEOUT" ] 2>/dev/null; then
+        return 124
+      fi
+      sleep 1
+      LOCK_WAIT=$((LOCK_WAIT + 1))
+    done
+
+    printf '%s\n' "$$" > "$LOCK_DIR/pid" 2>/dev/null || true
+    dex_lock_now > "$LOCK_DIR/created_at" 2>/dev/null || true
+    trap 'dex_release_lock' 0 HUP INT TERM
+    "$@"
+    LOCK_CODE=$?
+    dex_release_lock
+    trap - 0 HUP INT TERM
+    return "$LOCK_CODE"
+  )
 }
 
 dex_detect_platform() {

@@ -21,7 +21,6 @@ dex_safe_remove_state_tree() {
   dex_safe_state_dir || return 1
   case "$DEX_SAFE_TARGET" in
     "$DEX_SAFE_STATE_DIR/backup"|"$DEX_SAFE_STATE_DIR/logs"|\
-"$DEX_SAFE_STATE_DIR/snapshots"|"$DEX_SAFE_STATE_DIR/diagnostics"|"$DEX_SAFE_STATE_DIR/dry-run"|\
 "$DEX_SAFE_STATE_DIR/.state.lock"|"$DEX_SAFE_STATE_DIR/.summary.lock"|\
 "$DEX_SAFE_STATE_DIR/.service.lock"|"$DEX_SAFE_STATE_DIR/.runtime.lock"|\
 "$DEX_SAFE_STATE_DIR/.action.lock"|"$DEX_SAFE_STATE_DIR/.health-history.lock")

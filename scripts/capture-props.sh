@@ -12,7 +12,6 @@ trap 'rm -f "$TMP_FILE" 2>/dev/null || true' EXIT HUP INT TERM
 
 GETPROP=/system/bin/getprop
 [ -x "$GETPROP" ] || GETPROP=getprop
-command -v "$GETPROP" >/dev/null 2>&1 || exit 1
 
 if [ -s "$RULES_FILE" ]; then
   if ! "$GETPROP" | awk -v rules="$RULES_FILE" '

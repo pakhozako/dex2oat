@@ -147,9 +147,6 @@ cleanup_state_files() {
   for CLEANUP_DIR in \
     "$STATE_DIR/backup" \
     "$STATE_DIR/logs" \
-    "$STATE_DIR/snapshots" \
-    "$STATE_DIR/diagnostics" \
-    "$STATE_DIR/dry-run" \
     "$STATE_DIR/.state.lock" \
     "$STATE_DIR/.summary.lock" \
     "$STATE_DIR/.service.lock" \

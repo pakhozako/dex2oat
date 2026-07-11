@@ -42,8 +42,6 @@ TMP_SOURCE="$SOURCE_FILE.tmp.$$"
 SEEN_PROPS="$STATE_DIR/rule-seen-props.$$.txt"
 GENERATED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 SCRIPT_DIR="${0%/*}"
-[ -f "$SCRIPT_DIR/rule-validate.sh" ] || exit 1
-. "$SCRIPT_DIR/rule-validate.sh"
 case "$SCRIPT_DIR" in
   */scripts) MODULE_DIR="${SCRIPT_DIR%/scripts}" ;;
   scripts) MODULE_DIR="." ;;
@@ -197,89 +195,25 @@ should_force_default_when_captured() {
   policy_prop_matches force-default-when-captured "$1"
 }
 
-rule_resolve_captured_values() {
-  : > "$VALUES_FILE" || return 1
-  if [ -s "$CAPTURED_FILE" ]; then
-    awk '
-      BEGIN { bom = sprintf("%c%c%c", 239, 187, 191) }
-      NR == 1 { sub("^" bom, "") }
-      { sub(/\r$/, ""); line = $0; if (line ~ /^\[[^]]*\]: \[.*\]$/) { sub(/^\[/, "", line); sub(/\]: \[/, "=", line); sub(/\]$/, "", line); print line } else if (line ~ /^[^=#][^=]*=/) print line }
-    ' "$CAPTURED_FILE" > "$VALUES_FILE" || return 1
-  fi
-}
-
-rule_emit_header() {
-  {
-    printf '# Dex2oat Lock 生成的 system.prop\n'
-    printf '# generated_at=%s\n' "$GENERATED_AT"
-    printf '# mode=rule-driven\n'
-    printf '# version=%s\n' "${MODULE_VERSION:-unknown}"
-    printf '\n'
-  } >> "$TMP_OUTPUT"
-}
-
-rule_report_emit() {
-  {
-    printf 'generated_at=%s\n' "$GENERATED_AT"
-    printf 'mode=rule-driven\n'
-    printf 'schema_version=32\n'
-    printf 'status=%s\n' "$MATCH_STATUS"
-    printf 'reason=%s\n' "$MATCH_REASON"
-    printf 'confidence=%s\n' "$MATCH_CONFIDENCE"
-    printf 'captured_total=%s\n' "${CAPTURED_TOTAL:-0}"
-    printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
-    printf 'default_total=%s\n' "${DEFAULT_TOTAL:-0}"
-    printf 'disabled_total=%s\n' "${DISABLED_TOTAL:-0}"
-    printf 'fallback_total=%s\n' "${FALLBACK_TOTAL:-0}"
-    printf 'unmatched_total=%s\n' "${UNMATCHED_TOTAL:-0}"
-    printf 'skipped_duplicate_total=%s\n' "${SKIPPED_DUP_TOTAL:-0}"
-    printf 'invalid_total=%s\n' "${INVALID_TOTAL:-0}"
-    printf 'background_default_total=%s\n' "${BACKGROUND_DEFAULT_TOTAL:-0}"
-    printf 'resolver=rule-props-tsv\n'
-    printf 'generated_system_prop=%s\n' "$OUTPUT_FILE"
-    printf '[diff]\n'
-    while IFS='=' read -r DIFF_KEY DIFF_VALUE || [ -n "$DIFF_KEY" ]; do
-      [ -z "$DIFF_KEY" ] && continue
-      ORIGINAL_LINE=""
-      [ -n "$ORIGINAL_PROPS" ] && [ -f "$ORIGINAL_PROPS" ] && ORIGINAL_LINE="$(grep -F -m 1 "$DIFF_KEY=" "$ORIGINAL_PROPS" 2>/dev/null)"
-      if [ -n "$ORIGINAL_LINE" ]; then
-        ORIGINAL_VALUE="${ORIGINAL_LINE#*=}"
-      elif [ -n "$ORIGINAL_PROPS" ] && [ -f "$ORIGINAL_PROPS" ] && grep -F -x -q "@unset:$DIFF_KEY" "$ORIGINAL_PROPS" 2>/dev/null; then
-        ORIGINAL_VALUE="<unset>"
-      else
-        ORIGINAL_VALUE="<unknown>"
-      fi
-      printf '%s: %s -> %s\n' "$DIFF_KEY" "$ORIGINAL_VALUE" "$DIFF_VALUE"
-    done < "$TMP_MATCHED"
-  } > "$TMP_REPORT" || exit 1
-  
-  {
-    printf 'source=auto-rules\n'
-    printf 'updated_at=%s\n' "$GENERATED_AT"
-    printf 'version=%s\n' "${MODULE_VERSION:-unknown}"
-    printf 'mode=rule-driven\n'
-    printf 'status=%s\n' "$MATCH_STATUS"
-    printf 'reason=%s\n' "$MATCH_REASON"
-    printf 'confidence=%s\n' "$MATCH_CONFIDENCE"
-    printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
-    printf 'default_total=%s\n' "${DEFAULT_TOTAL:-0}"
-    printf 'background_default_total=%s\n' "${BACKGROUND_DEFAULT_TOTAL:-0}"
-  } > "$TMP_SOURCE" || return 1
-}
-
-rule_emit_commit() {
-  mv -f "$TMP_OUTPUT" "$OUTPUT_FILE" || exit 1
-  mv -f "$TMP_MATCHED" "$MATCHED_FILE" || exit 1
-  mv -f "$TMP_REPORT" "$REPORT_FILE" || exit 1
-  mv -f "$TMP_SOURCE" "$SOURCE_FILE" || exit 1
-  trap - EXIT HUP INT TERM
-  chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$VALUES_FILE" "$RULES_FILE" "$SEEN_PROPS" 2>/dev/null || true
-  rm -f "$VALUES_FILE" "$SEEN_PROPS" 2>/dev/null || true
-  
-  return 0
-}
-
-rule_resolve_captured_values || exit 1
+: > "$VALUES_FILE" || exit 1
+if [ -s "$CAPTURED_FILE" ]; then
+  awk '
+    BEGIN { bom = sprintf("%c%c%c", 239, 187, 191) }
+    NR == 1 { sub("^" bom, "") }
+    {
+      sub(/\r$/, "")
+      line = $0
+      if (line ~ /^\[[^]]*\]: \[.*\]$/) {
+        sub(/^\[/, "", line)
+        sub(/\]: \[/, "=", line)
+        sub(/\]$/, "", line)
+        print line
+      } else if (line ~ /^[^=#][^=]*=/) {
+        print line
+      }
+    }
+  ' "$CAPTURED_FILE" > "$VALUES_FILE" || exit 1
+fi
 
 [ -s "$BUILT_RULES_FILE" ] || exit 1
 if [ "$BUILT_RULES_FILE" != "$RULES_FILE" ]; then
@@ -287,8 +221,6 @@ if [ "$BUILT_RULES_FILE" != "$RULES_FILE" ]; then
 fi
 
 [ -s "$RULES_FILE" ] || exit 1
-rule_validate_tsv "$RULES_FILE" || exit 1
-rule_validate_policy "$PROP_POLICY_FILE" || exit 1
 
 CAPTURED_TOTAL=$(grep -c '=' "$VALUES_FILE" 2>/dev/null | tr -d ' ')
 MATCHED_TOTAL=0
@@ -305,7 +237,13 @@ MATCH_CONFIDENCE=high
 : > "$TMP_MATCHED" || exit 1
 : > "$TMP_OUTPUT" || exit 1
 
-rule_emit_header || exit 1
+{
+  printf '# Dex2oat Lock 生成的 system.prop\n'
+  printf '# generated_at=%s\n' "$GENERATED_AT"
+  printf '# mode=rule-driven\n'
+  printf '# version=%s\n' "${MODULE_VERSION:-unknown}"
+  printf '\n'
+} >> "$TMP_OUTPUT"
 
 : > "$SEEN_PROPS" || exit 1
 
@@ -367,13 +305,14 @@ while IFS="$RULE_FIELD_SEP" read -r RULE_ID RULE_LABEL RULE_PROP RULE_ENABLED RU
     fi
     MATCHED_TOTAL=$((MATCHED_TOTAL + 1))
   elif [ "$RULE_ENABLED" = "true" ]; then
-    DEFAULT_TOTAL=$((DEFAULT_TOTAL + 1))
-    if [ -n "$RULE_DEFAULT" ] && is_valid_prop_value "$RULE_DEFAULT" && is_value_allowed "$RULE_DEFAULT" "$RULE_VALUES"; then
+    if [ -n "$RULE_DEFAULT" ]; then
       FINAL_VALUE="$RULE_DEFAULT"
-      FINAL_SOURCE=captured-default
     else
-      INVALID_TOTAL=$((INVALID_TOTAL + 1))
+      FINAL_VALUE="$FALLBACK_VALUE"
     fi
+    FINAL_SOURCE=captured-default
+    DEFAULT_TOTAL=$((DEFAULT_TOTAL + 1))
+    MATCHED_TOTAL=$((MATCHED_TOTAL + 1))
   else
     DISABLED_TOTAL=$((DISABLED_TOTAL + 1))
   fi
@@ -433,5 +372,59 @@ else
   MATCH_CONFIDENCE=high
 fi
 
-rule_report_emit || exit 1
-rule_emit_commit
+{
+  printf 'generated_at=%s\n' "$GENERATED_AT"
+  printf 'mode=rule-driven\n'
+  printf 'schema_version=32\n'
+  printf 'status=%s\n' "$MATCH_STATUS"
+  printf 'reason=%s\n' "$MATCH_REASON"
+  printf 'confidence=%s\n' "$MATCH_CONFIDENCE"
+  printf 'captured_total=%s\n' "${CAPTURED_TOTAL:-0}"
+  printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
+  printf 'default_total=%s\n' "${DEFAULT_TOTAL:-0}"
+  printf 'disabled_total=%s\n' "${DISABLED_TOTAL:-0}"
+  printf 'fallback_total=%s\n' "${FALLBACK_TOTAL:-0}"
+  printf 'unmatched_total=%s\n' "${UNMATCHED_TOTAL:-0}"
+  printf 'skipped_duplicate_total=%s\n' "${SKIPPED_DUP_TOTAL:-0}"
+  printf 'invalid_total=%s\n' "${INVALID_TOTAL:-0}"
+  printf 'background_default_total=%s\n' "${BACKGROUND_DEFAULT_TOTAL:-0}"
+  printf 'resolver=rule-props-tsv\n'
+  printf 'generated_system_prop=%s\n' "$OUTPUT_FILE"
+  printf '[diff]\n'
+  while IFS='=' read -r DIFF_KEY DIFF_VALUE || [ -n "$DIFF_KEY" ]; do
+    [ -z "$DIFF_KEY" ] && continue
+    ORIGINAL_LINE=""
+    [ -n "$ORIGINAL_PROPS" ] && [ -f "$ORIGINAL_PROPS" ] && ORIGINAL_LINE="$(grep -F -m 1 "$DIFF_KEY=" "$ORIGINAL_PROPS" 2>/dev/null)"
+    if [ -n "$ORIGINAL_LINE" ]; then
+      ORIGINAL_VALUE="${ORIGINAL_LINE#*=}"
+    elif [ -n "$ORIGINAL_PROPS" ] && [ -f "$ORIGINAL_PROPS" ] && grep -F -x -q "@unset:$DIFF_KEY" "$ORIGINAL_PROPS" 2>/dev/null; then
+      ORIGINAL_VALUE="<unset>"
+    else
+      ORIGINAL_VALUE="<unknown>"
+    fi
+    printf '%s: %s -> %s\n' "$DIFF_KEY" "$ORIGINAL_VALUE" "$DIFF_VALUE"
+  done < "$TMP_MATCHED"
+} > "$TMP_REPORT" || exit 1
+
+{
+  printf 'source=auto-rules\n'
+  printf 'updated_at=%s\n' "$GENERATED_AT"
+  printf 'version=%s\n' "${MODULE_VERSION:-unknown}"
+  printf 'mode=rule-driven\n'
+  printf 'status=%s\n' "$MATCH_STATUS"
+  printf 'reason=%s\n' "$MATCH_REASON"
+  printf 'confidence=%s\n' "$MATCH_CONFIDENCE"
+  printf 'matched_total=%s\n' "${MATCHED_TOTAL:-0}"
+  printf 'default_total=%s\n' "${DEFAULT_TOTAL:-0}"
+  printf 'background_default_total=%s\n' "${BACKGROUND_DEFAULT_TOTAL:-0}"
+} > "$TMP_SOURCE" || exit 1
+
+mv -f "$TMP_OUTPUT" "$OUTPUT_FILE" || exit 1
+mv -f "$TMP_MATCHED" "$MATCHED_FILE" || exit 1
+mv -f "$TMP_REPORT" "$REPORT_FILE" || exit 1
+mv -f "$TMP_SOURCE" "$SOURCE_FILE" || exit 1
+trap - EXIT HUP INT TERM
+chmod 0600 "$OUTPUT_FILE" "$MATCHED_FILE" "$REPORT_FILE" "$SOURCE_FILE" "$VALUES_FILE" "$RULES_FILE" "$SEEN_PROPS" 2>/dev/null || true
+rm -f "$VALUES_FILE" "$SEEN_PROPS" 2>/dev/null || true
+
+exit 0

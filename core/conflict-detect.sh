@@ -4,10 +4,10 @@ MODDIR="$1"
 [ -n "$MODDIR" ] || MODDIR=${0%/*}/..
 
 STATE_DIR=${STATE_DIR:-/data/adb/dex2oat-lock}
+MODULES_ROOT=${DEX2OAT_MODULES_ROOT:-/data/adb/modules}
 REPORT_FILE="$STATE_DIR/conflict-report.txt"
 STATE_FILE="$STATE_DIR/state.prop"
 PROP_FILE="$MODDIR/system.prop"
-MODULES_ROOT=${DEX2OAT_MODULES_ROOT:-/data/adb/modules}
 TMP_FILE="$STATE_DIR/conflict-report.$$.items.tmp"
 MANAGED_FILE="$STATE_DIR/conflict-managed.$$.tmp"
 REPORT_TMP="$STATE_DIR/conflict-report.$$.tmp"
@@ -17,7 +17,6 @@ SCAN_REASON=passed
 SCAN_MODULE_TOTAL=0
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
-[ ! -L "$STATE_DIR" ] && [ ! -L "$REPORT_FILE" ] && [ ! -L "$TMP_FILE" ] && [ ! -L "$MANAGED_FILE" ] && [ ! -L "$REPORT_TMP" ] || exit 1
 
 cleanup_conflict_scan() {
   rm -f "$TMP_FILE" "$MANAGED_FILE" "$REPORT_TMP" 2>/dev/null || true
@@ -69,11 +68,6 @@ scan_prop_conflicts() {
   ' "$MANAGED_FILE" "$SCAN_OTHER_PROP"
 }
 
-module_skip_conflict_scan() {
-  SCAN_MODDIR="$1"
-  [ -e "$SCAN_MODDIR/disable" ] || [ -e "$SCAN_MODDIR/remove" ]
-}
-
 if [ -s "$PROP_FILE" ]; then
   while IFS= read -r PROP_LINE || [ -n "$PROP_LINE" ]; do
     case "$PROP_LINE" in
@@ -98,7 +92,8 @@ if [ -s "$MANAGED_FILE" ]; then
     [ "$OTHER_MODDIR" = "$MODDIR" ] && continue
     OTHER_MODULE="${OTHER_MODDIR##*/}"
     [ "$OTHER_MODULE" = "dex2oat-lock" ] && continue
-    module_skip_conflict_scan "$OTHER_MODDIR" && continue
+    [ -e "$OTHER_MODDIR/disable" ] && continue
+    [ -e "$OTHER_MODDIR/remove" ] && continue
 
     SCAN_MODULE_TOTAL=$((SCAN_MODULE_TOTAL + 1))
     scan_prop_conflicts "$OTHER_PROP" "$OTHER_MODULE" >> "$TMP_FILE" 2>/dev/null || {
