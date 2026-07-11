@@ -3,5 +3,5 @@ name=Dex2oat Lock
 version=v6.0
 versionCode=600
 author=pakhozako
-description=规则驱动 ART / dexopt 调优 | 状态=正常
+description=规则驱动的 ART / dexopt 属性匹配、冲突过滤与差异应用
 updateJson=https://raw.githubusercontent.com/pakhozako/dex2oat/main/update.json

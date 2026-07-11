@@ -6,195 +6,79 @@ dex_now() {
   date '+%Y-%m-%d %H:%M:%S'
 }
 
+dex_epoch() {
+  date '+%s' 2>/dev/null || printf '0\n'
+}
+
+dex_boot_id() {
+  cat /proc/sys/kernel/random/boot_id 2>/dev/null
+}
+
 dex_rotate_log() {
-  LOG_PATH="$1"
-  MAX_SIZE="${2:-262144}"
-  [ -f "$LOG_PATH" ] || return 0
-  LOG_SIZE="$(wc -c < "$LOG_PATH" 2>/dev/null | tr -d ' ')"
-  [ "${LOG_SIZE:-0}" -gt "$MAX_SIZE" ] 2>/dev/null || return 0
-  mv -f "$LOG_PATH" "$LOG_PATH.1" 2>/dev/null || true
-  : > "$LOG_PATH" 2>/dev/null || true
-  chmod 0600 "$LOG_PATH" 2>/dev/null || true
+  DEX_LOG_PATH="$1"
+  DEX_LOG_MAX="${2:-262144}"
+  [ -f "$DEX_LOG_PATH" ] || return 0
+  DEX_LOG_SIZE="$(wc -c < "$DEX_LOG_PATH" 2>/dev/null | tr -d ' ')"
+  [ "${DEX_LOG_SIZE:-0}" -gt "$DEX_LOG_MAX" ] 2>/dev/null || return 0
+  mv -f "$DEX_LOG_PATH" "$DEX_LOG_PATH.1" 2>/dev/null || return 1
+  : > "$DEX_LOG_PATH" 2>/dev/null || return 1
+  chmod 0600 "$DEX_LOG_PATH" 2>/dev/null || true
 }
 
 dex_hash_file() {
-  TARGET_FILE="$1"
-  [ -s "$TARGET_FILE" ] || { printf 'missing\n'; return 0; }
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$TARGET_FILE" 2>/dev/null | awk '{print $1}'
-  elif command -v md5sum >/dev/null 2>&1; then
-    md5sum "$TARGET_FILE" 2>/dev/null | awk '{print $1}'
-  else
-    wc -c < "$TARGET_FILE" 2>/dev/null | tr -d ' '
-  fi
-}
-
-dex_normalize_value() {
-  printf '%s' "$1" | tr -d '\r'
+  DEX_HASH_TARGET="$1"
+  [ -f "$DEX_HASH_TARGET" ] || return 1
+  command -v sha256sum >/dev/null 2>&1 || return 1
+  DEX_HASH_VALUE="$(sha256sum "$DEX_HASH_TARGET" 2>/dev/null | awk '{print $1}')"
+  case "$DEX_HASH_VALUE" in
+    [0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]*)
+      [ "${#DEX_HASH_VALUE}" -eq 64 ] 2>/dev/null || return 1
+      printf '%s\n' "$DEX_HASH_VALUE"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 dex_valid_prop_key() {
   case "$1" in
     ""|*[!A-Za-z0-9_.-]*|.*|*.) return 1 ;;
+    *.*) return 0 ;;
   esac
-  return 0
-}
-
-dex_prepare_runtime_rules() {
-  RULES_DECODE_SCRIPT_ARG="$1"
-  RULES_PACK_FILE_ARG="$2"
-  RULES_OUTPUT_FILE_ARG="$3"
-
-  [ -f "$RULES_DECODE_SCRIPT_ARG" ] || return 1
-  [ -s "$RULES_PACK_FILE_ARG" ] || return 1
-  chmod 0755 "$RULES_DECODE_SCRIPT_ARG" 2>/dev/null || true
-  sh "$RULES_DECODE_SCRIPT_ARG" "$RULES_PACK_FILE_ARG" "$RULES_OUTPUT_FILE_ARG" || return 1
-  [ -s "$RULES_OUTPUT_FILE_ARG" ] || return 1
-  chmod 0600 "$RULES_OUTPUT_FILE_ARG" 2>/dev/null || true
-  return 0
-}
-
-dex_write_prop_lock_list() {
-  SOURCE_PROP_FILE="$1"
-  TARGET_LOCK_FILE="$2"
-  WRITE_MODE="${3:-atomic}"
-
-  case "$WRITE_MODE" in
-    direct)
-      : > "$TARGET_LOCK_FILE" 2>/dev/null || return 0
-      while IFS='=' read -r PROP_KEY PROP_VALUE || [ -n "$PROP_KEY" ]; do
-        PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
-        PROP_VALUE="$(dex_normalize_value "$PROP_VALUE")"
-        case "$PROP_KEY" in
-          ""|\#*) continue ;;
-        esac
-        printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$TARGET_LOCK_FILE" 2>/dev/null || true
-      done < "$SOURCE_PROP_FILE"
-      chmod 0600 "$TARGET_LOCK_FILE" 2>/dev/null || true
-      return 0
-      ;;
-    atomic)
-      [ -s "$SOURCE_PROP_FILE" ] || return 1
-      TMP_LOCK_FILE="$TARGET_LOCK_FILE.tmp.$$"
-      : > "$TMP_LOCK_FILE" 2>/dev/null || return 1
-      while IFS='=' read -r PROP_KEY PROP_VALUE; do
-        PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
-        PROP_VALUE="$(dex_normalize_value "$PROP_VALUE")"
-        case "$PROP_KEY" in
-          ""|\#*) continue ;;
-        esac
-        printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$TMP_LOCK_FILE" 2>/dev/null || {
-          rm -f "$TMP_LOCK_FILE" 2>/dev/null || true
-          return 1
-        }
-      done < "$SOURCE_PROP_FILE"
-      mv -f "$TMP_LOCK_FILE" "$TARGET_LOCK_FILE" 2>/dev/null || {
-        rm -f "$TMP_LOCK_FILE" 2>/dev/null || true
-        return 1
-      }
-      chmod 0600 "$TARGET_LOCK_FILE" 2>/dev/null || true
-      return 0
-      ;;
-    atomic-final)
-      [ -s "$SOURCE_PROP_FILE" ] || return 1
-      TMP_LOCK_FILE="$TARGET_LOCK_FILE.tmp.$$"
-      : > "$TMP_LOCK_FILE" 2>/dev/null || return 1
-      while IFS='=' read -r PROP_KEY PROP_VALUE || [ -n "$PROP_KEY" ]; do
-        PROP_KEY="$(printf '%s' "$PROP_KEY" | tr -d '\r' | sed 's/[[:space:]]*$//')"
-        PROP_VALUE="$(dex_normalize_value "$PROP_VALUE")"
-        case "$PROP_KEY" in
-          ""|\#*) continue ;;
-        esac
-        printf '%s=%s\n' "$PROP_KEY" "$PROP_VALUE" >> "$TMP_LOCK_FILE" 2>/dev/null || {
-          rm -f "$TMP_LOCK_FILE" 2>/dev/null || true
-          return 1
-        }
-      done < "$SOURCE_PROP_FILE"
-      mv -f "$TMP_LOCK_FILE" "$TARGET_LOCK_FILE" 2>/dev/null || {
-        rm -f "$TMP_LOCK_FILE" 2>/dev/null || true
-        return 1
-      }
-      chmod 0600 "$TARGET_LOCK_FILE" 2>/dev/null || true
-      return 0
-      ;;
-  esac
-
   return 1
 }
 
-dex_lock_now() {
-  date '+%s' 2>/dev/null || printf '0\n'
+dex_valid_prop_value() {
+  case "$1" in
+    *[!A-Za-z0-9_.,:/@%+*-]*) return 1 ;;
+  esac
+  return 0
 }
 
-dex_with_lock() {
-  (
-    LOCK_DIR="$1"
-    LOCK_TIMEOUT="${2:-10}"
-    LOCK_STALE_SECONDS="${DEX_LOCK_STALE_SECONDS:-300}"
-    shift 2
+dex_count_props() {
+  DEX_COUNT_FILE="$1"
+  [ -f "$DEX_COUNT_FILE" ] || { printf '0\n'; return 0; }
+  awk -F= '/^[A-Za-z0-9_.-]+=/ { count++ } END { print count + 0 }' "$DEX_COUNT_FILE" 2>/dev/null
+}
 
-    case "$LOCK_DIR" in
-      ""|"/"|"/data"|"/data/adb"|"$DEX2OAT_STATE_DIR")
-        return 125
-        ;;
-    esac
-
-    LOCK_PARENT="${LOCK_DIR%/*}"
-    [ "$LOCK_PARENT" != "$LOCK_DIR" ] && mkdir -p "$LOCK_PARENT" 2>/dev/null || true
-
-    dex_lock_pid_alive() {
-      [ -f "$LOCK_DIR/pid" ] || return 1
-      LOCK_PID="$(cat "$LOCK_DIR/pid" 2>/dev/null)"
-      case "$LOCK_PID" in
-        ""|*[!0-9]*) return 1 ;;
-      esac
-      [ -d "/proc/$LOCK_PID" ]
+dex_validate_prop_file() {
+  DEX_VALIDATE_FILE="$1"
+  [ -f "$DEX_VALIDATE_FILE" ] || return 1
+  awk -F= '
+    /^[[:space:]]*($|#)/ { next }
+    index($0, "=") == 0 { invalid = 1; next }
+    {
+      key = $1
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      sub(/\r$/, "", value)
+      if (key == "" || key !~ /^[A-Za-z0-9_.-]+$/ || key !~ /\./ || key ~ /^\./ || key ~ /\.$/) invalid = 1
+      if (value ~ /[^-A-Za-z0-9_.,:\/@%+*]/) invalid = 1
+      if (seen[key]++) invalid = 1
     }
-
-    dex_lock_age() {
-      [ -f "$LOCK_DIR/created_at" ] || { printf '0\n'; return 0; }
-      LOCK_CREATED="$(cat "$LOCK_DIR/created_at" 2>/dev/null)"
-      LOCK_NOW="$(dex_lock_now)"
-      case "$LOCK_CREATED:$LOCK_NOW" in
-        *[!0-9:]*|:*) printf '0\n' ;;
-        *) printf '%s\n' $((LOCK_NOW - LOCK_CREATED)) ;;
-      esac
-    }
-
-    dex_release_lock() {
-      if [ -f "$LOCK_DIR/pid" ] && [ "$(cat "$LOCK_DIR/pid" 2>/dev/null)" = "$$" ]; then
-        rm -f "$LOCK_DIR/pid" "$LOCK_DIR/created_at" 2>/dev/null || true
-        rmdir "$LOCK_DIR" 2>/dev/null || true
-      fi
-    }
-
-    LOCK_WAIT=0
-    while ! mkdir "$LOCK_DIR" 2>/dev/null; do
-      if ! dex_lock_pid_alive; then
-        rm -rf "$LOCK_DIR" 2>/dev/null || true
-        continue
-      fi
-      LOCK_AGE="$(dex_lock_age)"
-      if [ "${LOCK_AGE:-0}" -gt "$LOCK_STALE_SECONDS" ] 2>/dev/null; then
-        rm -rf "$LOCK_DIR" 2>/dev/null || true
-        continue
-      fi
-      if [ "$LOCK_WAIT" -ge "$LOCK_TIMEOUT" ] 2>/dev/null; then
-        return 124
-      fi
-      sleep 1
-      LOCK_WAIT=$((LOCK_WAIT + 1))
-    done
-
-    printf '%s\n' "$$" > "$LOCK_DIR/pid" 2>/dev/null || true
-    dex_lock_now > "$LOCK_DIR/created_at" 2>/dev/null || true
-    trap 'dex_release_lock' 0 HUP INT TERM
-    "$@"
-    LOCK_CODE=$?
-    dex_release_lock
-    trap - 0 HUP INT TERM
-    return "$LOCK_CODE"
-  )
+    END { exit invalid ? 1 : 0 }
+  ' "$DEX_VALIDATE_FILE"
 }
 
 dex_detect_platform() {
@@ -221,57 +105,111 @@ dex_platform_version() {
   fi
 }
 
-dex_platform_version_code() {
-  if [ -n "$KSU_VER_CODE" ]; then
-    printf '%s' "$KSU_VER_CODE"
-  elif [ -n "$APATCH_VER_CODE" ]; then
-    printf '%s' "$APATCH_VER_CODE"
-  elif [ -n "$MAGISK_VER_CODE" ]; then
-    printf '%s' "$MAGISK_VER_CODE"
-  else
-    printf '0'
-  fi
-}
-
-dex_platform_info() {
-  PLATFORM="$(dex_detect_platform)"
-  VERSION="$(dex_platform_version)"
-  VERSION_CODE="$(dex_platform_version_code)"
-  EXTRA_INFO=""
-  [ -n "$KSU_RUNTIME_MODE" ] && EXTRA_INFO=", mode: $KSU_RUNTIME_MODE"
-  if [ "$VERSION_CODE" != "0" ]; then
-    printf '%s %s (code: %s%s)' "$PLATFORM" "$VERSION" "$VERSION_CODE" "$EXTRA_INFO"
-  elif [ -n "$EXTRA_INFO" ]; then
-    printf '%s %s (%s)' "$PLATFORM" "$VERSION" "${EXTRA_INFO#, }"
-  else
-    printf '%s %s' "$PLATFORM" "$VERSION"
-  fi
-}
-
-dex_has_resetprop() {
-  command -v resetprop >/dev/null 2>&1
-}
-
 dex_apply_prop() {
-  PROP_KEY="$1"
-  PROP_VALUE="$2"
+  DEX_PROP_KEY="$1"
+  DEX_PROP_VALUE="$2"
   DEX_PROP_APPLY_TOOL=setprop
 
-  if dex_has_resetprop; then
+  if command -v resetprop >/dev/null 2>&1; then
     DEX_PROP_APPLY_TOOL=resetprop
-    if resetprop -n "$PROP_KEY" "$PROP_VALUE" 2>/dev/null; then
+    if resetprop -n "$DEX_PROP_KEY" "$DEX_PROP_VALUE" 2>/dev/null; then
       return 0
     fi
     DEX_PROP_APPLY_TOOL=setprop-fallback
   fi
 
-  setprop "$PROP_KEY" "$PROP_VALUE" 2>/dev/null
+  setprop "$DEX_PROP_KEY" "$DEX_PROP_VALUE" 2>/dev/null
 }
 
-dex_prop_command() {
-  if dex_has_resetprop; then
-    printf 'resetprop'
-  else
-    printf 'setprop'
+dex_apply_checked_prop() {
+  DEX_CHECKED_PROP_KEY="$1"
+  DEX_CHECKED_PROP_VALUE="$2"
+  DEX_CHECKED_OLD_VALUE="$(getprop "$DEX_CHECKED_PROP_KEY")"
+  DEX_CHECKED_NEW_VALUE="$DEX_CHECKED_OLD_VALUE"
+  DEX_CHECKED_APPLY_CODE=0
+  DEX_CHECKED_APPLY_TOOL=none
+
+  if [ "$DEX_CHECKED_OLD_VALUE" = "$DEX_CHECKED_PROP_VALUE" ]; then
+    return 3
   fi
+
+  dex_apply_prop "$DEX_CHECKED_PROP_KEY" "$DEX_CHECKED_PROP_VALUE"
+  DEX_CHECKED_APPLY_CODE=$?
+  DEX_CHECKED_APPLY_TOOL="${DEX_PROP_APPLY_TOOL:-setprop}"
+  [ "$DEX_CHECKED_APPLY_CODE" -eq 0 ] 2>/dev/null || return 1
+
+  DEX_CHECKED_NEW_VALUE="$(getprop "$DEX_CHECKED_PROP_KEY")"
+  [ "$DEX_CHECKED_NEW_VALUE" = "$DEX_CHECKED_PROP_VALUE" ] || return 2
+  return 0
+}
+
+dex_lock_read() {
+  DEX_LOCK_PATH="$1"
+  [ -f "$DEX_LOCK_PATH/owner" ] || return 1
+  IFS='|' read -r DEX_LOCK_PID DEX_LOCK_BOOT DEX_LOCK_NAME DEX_LOCK_CREATED < "$DEX_LOCK_PATH/owner"
+  case "$DEX_LOCK_PID" in ""|*[!0-9]*) return 1 ;; esac
+  [ -n "$DEX_LOCK_BOOT" ] || return 1
+  [ -n "$DEX_LOCK_NAME" ] || return 1
+}
+
+dex_lock_remove() {
+  DEX_LOCK_PATH="$1"
+  rm -f "$DEX_LOCK_PATH/owner" "$DEX_LOCK_PATH"/owner.tmp.* 2>/dev/null || true
+  rmdir "$DEX_LOCK_PATH" 2>/dev/null
+}
+
+dex_lock_acquire() {
+  DEX_LOCK_PATH="$1"
+  DEX_LOCK_TIMEOUT="${2:-20}"
+  DEX_LOCK_REQUEST_NAME="${3:-operation}"
+  DEX_LOCK_WAIT=0
+  DEX_LOCK_EMPTY_WAIT=0
+  DEX_LOCK_CURRENT_BOOT="$(dex_boot_id)"
+  [ -n "$DEX_LOCK_CURRENT_BOOT" ] || DEX_LOCK_CURRENT_BOOT=unknown
+
+  mkdir -p "${DEX_LOCK_PATH%/*}" 2>/dev/null || return 1
+  while ! mkdir "$DEX_LOCK_PATH" 2>/dev/null; do
+    if dex_lock_read "$DEX_LOCK_PATH"; then
+      if [ "$DEX_LOCK_BOOT" != "$DEX_LOCK_CURRENT_BOOT" ] || [ ! -d "/proc/$DEX_LOCK_PID" ]; then
+        DEX_LOCK_SNAPSHOT="$DEX_LOCK_PID|$DEX_LOCK_BOOT|$DEX_LOCK_NAME|$DEX_LOCK_CREATED"
+        [ "$(cat "$DEX_LOCK_PATH/owner" 2>/dev/null)" = "$DEX_LOCK_SNAPSHOT" ] && dex_lock_remove "$DEX_LOCK_PATH"
+        continue
+      fi
+      DEX_LOCK_EMPTY_WAIT=0
+    else
+      DEX_LOCK_EMPTY_WAIT=$((DEX_LOCK_EMPTY_WAIT + 1))
+      if [ "$DEX_LOCK_EMPTY_WAIT" -ge 2 ] 2>/dev/null && [ ! -f "$DEX_LOCK_PATH/owner" ]; then
+        dex_lock_remove "$DEX_LOCK_PATH"
+        continue
+      fi
+    fi
+
+    [ "$DEX_LOCK_WAIT" -lt "$DEX_LOCK_TIMEOUT" ] 2>/dev/null || return 124
+    sleep 1
+    DEX_LOCK_WAIT=$((DEX_LOCK_WAIT + 1))
+  done
+
+  DEX_LOCK_TOKEN="$$|$DEX_LOCK_CURRENT_BOOT|$DEX_LOCK_REQUEST_NAME|$(dex_epoch)"
+  DEX_LOCK_TMP="$DEX_LOCK_PATH/owner.tmp.$$"
+  printf '%s\n' "$DEX_LOCK_TOKEN" > "$DEX_LOCK_TMP" 2>/dev/null || {
+    dex_lock_remove "$DEX_LOCK_PATH"
+    return 1
+  }
+  mv -f "$DEX_LOCK_TMP" "$DEX_LOCK_PATH/owner" 2>/dev/null || {
+    dex_lock_remove "$DEX_LOCK_PATH"
+    return 1
+  }
+  chmod 0600 "$DEX_LOCK_PATH/owner" 2>/dev/null || true
+  DEX_ACTIVE_LOCK_PATH="$DEX_LOCK_PATH"
+  DEX_ACTIVE_LOCK_TOKEN="$DEX_LOCK_TOKEN"
+  return 0
+}
+
+dex_lock_release() {
+  [ -n "$DEX_ACTIVE_LOCK_PATH" ] || return 0
+  if [ "$(cat "$DEX_ACTIVE_LOCK_PATH/owner" 2>/dev/null)" = "$DEX_ACTIVE_LOCK_TOKEN" ]; then
+    dex_lock_remove "$DEX_ACTIVE_LOCK_PATH" || true
+  fi
+  DEX_ACTIVE_LOCK_PATH=""
+  DEX_ACTIVE_LOCK_TOKEN=""
 }

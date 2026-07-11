@@ -6,6 +6,7 @@ OUTPUT_FILE="$2"
 [ -n "$SOURCE_FILE" ] || exit 1
 [ -n "$OUTPUT_FILE" ] || exit 1
 [ -s "$SOURCE_FILE" ] || exit 1
+command -v sha256sum >/dev/null 2>&1 || exit 1
 
 OUTPUT_DIR="${OUTPUT_FILE%/*}"
 [ "$OUTPUT_DIR" = "$OUTPUT_FILE" ] || mkdir -p "$OUTPUT_DIR" 2>/dev/null || exit 1
@@ -74,10 +75,11 @@ LC_ALL=C awk '
 ' "$SOURCE_FILE" > "$TMP_FILE" || exit 1
 
 EXPECTED_HASH="$(sed -n 's/^sha256=//p' "$SOURCE_FILE" 2>/dev/null | head -n 1)"
-if [ -n "$EXPECTED_HASH" ] && command -v sha256sum >/dev/null 2>&1; then
-  ACTUAL_HASH="$(sha256sum "$TMP_FILE" 2>/dev/null | awk '{print $1}')"
-  [ "$EXPECTED_HASH" = "$ACTUAL_HASH" ] || exit 1
-fi
+case "$EXPECTED_HASH" in ""|*[!0-9A-Fa-f]*) exit 1 ;; esac
+[ "${#EXPECTED_HASH}" -eq 64 ] 2>/dev/null || exit 1
+ACTUAL_HASH="$(sha256sum "$TMP_FILE" 2>/dev/null | awk '{print $1}')"
+[ -n "$ACTUAL_HASH" ] || exit 1
+[ "$EXPECTED_HASH" = "$ACTUAL_HASH" ] || exit 1
 
 mv -f "$TMP_FILE" "$OUTPUT_FILE" || exit 1
 chmod 0600 "$OUTPUT_FILE" 2>/dev/null || true
