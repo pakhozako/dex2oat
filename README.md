@@ -14,34 +14,6 @@ Android 版本、厂商 ROM 和 Root 实现对 ART / dexopt 属性的支持并�
 
 Dex2oat Lock 采用规则驱动流程：先验证规则包，再采集规则涉及的设备属性，根据允许值、默认值和共享策略生成候选配置，最后扫描其他活动模块并移除冲突项。整个流程失败时不会提交未验证的候选配置。
 
-## 🧭 v6.1 架构
-
-```text
-update-binary
-    └─ customize.sh
-       ├─ 规则包 SHA256 与 TSV schema 校验
-       ├─ 设备属性采集
-       ├─ 规则解析与候选 system.prop 生成
-       ├─ 活动模块冲突过滤
-       └─ 校验后原子替换最终 system.prop
-
-service.sh
-    ├─ 有界等待 Android 启动完成
-    ├─ 读取最终 system.prop
-    └─ 只写入当前值不同的属性
-
-action.sh
-    ├─ 状态与健康摘要
-    ├─ 只读规则预演
-    ├─ 重新匹配与冲突过滤
-    └─ 手动差异应用
-
-uninstall.sh
-    └─ 停止活动服务并清理模块状态
-```
-
-公共逻辑集中在 `core/`：`common.sh` 提供哈希、属性校验、差异写入和有界锁；`rule-engine.sh` 编排规则流水线；`conflict-detect.sh` 负责冲突过滤；`runtime.sh` 负责运行时应用与状态记录。
-
 ## 🔧 主要功能
 
 ### 规则包校验与规则解析
@@ -108,19 +80,3 @@ sh action.sh all
 本模块需要 Root 权限，修改 ART / dexopt 属性可能影响应用安装、后台编译、功耗和系统稳定性。安装前应备份重要数据，并确认能够通过模块管理器禁用或卸载模块。
 
 项目不会备份所谓“原始属性”。Android 模块属性不是需要在卸载时逐项回写的持久配置：卸载模块并重启后，其 `system.prop` 不再参与加载。
-
-## 🧪 验证与构建
-
-在已安装 WSL、Dash 和 BusyBox 的开发环境中运行回归测试：
-
-```powershell
-wsl.exe -- bash -lc 'cd /mnt/d/1/dex2oat-publish-fresh && bash tests/run.sh'
-```
-
-使用无第三方依赖的 PowerShell 构建脚本生成正式包：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/build.ps1
-```
-
-构建使用明确的运行文件白名单、固定 ZIP 时间戳和稳定文件顺序。发布包不包含 Markdown、测试或构建工具。
