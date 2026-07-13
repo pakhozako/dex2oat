@@ -52,7 +52,10 @@ health_summary() {
   fi
   case "$(report_value status "$RUNTIME_STATUS" pending)" in
     error) printf '%s' "异常（运行时应用失败）" ;;
-    *) printf '%s' "正常" ;;
+    warning) printf '%s' "警告（运行时状态需要处理）" ;;
+    pending) printf '%s' "待应用（等待系统启动）" ;;
+    ok) printf '%s' "正常" ;;
+    *) printf '%s' "待检查（运行时状态未知）" ;;
   esac
 }
 

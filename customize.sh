@@ -147,4 +147,5 @@ install_log "- 安装耗时: ${INSTALL_SECONDS}s"
 
 install_cleanup
 trap - HUP INT TERM
-exit 0
+# Module managers source this file and must continue their installer cleanup.
+return 0 2>/dev/null || exit 0

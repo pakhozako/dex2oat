@@ -8,17 +8,20 @@ RULES_FILE="$2"
 
 OUTPUT_DIR="${OUTPUT_FILE%/*}"
 TMP_FILE="$OUTPUT_FILE.tmp.$$"
+RAW_FILE="$OUTPUT_FILE.getprop.$$"
 GETPROP=/system/bin/getprop
 [ -x "$GETPROP" ] || GETPROP=getprop
 
 cleanup_capture() {
-  rm -f "$TMP_FILE" 2>/dev/null || true
+  rm -f "$TMP_FILE" "$RAW_FILE" 2>/dev/null || true
 }
 trap 'cleanup_capture' EXIT HUP INT TERM
 
 [ "$OUTPUT_DIR" = "$OUTPUT_FILE" ] || mkdir -p "$OUTPUT_DIR" 2>/dev/null || exit 1
 
-"$GETPROP" | awk -v rules="$RULES_FILE" '
+"$GETPROP" > "$RAW_FILE" || exit 1
+
+awk -v rules="$RULES_FILE" '
   BEGIN {
     FS = "\t"
     while ((getline line < rules) > 0) {
@@ -40,7 +43,7 @@ trap 'cleanup_capture' EXIT HUP INT TERM
     sub(/=.*/, "", key)
     if (wanted[key]) print
   }
-' > "$TMP_FILE" || exit 1
+' "$RAW_FILE" > "$TMP_FILE" || exit 1
 
 mv -f "$TMP_FILE" "$OUTPUT_FILE" || exit 1
 chmod 0600 "$OUTPUT_FILE" 2>/dev/null || true

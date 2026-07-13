@@ -1,6 +1,6 @@
 {
-  "version": "v6.0",
-  "versionCode": 600,
-  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/6.0/dex2oat-lock-v6.0-release.zip",
+  "version": "v6.1",
+  "versionCode": 610,
+  "zipUrl": "https://github.com/pakhozako/dex2oat/releases/download/6.1/dex2oat-lock-v6.1-release.zip",
   "changelog": "https://raw.githubusercontent.com/pakhozako/dex2oat/main/RELEASE_NOTES.md"
 }
